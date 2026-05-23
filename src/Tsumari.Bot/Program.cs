@@ -39,7 +39,12 @@ namespace Tsumari.Bot
                 DefaultRunMode = RunMode.Async
             };
             builder.Services.AddSingleton(interactionConfig);
-            builder.Services.AddSingleton<InteractionService>();
+            // Explicitly construct it using the registered DiscordSocketClient instance
+            builder.Services.AddSingleton<InteractionService>(provider =>
+                new InteractionService(
+                    provider.GetRequiredService<DiscordSocketClient>(),
+                    provider.GetRequiredService<InteractionServiceConfig>()
+                ));
 
             // Register Custom services
             builder.Services.AddSingleton<DatabaseService>();
