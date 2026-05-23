@@ -28,7 +28,8 @@ E:\Development\Tsumari\
 │   ├── database.md         # Database schema & WAL mode guide
 │   ├── routing.md          # Multi-master routing engine logic
 │   ├── resiliency.md       # Circuit breaker & retry implementation
-│   └── media.md            # Expiring CDN re-upload layer details
+│   ├── media.md            # Expiring CDN re-upload layer details
+│   └── examples.md         # Chat interface visual examples
 ├── src/
 │   └── Tsumari.Bot/        # Bot application project (.NET 10 Worker)
 │       ├── Program.cs      # Host bootstrap & DI setup
@@ -106,3 +107,4 @@ For in-depth guides on Tsumari's architecture, review the files in the `docs` di
 2.  [Routing Engine Logic](docs/routing.md): Master-to-local and local-to-master (match and mismatch) flow diagrams.
 3.  [Resiliency & Circuit Breakers](docs/resiliency.md): Retry state machine and exponential backoff configuration.
 4.  [Media Mirroring Layer](docs/media.md): CDN downloads and stream memory footprint optimizations.
+5.  [Chat Interface & Live Examples](docs/examples.md): Visual representations of Discord message formatting under all workflows.
