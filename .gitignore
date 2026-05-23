@@ -1,0 +1,22 @@
+# .NET build directories
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+.vs/
+.vscode/
+
+# SQLite databases & temp journals
+*.db
+*.db-wal
+*.db-shm
+
+# User configurations / secrets
+appsettings.json
+appsettings.Development.json
+*.user
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
