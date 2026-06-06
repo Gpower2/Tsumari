@@ -1,4 +1,9 @@
 using System;
+using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using DeepL;
 using Microsoft.Extensions.Configuration;
@@ -6,12 +11,25 @@ using Microsoft.Extensions.Logging;
 
 namespace Tsumari.Bot.Services
 {
+    public enum TranslationProvider
+    {
+        DeepL,
+        Ollama,
+        OpenAI
+    }
+
     public class TranslationService
     {
         private readonly DatabaseService _dbService;
         private readonly ILogger<TranslationService> _logger;
         private readonly Translator? _translator;
         private readonly ResiliencyHelper _resiliencyHelper;
+        private readonly HttpClient _httpClient;
+        
+        private readonly TranslationProvider _provider;
+        private readonly string? _llmUrl;
+        private readonly string? _llmModel;
+        private readonly string? _llmApiKey;
         
         public const int MonthlyCharacterLimit = 500000;
 
@@ -19,12 +37,14 @@ namespace Tsumari.Bot.Services
             IConfiguration configuration,
             DatabaseService dbService,
             ILogger<TranslationService> logger,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            HttpClient httpClient)
         {
             _dbService = dbService;
             _logger = logger;
+            _httpClient = httpClient;
 
-            // Instantiate ResiliencyHelper specifically for DeepL API operations
+            // Instantiate ResiliencyHelper specifically for external translation calls
             _resiliencyHelper = new ResiliencyHelper(
                 failureThreshold: 3,
                 breakDuration: TimeSpan.FromSeconds(30),
@@ -33,41 +53,67 @@ namespace Tsumari.Bot.Services
                 logger: loggerFactory.CreateLogger<ResiliencyHelper>()
             );
 
-            var apiKey = configuration["DeepL:ApiKey"] ?? configuration["DeepLKey"];
-            if (string.IsNullOrWhiteSpace(apiKey))
+            // Parse translation provider
+            var providerString = configuration["Translation:Provider"] ?? "DeepL";
+            if (Enum.TryParse<TranslationProvider>(providerString, true, out var parsedProvider))
             {
-                _logger.LogCritical("DeepL API Key is missing! Bot will not be able to perform translations.");
-                return;
+                _provider = parsedProvider;
+            }
+            else
+            {
+                _provider = TranslationProvider.DeepL;
             }
 
-            try
+            _logger.LogInformation("Translation Service configured to use provider: {Provider}", _provider);
+
+            if (_provider == TranslationProvider.Ollama)
             {
-                var options = new TranslatorOptions();
-                
-                // Explicitly check for Free Tier suffix ':fx' as requested
-                if (apiKey.EndsWith(":fx", StringComparison.OrdinalIgnoreCase))
+                _llmUrl = configuration["Translation:Ollama:ApiUrl"] ?? "http://localhost:11434/api/generate";
+                _llmModel = configuration["Translation:Ollama:Model"] ?? "aya:8b";
+            }
+            else if (_provider == TranslationProvider.OpenAI)
+            {
+                _llmUrl = configuration["Translation:OpenAI:ApiUrl"] ?? "http://localhost:8080/v1/chat/completions";
+                _llmModel = configuration["Translation:OpenAI:Model"] ?? "mistral-7b";
+                _llmApiKey = configuration["Translation:OpenAI:ApiKey"] ?? "dummy";
+            }
+            else
+            {
+                // DeepL Initialization
+                var apiKey = configuration["DeepL:ApiKey"] ?? configuration["DeepLKey"];
+                if (string.IsNullOrWhiteSpace(apiKey))
                 {
-                    options.ServerUrl = "https://api-free.deepl.com";
-                    _logger.LogInformation("DeepL Key verified with ':fx' suffix. Hardcoded routing to 'https://api-free.deepl.com'.");
-                }
-                else
-                {
-                    options.ServerUrl = "https://api.deepl.com";
-                    _logger.LogInformation("DeepL Key parsed. Routing to 'https://api.deepl.com'.");
+                    _logger.LogCritical("DeepL API Key is missing! Bot will not be able to perform translations with DeepL.");
+                    return;
                 }
 
-                _translator = new Translator(apiKey, options);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to initialize DeepL Translator client.");
+                try
+                {
+                    var options = new TranslatorOptions();
+                    if (apiKey.EndsWith(":fx", StringComparison.OrdinalIgnoreCase))
+                    {
+                        options.ServerUrl = "https://api-free.deepl.com";
+                        _logger.LogInformation("DeepL Key verified with ':fx' suffix. Hardcoded routing to 'https://api-free.deepl.com'.");
+                    }
+                    else
+                    {
+                        options.ServerUrl = "https://api.deepl.com";
+                        _logger.LogInformation("DeepL Key parsed. Routing to 'https://api.deepl.com'.");
+                    }
+
+                    _translator = new Translator(apiKey, options);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to initialize DeepL Translator client.");
+                }
             }
         }
 
         /// <summary>
-        /// True if the translator is successfully configured and active.
+        /// True if the translator configuration is valid and active.
         /// </summary>
-        public bool IsActive => _translator != null;
+        public bool IsActive => _provider != TranslationProvider.DeepL || _translator != null;
 
         /// <summary>
         /// Evaluates if the current monthly usage allows translating the given character count.
@@ -87,7 +133,7 @@ namespace Tsumari.Bot.Services
                 return "EN"; // Default fallback
 
             if (!IsActive)
-                throw new InvalidOperationException("TranslationService is not active or missing API configuration.");
+                throw new InvalidOperationException("TranslationService is not active.");
 
             int charCount = text.Length;
 
@@ -100,9 +146,16 @@ namespace Tsumari.Bot.Services
 
             string code = await _resiliencyHelper.ExecuteAsync(async () =>
             {
-                // To detect language using standard DeepL .NET SDK, we translate to EN-US with sourceLanguage = null.
-                var response = await _translator!.TranslateTextAsync(text, null, "EN-US");
-                return response.DetectedSourceLanguageCode.ToUpperInvariant();
+                if (_provider == TranslationProvider.DeepL)
+                {
+                    var response = await _translator!.TranslateTextAsync(text, null, "EN-US");
+                    return response.DetectedSourceLanguageCode.ToUpperInvariant();
+                }
+                else
+                {
+                    // For local LLMs, we prompt the model to perform language detection
+                    return await DetectLanguageWithLLMAsync(text);
+                }
             });
 
             // Increment usage post success
@@ -123,12 +176,9 @@ namespace Tsumari.Bot.Services
                 return string.Empty;
 
             if (!IsActive)
-                throw new InvalidOperationException("TranslationService is not active or missing API configuration.");
+                throw new InvalidOperationException("TranslationService is not active.");
 
-            // Standardize language code format (e.g. DeepL expects EN-US, EN-GB or EN, EL, IT, etc.)
-            // DeepL expects target languages like "en-US", "el", "it". We will sanitize the inputs.
             string sanitizedTargetLang = SanitizeLanguageCode(targetLanguageCode);
-
             int charCount = text.Length;
 
             // Character quota guard check
@@ -140,8 +190,15 @@ namespace Tsumari.Bot.Services
 
             string translatedResult = await _resiliencyHelper.ExecuteAsync(async () =>
             {
-                var response = await _translator!.TranslateTextAsync(text, null, sanitizedTargetLang);
-                return response.Text;
+                if (_provider == TranslationProvider.DeepL)
+                {
+                    var response = await _translator!.TranslateTextAsync(text, null, sanitizedTargetLang);
+                    return response.Text;
+                }
+                else
+                {
+                    return await TranslateTextWithLLMAsync(text, sanitizedTargetLang);
+                }
             });
 
             // Increment usage post success
@@ -150,12 +207,100 @@ namespace Tsumari.Bot.Services
             return translatedResult;
         }
 
+        private async Task<string> DetectLanguageWithLLMAsync(string text)
+        {
+            var systemPrompt = "You are a precise language detection tool. Detect the primary language of the user text. Return ONLY the ISO 639-1 two-letter code (e.g. EN, EL, IT, FR, DE, ES) in uppercase, with absolutely no formatting, notes, or conversational filler.";
+            var userPrompt = $"Text to detect:\n{text}";
+
+            var rawResult = await CallLLMApiAsync(systemPrompt, userPrompt);
+            var cleanResult = rawResult.Trim().ToUpperInvariant();
+            
+            // Clean up common LLM markdown output artifacts if present (e.g. "EN" instead of "**EN**")
+            cleanResult = cleanResult.Replace("*", "").Replace("`", "").Trim();
+            
+            if (cleanResult.Length > 2)
+            {
+                // Fallback to substring in case the model output had trailing whitespace/periods
+                cleanResult = cleanResult.Substring(0, 2);
+            }
+
+            return cleanResult.Length == 2 ? cleanResult : "EN";
+        }
+
+        private async Task<string> TranslateTextWithLLMAsync(string text, string targetLanguage)
+        {
+            var systemPrompt = $"You are a professional translator. Translate the user text into the target language code: {targetLanguage}. Maintain the original tone and markdown formatting. Return ONLY the translated text, with absolutely no explanation, notes, conversational filler, or introductory text.";
+            var userPrompt = $"Text to translate:\n{text}";
+
+            var result = await CallLLMApiAsync(systemPrompt, userPrompt);
+            
+            // Strip out any surrounding quotes that models sometimes add
+            var cleanResult = result.Trim();
+            if (cleanResult.StartsWith("\"") && cleanResult.EndsWith("\"") && cleanResult.Length > 2)
+            {
+                cleanResult = cleanResult.Substring(1, cleanResult.Length - 2).Trim();
+            }
+
+            return cleanResult;
+        }
+
+        private async Task<string> CallLLMApiAsync(string systemPrompt, string userPrompt)
+        {
+            if (_provider == TranslationProvider.Ollama)
+            {
+                // Ollama Generate API payload
+                var payload = new
+                {
+                    model = _llmModel,
+                    prompt = $"{systemPrompt}\n\n{userPrompt}",
+                    stream = false,
+                    options = new { temperature = 0.0 } // Low temperature for high precision
+                };
+
+                var requestContent = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(_llmUrl, requestContent);
+                response.EnsureSuccessStatusCode();
+
+                var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+                return jsonDoc.RootElement.GetProperty("response").GetString() ?? string.Empty;
+            }
+            else if (_provider == TranslationProvider.OpenAI)
+            {
+                // OpenAI-compatible Chat API payload
+                var payload = new
+                {
+                    model = _llmModel,
+                    messages = new[]
+                    {
+                        new { role = "system", content = systemPrompt },
+                        new { role = "user", content = userPrompt }
+                    },
+                    temperature = 0.0
+                };
+
+                var requestMessage = new HttpRequestMessage(HttpMethod.Post, _llmUrl)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+                };
+
+                if (!string.IsNullOrWhiteSpace(_llmApiKey))
+                {
+                    requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _llmApiKey);
+                }
+
+                var response = await _httpClient.SendAsync(requestMessage);
+                response.EnsureSuccessStatusCode();
+
+                var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+                return jsonDoc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? string.Empty;
+            }
+
+            throw new InvalidOperationException("Invalid LLM configuration.");
+        }
+
         private static string SanitizeLanguageCode(string code)
         {
             var clean = code.Trim().ToUpperInvariant();
-            
-            // Map simple 2-letter codes to DeepL specific targets if necessary
-            // E.g., EN -> EN-US, PT -> PT-PT (DeepL requires region details for some, others are simple like EL, IT)
             return clean switch
             {
                 "EN" => "EN-US",
