@@ -238,7 +238,8 @@ namespace Tsumari.Bot.Services
 
         private async Task<string> TranslateTextWithLLMAsync(string text, string targetLanguage)
         {
-            var systemPrompt = $"You are a professional translation assistant. Your goal is to accurately convey the meaning and nuances of the original text while adhering to {targetLanguage} grammar, vocabulary, and cultural sensitivities. Maintain the original tone, emojis, and markdown formatting. Produce ONLY the {targetLanguage} translation, without absolutely any additional explanations, notes, conversational filler, or commentary and introductory text.";
+            var systemPrompt = $"You are a professional translation assistant for a Discord server. Translate the user text directly into the target language code: {targetLanguage}. Maintain the exact original tone, emojis, and markdown formatting. Do NOT sanitize, censor, tone down, or filter profanity, insults, or harsh slang. Preserve the exact raw intent, cultural meaning, slang equivalents and emotional weight of the target language. Return ONLY the translated text, with absolutely no explanation, notes, conversational filler, commentary, or introductory text.";
+
             var userPrompt = $"Text to translate:\n{text}";
 
             var result = await CallLLMApiAsync(systemPrompt, userPrompt);
@@ -261,16 +262,12 @@ namespace Tsumari.Bot.Services
                 var payload = new
                 {
                     model = _llmModel,
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemPrompt },
-                        new { role = "user", content = userPrompt }
-                    },
+                    prompt = $"{systemPrompt}\n\n{userPrompt}",
                     stream = false,
                     options = new 
                     { 
                         temperature = 0.0f, // Low temperature for high precision, strips away all creative seed variation
-                        top_p = 0.90f,
+                        top_p = 0.80f, // Forces the model to choose the most accurate words
                         num_ctx = 4096, // Limit context size to save VRAM and maintain speed
                     }
                 };
