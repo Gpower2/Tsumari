@@ -9,7 +9,7 @@ namespace Tsumari.Bot.Services
     {
         DeepL,
         Ollama,
-        OpenAI
+        OpenAI,
     }
 
     public class TranslationService
@@ -111,11 +111,32 @@ namespace Tsumari.Bot.Services
 
         /// <summary>
         /// Evaluates if the current monthly usage allows translating the given character count.
+        /// This only applies to DeepL since local LLMs do not have a character quota
         /// </summary>
         public async Task<bool> CanTranslateAsync(int characterCount)
         {
-            var currentUsage = await _dbService.GetCurrentMonthUsageAsync();
-            return (currentUsage + characterCount) <= MonthlyCharacterLimit;
+            if (_provider == TranslationProvider.DeepL)
+            {
+                var currentUsage = await _dbService.GetCurrentMonthUsageAsync();
+                return (currentUsage + characterCount) <= MonthlyCharacterLimit;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Increments the monthly usage count by the specified character count. This should be called after a successful translation 
+        /// or detection operation to track usage against the quota. 
+        /// For local LLM providers, this method does not apply.
+        /// </summary>
+        /// <param name="charCount"></param>
+        /// <returns></returns>
+        public async Task IncrementTranslationUsageAsync(int charCount)
+        {
+            if (_provider == TranslationProvider.DeepL)
+            {
+                await _dbService.IncrementUsageAsync(charCount);
+            }
         }
 
         /// <summary>
@@ -153,7 +174,7 @@ namespace Tsumari.Bot.Services
             });
 
             // Increment usage post success
-            await _dbService.IncrementUsageAsync(charCount);
+            await IncrementTranslationUsageAsync(charCount);
 
             _logger.LogInformation("Language detected: '{Lang}' for text prefix '{Prefix}'", 
                 code, text.Substring(0, Math.Min(text.Length, 15)));
@@ -196,7 +217,7 @@ namespace Tsumari.Bot.Services
             });
 
             // Increment usage post success
-            await _dbService.IncrementUsageAsync(charCount);
+            await IncrementTranslationUsageAsync(charCount);
 
             return translatedResult;
         }
@@ -212,18 +233,12 @@ namespace Tsumari.Bot.Services
             // Clean up common LLM markdown output artifacts if present (e.g. "EN" instead of "**EN**")
             cleanResult = cleanResult.Replace("*", "").Replace("`", "").Trim();
             
-            if (cleanResult.Length > 2)
-            {
-                // Fallback to substring in case the model output had trailing whitespace/periods
-                cleanResult = cleanResult.Substring(0, 2);
-            }
-
-            return cleanResult.Length == 2 ? cleanResult : "EN";
+            return cleanResult;
         }
 
         private async Task<string> TranslateTextWithLLMAsync(string text, string targetLanguage)
         {
-            var systemPrompt = $"You are a professional translator. Translate the user text into the target language code: {targetLanguage}. Maintain the original tone and markdown formatting. Preserve the cultural meaning and slang equivalents of the target language. Return ONLY the translated text, with absolutely no explanation, notes, conversational filler, or introductory text.";
+            var systemPrompt = $"You are a professional translation assistant. Your goal is to accurately convey the meaning and nuances of the original text while adhering to {targetLanguage} grammar, vocabulary, and cultural sensitivities. Maintain the original tone, emojis, and markdown formatting. Produce ONLY the {targetLanguage} translation, without absolutely any additional explanations, notes, conversational filler, or commentary and introductory text.";
             var userPrompt = $"Text to translate:\n{text}";
 
             var result = await CallLLMApiAsync(systemPrompt, userPrompt);
@@ -246,11 +261,15 @@ namespace Tsumari.Bot.Services
                 var payload = new
                 {
                     model = _llmModel,
-                    prompt = $"{systemPrompt}\n\n{userPrompt}",
+                    messages = new[]
+                    {
+                        new { role = "system", content = systemPrompt },
+                        new { role = "user", content = userPrompt }
+                    },
                     stream = false,
                     options = new 
                     { 
-                        temperature = 0.1f, // Low temperature for high precision
+                        temperature = 0.0f, // Low temperature for high precision, strips away all creative seed variation
                         top_p = 0.90f,
                         num_ctx = 4096, // Limit context size to save VRAM and maintain speed
                     }

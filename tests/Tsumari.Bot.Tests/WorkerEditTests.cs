@@ -24,7 +24,7 @@ namespace Tsumari.Bot.Tests
             var channelMock = new Mock<IMessageChannel>();
             var userMsgMock = new Mock<IUserMessage>();
 
-            string capturedContent = null;
+            string? capturedContent = null;
 
             userMsgMock
                 .Setup(m => m.ModifyAsync(It.IsAny<Action<MessageProperties>>(), It.IsAny<RequestOptions?>()))
