@@ -1,13 +1,7 @@
-using System;
-using System.IO;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using DeepL;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 
 namespace Tsumari.Bot.Services
 {
@@ -24,7 +18,7 @@ namespace Tsumari.Bot.Services
         private readonly ILogger<TranslationService> _logger;
         private readonly Translator? _translator;
         private readonly ResiliencyHelper _resiliencyHelper;
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
         
         private readonly TranslationProvider _provider;
         private readonly string? _llmUrl;
@@ -38,11 +32,11 @@ namespace Tsumari.Bot.Services
             DatabaseService dbService,
             ILogger<TranslationService> logger,
             ILoggerFactory loggerFactory,
-            HttpClient httpClient)
+            IHttpClientFactory httpClientFactory)
         {
             _dbService = dbService;
             _logger = logger;
-            _httpClient = httpClient;
+            _httpClientFactory = httpClientFactory;
 
             // Instantiate ResiliencyHelper specifically for external translation calls
             _resiliencyHelper = new ResiliencyHelper(
@@ -229,14 +223,14 @@ namespace Tsumari.Bot.Services
 
         private async Task<string> TranslateTextWithLLMAsync(string text, string targetLanguage)
         {
-            var systemPrompt = $"You are a professional translator. Translate the user text into the target language code: {targetLanguage}. Maintain the original tone and markdown formatting. Return ONLY the translated text, with absolutely no explanation, notes, conversational filler, or introductory text.";
+            var systemPrompt = $"You are a professional translator. Translate the user text into the target language code: {targetLanguage}. Maintain the original tone and markdown formatting. Preserve the cultural meaning and slang equivalents of the target language. Return ONLY the translated text, with absolutely no explanation, notes, conversational filler, or introductory text.";
             var userPrompt = $"Text to translate:\n{text}";
 
             var result = await CallLLMApiAsync(systemPrompt, userPrompt);
             
             // Strip out any surrounding quotes that models sometimes add
             var cleanResult = result.Trim();
-            if (cleanResult.StartsWith("\"") && cleanResult.EndsWith("\"") && cleanResult.Length > 2)
+            if (cleanResult.StartsWith('\"') && cleanResult.EndsWith('\"') && cleanResult.Length > 2)
             {
                 cleanResult = cleanResult.Substring(1, cleanResult.Length - 2).Trim();
             }
@@ -254,14 +248,20 @@ namespace Tsumari.Bot.Services
                     model = _llmModel,
                     prompt = $"{systemPrompt}\n\n{userPrompt}",
                     stream = false,
-                    options = new { temperature = 0.0 } // Low temperature for high precision
+                    options = new 
+                    { 
+                        temperature = 0.1f, // Low temperature for high precision
+                        top_p = 0.90f,
+                        num_ctx = 4096, // Limit context size to save VRAM and maintain speed
+                    }
                 };
 
-                var requestContent = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync(_llmUrl, requestContent);
+                using var requestContent = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                using var httpClient = _httpClientFactory.CreateClient();
+                var response = await httpClient.PostAsync(_llmUrl, requestContent);
                 response.EnsureSuccessStatusCode();
 
-                var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+                using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
                 return jsonDoc.RootElement.GetProperty("response").GetString() ?? string.Empty;
             }
             else if (_provider == TranslationProvider.OpenAI)
@@ -278,7 +278,7 @@ namespace Tsumari.Bot.Services
                     temperature = 0.0
                 };
 
-                var requestMessage = new HttpRequestMessage(HttpMethod.Post, _llmUrl)
+                using var requestMessage = new HttpRequestMessage(HttpMethod.Post, _llmUrl)
                 {
                     Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
                 };
@@ -288,10 +288,11 @@ namespace Tsumari.Bot.Services
                     requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _llmApiKey);
                 }
 
-                var response = await _httpClient.SendAsync(requestMessage);
+                using var httpClient = _httpClientFactory.CreateClient();
+                var response = await httpClient.SendAsync(requestMessage);
                 response.EnsureSuccessStatusCode();
 
-                var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+                using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
                 return jsonDoc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? string.Empty;
             }
 

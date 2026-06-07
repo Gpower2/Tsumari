@@ -49,7 +49,7 @@ namespace Tsumari.Bot
             // Register Custom services
             builder.Services.AddSingleton<DatabaseService>();
             builder.Services.AddSingleton<TranslationService>();
-            builder.Services.AddSingleton<HttpClient>();
+            builder.Services.AddHttpClient();
 
             // Main Background Bot Service
             builder.Services.AddHostedService<Worker>();
