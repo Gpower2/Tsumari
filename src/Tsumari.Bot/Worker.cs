@@ -53,6 +53,7 @@ namespace Tsumari.Bot
             _client.Log += OnLogAsync;
             _client.Ready += OnReadyAsync;
             _client.MessageReceived += OnMessageReceivedAsync;
+            _client.MessageUpdated += OnMessageUpdatedAsync;
             _client.InteractionCreated += OnInteractionCreatedAsync;
 
             _interactionService.Log += OnLogAsync;
@@ -165,6 +166,114 @@ namespace Tsumari.Bot
             });
 
             return Task.CompletedTask;
+        }
+
+        private Task OnMessageUpdatedAsync(Cacheable<IMessage, ulong> beforeCache, SocketMessage after, ISocketMessageChannel channel)
+        {
+            // Only process user edits (ignore bot edits)
+            if (after is not SocketUserMessage message) return Task.CompletedTask;
+            if (message.Author.IsBot) return Task.CompletedTask;
+            if (message.Source != MessageSource.User) return Task.CompletedTask;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var beforeMsg = await beforeCache.GetOrDownloadAsync();
+                    var beforeContent = beforeMsg?.Content ?? string.Empty;
+                    var afterContent = message.Content ?? string.Empty;
+
+                    // If nothing changed in textual content, skip
+                    if (string.Equals(beforeContent, afterContent, StringComparison.Ordinal)) return;
+
+                    await ProcessEditedMessageAsync(message, beforeContent);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unhandled error handling edited message {MsgId}.", message.Id);
+                }
+            });
+
+            return Task.CompletedTask;
+        }
+
+        private async Task ProcessEditedMessageAsync(SocketUserMessage message, string previousContent)
+        {
+            try
+            {
+                var afterContent = message.Content ?? string.Empty;
+                string detectedLang = "EN";
+                if (!string.IsNullOrWhiteSpace(afterContent))
+                {
+                    try
+                    {
+                        detectedLang = await _translationService.DetectLanguageAsync(afterContent);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to detect language for edited message {MsgId}.", message.Id);
+                    }
+                }
+
+                // Determine author name for header
+                string authorName = message.Author.Username;
+                if (message.Author is IGuildUser guildUser)
+                {
+                    authorName = guildUser.Nickname ?? guildUser.GlobalName ?? guildUser.Username;
+                }
+
+                var mirrored = await _dbService.GetMirroredMessagesAsync(message.Id);
+                foreach (var link in mirrored)
+                {
+                    var mirroredId = link.MirroredMessageId;
+                    var chanId = link.ChannelId;
+
+                    try
+                    {
+                        var ch = await _client.GetChannelAsync(chanId) as IMessageChannel;
+                        if (ch == null) continue;
+
+                        var targetLang = await _dbService.GetTargetLanguageCodeAsync(chanId); // null for master channel
+                        string newText;
+
+                        if (targetLang == null || string.Equals(targetLang, detectedLang, StringComparison.OrdinalIgnoreCase))
+                        {
+                            newText = $"**{authorName}**:\n{afterContent}";
+                        }
+                        else
+                        {
+                            try
+                            {
+                                var translated = await _translationService.TranslateTextAsync(afterContent, targetLang);
+                                newText = $"**{authorName}** ({detectedLang.ToUpperInvariant()} to {targetLang.ToUpperInvariant()}):\n{translated}";
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Failed to retranslate edited message {MsgId} to {Lang}.", message.Id, targetLang);
+                                newText = $"**{authorName}**:\n{afterContent} *(Translation Failed)*";
+                            }
+                        }
+
+                        var fetched = await ch.GetMessageAsync(mirroredId);
+                        if (fetched is IUserMessage userMsg)
+                        {
+                            await userMsg.ModifyAsync(p => p.Content = newText);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Could not fetch mirrored IUserMessage {MirrorId} in channel {ChanId} for edited message.", mirroredId, chanId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error while updating mirrored message {MirrorId} for edited original {MsgId}.", mirroredId, message.Id);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled failure while processing edited message {MsgId}.", message.Id);
+            }
         }
 
         private async Task ProcessMessageRoutingPipelineAsync(SocketUserMessage message, bool hasAttachments)
