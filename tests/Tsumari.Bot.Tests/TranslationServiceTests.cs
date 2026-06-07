@@ -30,8 +30,9 @@ namespace Tsumari.Bot.Tests
 
             var transLogger = NullLogger<TranslationService>.Instance;
             var loggerFactory = new NullLoggerFactory();
-
-            var transService = new TranslationService(configMock.Object, dbService, transLogger, loggerFactory);
+            
+            var httpClientFactory = new Mock<IHttpClientFactory>();
+            var transService = new TranslationService(configMock.Object, dbService, transLogger, loggerFactory, httpClientFactory.Object);
 
             try
             {
@@ -74,9 +75,10 @@ namespace Tsumari.Bot.Tests
             var dbMock = new Mock<DatabaseService>(new Mock<IConfiguration>().Object, NullLogger<DatabaseService>.Instance);
             var transLogger = NullLogger<TranslationService>.Instance;
             var loggerFactory = new NullLoggerFactory();
+            var httpClientFactory = new Mock<IHttpClientFactory>();
 
             // Act
-            var transService = new TranslationService(configMock.Object, dbMock.Object, transLogger, loggerFactory);
+            var transService = new TranslationService(configMock.Object, dbMock.Object, transLogger, loggerFactory, httpClientFactory.Object);
 
             // Assert
             Assert.False(transService.IsActive);
