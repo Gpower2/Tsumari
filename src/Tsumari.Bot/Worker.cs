@@ -262,7 +262,7 @@ namespace Tsumari.Bot
                         try
                         {
                             var translatedText = await _translationService.TranslateTextAsync(content, child.TargetLanguageCode);
-                            textToSend = $"**{authorName}** (Translated to {child.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
+                            textToSend = $"**{authorName}** ({detectedLang.ToUpperInvariant()} to {child.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
                         }
                         catch (Exception ex)
                         {
@@ -338,7 +338,7 @@ namespace Tsumari.Bot
                             try
                             {
                                 var translatedText = await _translationService.TranslateTextAsync(content, sibling.TargetLanguageCode);
-                                textToSibling = $"**{authorName}** (Translated to {sibling.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
+                                textToSibling = $"**{authorName}** ({detectedLang.ToUpperInvariant()} to {sibling.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
                             }
                             catch (Exception ex)
                             {
@@ -373,11 +373,17 @@ namespace Tsumari.Bot
                         try
                         {
                             var nativeTranslation = await _translationService.TranslateTextAsync(content, targetLang);
-                            nativeReply = await message.ReplyAsync($"*Translation ({targetLang.ToUpperInvariant()}):* {nativeTranslation}");
+                            nativeReply = await message.ReplyAsync($"*({detectedLang.ToUpperInvariant()} to {targetLang.ToUpperInvariant()}):* {nativeTranslation}");
                         }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Mismatch Flow: Failed native translation reply in channel {Id}", channelId);
+                        }
+
+                        if (nativeReply != null)
+                        {
+                            sentMessages.Add(channelId, nativeReply);
+                            await _dbService.LinkMessagesAsync(message.Id, nativeReply.Id, channelId, targetLang);
                         }
                     }
 
@@ -409,7 +415,7 @@ namespace Tsumari.Bot
                             try
                             {
                                 var translatedText = await _translationService.TranslateTextAsync(content, sibling.TargetLanguageCode);
-                                textToSibling = $"**{authorName}** (Translated to {sibling.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
+                                textToSibling = $"**{authorName}** ({detectedLang.ToUpperInvariant()} to {sibling.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
                             }
                             catch (Exception ex)
                             {
@@ -527,3 +533,4 @@ namespace Tsumari.Bot
         }
     }
 }
+
