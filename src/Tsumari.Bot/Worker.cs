@@ -254,12 +254,8 @@ namespace Tsumari.Bot
                             }
                         }
 
-                        var fetched = await ch.GetMessageAsync(mirroredId);
-                        if (fetched is IUserMessage userMsg)
-                        {
-                            await userMsg.ModifyAsync(p => p.Content = newText);
-                        }
-                        else
+                        var modified = await TryModifyMessageContentAsync(ch, mirroredId, newText);
+                        if (!modified)
                         {
                             _logger.LogWarning("Could not fetch mirrored IUserMessage {MirrorId} in channel {ChanId} for edited message.", mirroredId, chanId);
                         }
@@ -371,7 +367,7 @@ namespace Tsumari.Bot
                         try
                         {
                             var translatedText = await _translationService.TranslateTextAsync(content, child.TargetLanguageCode);
-                            textToSend = $"**{authorName}** ({detectedLang.ToUpperInvariant()} to {child.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
+                            textToSend = $"**{authorName}** {FormatLanguagePair(detectedLang, child.TargetLanguageCode)}:\n{translatedText}";
                         }
                         catch (Exception ex)
                         {
@@ -447,7 +443,7 @@ namespace Tsumari.Bot
                             try
                             {
                                 var translatedText = await _translationService.TranslateTextAsync(content, sibling.TargetLanguageCode);
-                                textToSibling = $"**{authorName}** ({detectedLang.ToUpperInvariant()} to {sibling.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
+                                textToSibling = $"**{authorName}** {FormatLanguagePair(detectedLang, sibling.TargetLanguageCode)}:\n{translatedText}";
                             }
                             catch (Exception ex)
                             {
@@ -482,7 +478,7 @@ namespace Tsumari.Bot
                         try
                         {
                             var nativeTranslation = await _translationService.TranslateTextAsync(content, targetLang);
-                            nativeReply = await message.ReplyAsync($"*({detectedLang.ToUpperInvariant()} to {targetLang.ToUpperInvariant()}):* {nativeTranslation}");
+                            nativeReply = await message.ReplyAsync($"*{FormatLanguagePair(detectedLang, targetLang)}:* {nativeTranslation}");
                         }
                         catch (Exception ex)
                         {
@@ -524,7 +520,7 @@ namespace Tsumari.Bot
                             try
                             {
                                 var translatedText = await _translationService.TranslateTextAsync(content, sibling.TargetLanguageCode);
-                                textToSibling = $"**{authorName}** ({detectedLang.ToUpperInvariant()} to {sibling.TargetLanguageCode.ToUpperInvariant()}):\n{translatedText}";
+                                textToSibling = $"**{authorName}** {FormatLanguagePair(detectedLang, sibling.TargetLanguageCode)}:\n{translatedText}";
                             }
                             catch (Exception ex)
                             {
@@ -638,6 +634,32 @@ namespace Tsumari.Bot
                         _logger.LogError(ex, "Failed to dispose MemoryStream in mirroring routine.");
                     }
                 }
+            }
+        }
+
+        internal static string FormatLanguagePair(string sourceLang, string targetLang)
+        {
+            sourceLang = (sourceLang ?? "").ToUpperInvariant();
+            targetLang = (targetLang ?? "").ToUpperInvariant();
+            return $"({sourceLang} to {targetLang})";
+        }
+
+        internal static async Task<bool> TryModifyMessageContentAsync(IMessageChannel channel, ulong messageId, string newText)
+        {
+            if (channel == null) return false;
+            try
+            {
+                var fetched = await channel.GetMessageAsync(messageId);
+                if (fetched is IUserMessage userMsg)
+                {
+                    await userMsg.ModifyAsync(p => p.Content = newText);
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
     }
