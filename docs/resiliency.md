@@ -1,49 +1,90 @@
-# Resiliency State Machine & Circuit Breakers
+# Resiliency Helper
 
-To meet budget constraints and avoid the overhead of heavy third-party resilience libraries, Tsumari implements a **custom, zero-allocation, thread-safe Circuit Breaker** and **exponential backoff retry utility** specifically designed for low-memory (1GB RAM) environments.
+Tsumari wraps translation and language-detection calls in a custom `ResiliencyHelper` instead of using an external resilience library.
 
----
+This helper provides:
 
-## 🔄 Circuit Breaker States
+- retry with exponential backoff and jitter
+- a circuit breaker with `Closed`, `Open`, and `HalfOpen` states
 
-The Circuit Breaker shields the bot and DeepL API by monitoring sequential failures and instantly failing fast when the translation engine is down:
+## Current Runtime Settings
 
-```
-            +--------- Success ---------+
+`TranslationService` creates the helper with:
+
+- failure threshold: `3`
+- break duration: `30s`
+- max retry attempts: `3`
+- initial retry delay: `1s`
+
+The same helper is used for:
+
+- `DetectLanguageAsync(...)`
+- `TranslateTextAsync(...)`
+
+## Circuit Breaker States
+
+```text
+            +--------- success ---------+
             |                           |
             v                           |
-      +-----------+   Failure >= 3    +----------+
-  --->|  CLOSED   |------------------>|   OPEN   |
+      +-----------+   failures >= 3   +----------+
+  --->|  Closed   |------------------>|   Open   |
       +-----------+                   +----------+
             ^                              |
-            |                         Cooldown (30s)
-         Success                           |
+            |                        cooldown 30s
+         success                           |
             |                              v
       +-----------+                   +----------+
-      | HALF-OPEN |<-- Test Request --| HALF-OPEN|
+      | HalfOpen  |<-- next request --| HalfOpen |
       +-----------+                   +----------+
             |                              |
-            +----------- Fail -------------+
+            +----------- failure ----------+
 ```
 
-1.  **`Closed` (Normal Operation):** All translation requests are forwarded to the DeepL client. If a request fails, the failure counter increments. If it succeeds, the counter resets.
-2.  **`Open` (Fault State):** If sequential failures reach the threshold of **3 consecutive errors**, the circuit trips to `Open` and starts a cooldown timer of **30 seconds**. 
-    *   *Fast-Fail:* During this state, all incoming translation tasks instantly fail-fast and throw an `InvalidOperationException` without calling the DeepL API, conserving HTTP resources.
-3.  **`Half-Open` (Test State):** After the 30-second cooldown expires, the next incoming request transitions the circuit to `Half-Open` and is allowed to run.
-    *   *Recovery:* If this test request succeeds, the circuit returns to `Closed` (Service Restored).
-    *   *Re-Trip:* If the test request fails, the circuit immediately returns to `Open` and starts another 30-second cooldown.
+### Closed
 
----
+Normal operation. Requests are allowed through. Success resets the failure count.
 
-## 📈 Exponential Backoff with Jitter
+### Open
 
-To prevent the "thundering herd" problem and avoid hitting DeepL API rate limits during high-load scenarios, Tsumari's retry policy uses an exponential backoff algorithm backed by a randomized jitter factor.
+The helper fast-fails requests without calling the underlying provider once the failure threshold is reached.
 
-### Backoff Calculation:
-$$\text{Delay} = \text{Initial Delay} \times 2^{\text{attempt} - 1} \times \text{Jitter}$$
+### HalfOpen
 
-*   **Initial Delay:** 1 second.
-*   **Jitter:** A random float factor between `0.5` and `1.5`.
-*   **Maximum Cap:** Capped at 30 seconds to prevent excessively long waits.
+After the cooldown window expires, the next request is allowed through as a test:
 
-This approach disperses request timings naturally, allowing temporary connection gaps or rate limit buckets to clear before retrying.
+- success closes the circuit again
+- failure reopens it immediately
+
+## Retry Strategy
+
+The retry delay uses:
+
+```text
+delay = initialDelay * 2^(attempt - 1) * jitter
+```
+
+Current details:
+
+- base delay starts at `1s`
+- jitter is a random value in `[0.5, 1.5)`
+- delay is capped at `30s`
+
+## Provider Scope
+
+The resilience behavior applies to the **selected translation backend**, not just DeepL.
+
+That means:
+
+- DeepL detection/translation calls are wrapped
+- Ollama detection/translation calls are wrapped
+- OpenAI-compatible detection/translation calls are wrapped
+
+## Relationship to Quota Checks
+
+Quota enforcement is separate from resiliency:
+
+- when `Translation.Provider = DeepL`, Tsumari checks the monthly character limit before calling the provider
+- when `Translation.Provider = Ollama` or `OpenAI`, `CanTranslateAsync(...)` always returns `true`
+
+So the circuit breaker protects backend availability, while `UsageTracker` protects DeepL billing.

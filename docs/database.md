@@ -1,10 +1,8 @@
-# SQLite Database Design & Optimizations
+# SQLite Schema and Message-Link Usage
 
-To fulfill the low-memory (1GB boundary) footprint constraint of free hosting containers, Tsumari avoids heavy ORMs (like Entity Framework Core) and communicates with SQLite directly through raw, parameter-mapped SQL queries using `Microsoft.Data.Sqlite`.
+Tsumari uses raw `Microsoft.Data.Sqlite` calls instead of an ORM. The database stores channel topology, mirrored message links, and optional DeepL usage tracking.
 
----
-
-## 📊 Relational Database Schema
+## Schema
 
 ```sql
 CREATE TABLE IF NOT EXISTS MasterChannels (
@@ -32,28 +30,78 @@ CREATE TABLE IF NOT EXISTS UsageTracker (
 );
 ```
 
-### Table Details:
-1.  **`MasterChannels`**: Stores registered parent translation channels. Since Discord Snowflake IDs fit within a 64-bit space, they are stored securely as string (`TEXT`) rows to avoid any overflow or serialization precision loss across layers.
-2.  **`LocalizedChannels`**: Stores language-specific child channels linked to their Master. Crucially, the foreign key constraint enforces an `ON DELETE CASCADE` rule. When a Master channel is unregistered, SQLite automatically cleans up all associated Localized channel links.
-3.  **`MessageLinks`**: Maps original user posts to all generated mirrored versions across cluster sibling channels. This enables future updates or message deletion synchronization.
-4.  **`UsageTracker`**: Enforces DeepL character limit protection. The `YearMonth` key is formatted as `YYYY-MM`. When a translation succeeds, the processed character weight is added here.
+## Table Roles
 
----
+### `MasterChannels`
 
-## ⚡ Concurrency & Performance Enhancements
+Stores master channel IDs. These are the parent hubs for each translation cluster.
 
-To ensure thread-safety and smooth non-blocking execution inside a multi-threaded asynchronous environment, Tsumari implements two SQLite PRAGMA tuning settings on every database connection lifecycle:
+### `LocalizedChannels`
 
-### 1. Write-Ahead Logging (WAL) Mode
+Stores localized channel IDs, their parent master channel, and the target language code used for routing and translation.
+
+Notes:
+
+- `TargetLanguageCode` is normalized to lowercase when saved.
+- `RegisterLocalChannelAsync` uses `INSERT OR REPLACE`, so re-registering a localized channel updates its current mapping.
+- The foreign key uses `ON DELETE CASCADE`, so removing a master automatically removes its localized children.
+
+### `MessageLinks`
+
+Stores one generated/mirrored bot message per `(OriginalMessageId, ChannelId)`.
+
+Current uses in code:
+
+- generating jump-link buttons after a message fan-out completes
+- looking up mirrored bot messages when a source message is edited later
+- tracking the mismatch-flow translated reply created in the source localized channel
+
+This table is **not** currently used for delete synchronization.
+
+### `UsageTracker`
+
+Stores a monthly character counter keyed by `YYYY-MM`.
+
+Current behavior:
+
+- used only for DeepL quota enforcement
+- ignored for `Ollama` and `OpenAI` providers
+- incremented after successful language detection and successful translation when DeepL is active
+
+## Why IDs Are Stored as `TEXT`
+
+Discord Snowflake IDs are 64-bit values. Storing them as `TEXT` avoids cross-layer precision issues and keeps the SQL simple.
+
+## Operational Flow in the Code
+
+### Startup
+
+`InitializeDatabaseAsync()` creates all four tables if they do not exist.
+
+### Channel Registration
+
+- `AddMasterChannelAsync()` inserts master channels
+- `RegisterLocalChannelAsync()` links localized channels to a master
+- `UnregisterChannelAsync()` removes either a master or localized channel configuration
+
+### Message Linking
+
+- `LinkMessagesAsync()` stores generated bot messages during routing
+- `GetMirroredMessagesAsync()` returns all generated bot messages tied to an original user message
+
+## Concurrency and Safety Settings
+
+Every connection enables:
+
 ```sql
 PRAGMA journal_mode = WAL;
-```
-By default, SQLite locks the entire database file during a write operation, causing other threads attempting reads to block or throw "Database is locked" exceptions. 
-*   In WAL mode, SQLite writes changes to a separate `-wal` file instead of directly updating the main database file.
-*   This enables **high concurrency**: multiple readers can read concurrently while a separate thread is writing, dramatically improving speed.
-
-### 2. Cascading Delete Enforcement
-```sql
 PRAGMA foreign_keys = ON;
 ```
-SQLite does not enforce foreign key relationships or cascading triggers by default. Tsumari explicitly sets this flag on every opened connection to guarantee that deleting a record from `MasterChannels` instantly purges corresponding elements in `LocalizedChannels`.
+
+### `journal_mode = WAL`
+
+Write-ahead logging improves concurrent read/write behavior, which matters because message routing, translation, and admin commands are all asynchronous.
+
+### `foreign_keys = ON`
+
+SQLite does not enforce foreign keys by default. Tsumari enables them explicitly so cascade deletes work reliably.

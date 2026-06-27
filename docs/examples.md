@@ -1,94 +1,172 @@
-# Discord Message Formatting & Live Examples
+# Discord Message Examples
 
-This guide displays visual representations of exactly how mirrored and translated messages appear in Discord chat interface layout for all routing workflows.
+These examples reflect the **current** message formatting, button labels, and edit-sync behavior in the code.
 
----
+## Formatting Rules
 
-## 🎨 Visual Layout System
+### Raw Copies
 
-Every synchronized message dispatched by Tsumari uses clean formatting to represent the original sender without requiring webhook allocations, keeping RAM footprint extremely light:
-1.  **Bold Author Header:** The sender's name is highlighted in bold: `**Username**`.
-2.  **Interactive View Context Button:** An interactive Link-style button labeled verbatim as `View Context` is appended to the bottom of the dispatch. Clicking this jumps users directly to the original conversation source.
-3.  **Expiring Media Assets:** Original file attachments are dynamically re-uploaded as native Discord uploads in target rooms alongside the button.
+```text
+**Author**:
+message text
+```
 
----
+### Translated Copies
 
-## 📖 Live Scenarios and Chat Simulations
+```text
+**Author** (XX to YY):
+translated text
+```
 
-### Scenario 1: Message in Master Channel (`#general`)
-*Sender: `gpowe` types in English:*
-> "Let's review the code deployment schedules for this evening."
+### Initial Mismatch Reply in a Localized Channel
 
-#### 1. Master Channel (`#general`):
-The user's original message is left untouched by the bot:
-> **gpowe**: Let's review the code deployment schedules for this evening.
+```text
+*(XX to YY):* translated text
+```
 
-#### 2. Localized Greek Channel (`#general-greek`):
-DeepL translates the English text into Greek:
-> **gpowe** (Translated to EL):
-> Ας αναθεωρήσουμε τα προγράμματα ανάπτυξης κώδικα για απόψε.
-> 
-> `[Button: View Context]`
+### Buttons
 
-#### 3. Localized Italian Channel (`#general-italian`):
-DeepL translates the English text into Italian:
-> **gpowe** (Translated to IT):
-> Rivediamo i programmi di implementazione del codice per questa sera.
-> 
-> `[Button: View Context]`
+Generated bot messages use:
+
+- `Original` to jump back to the source user-authored message
+- uppercased language-code buttons (`EL`, `IT`, `EN`, etc.) for generated bot copies
+
+> [!NOTE]
+> In master flow, a generated localized copy can include a button that links back to itself, because every generated copy receives the same final button layout.
 
 ---
 
-### Scenario 2: Correct Language in Localized Channel (Match Flow)
-*Sender: `nikos` types Greek in `#general-greek` (Target: Greek):*
-> "Η δοκιμή ολοκληρώθηκε με επιτυχία!"
+## Scenario 1: Message Sent in a Master Channel
 
-#### 1. Greek Local Channel (`#general-greek`):
-The user's original Greek message is left untouched:
+Assume `#general` is the master channel and it has localized children `#general-greek (EL)` and `#general-italian (IT)`.
+
+### Source Message in `#general`
+
+> **gpowe**: Let's review the deployment schedule for this evening.
+
+### Mirrored Message in `#general-greek`
+
+> **gpowe** (EN to EL):
+> Ας εξετάσουμε το πρόγραμμα ανάπτυξης για απόψε.
+>
+> `[Buttons: Original | EL | IT]`
+
+### Mirrored Message in `#general-italian`
+
+> **gpowe** (EN to IT):
+> Rivediamo il programma di distribuzione per questa sera.
+>
+> `[Buttons: Original | EL | IT]`
+
+---
+
+## Scenario 2: Localized Match Flow
+
+Assume the cluster contains:
+
+- master: `#general`
+- localized: `#general-greek (EL)`
+- localized: `#general-english (EN)`
+- localized: `#general-italian (IT)`
+
+The user writes Greek in `#general-greek`.
+
+### Original Message in `#general-greek`
+
 > **nikos**: Η δοκιμή ολοκληρώθηκε με επιτυχία!
 
-#### 2. Master Channel (`#general`):
-The bot broadcasts the original untouched Greek payload:
+### Mirrored Raw Copy in `#general`
+
 > **nikos**:
 > Η δοκιμή ολοκληρώθηκε με επιτυχία!
-> 
-> `[Button: View Context]`
+>
+> `[Buttons: Original | EN | IT]`
 
-#### 3. English Local Sibling (`#general-english`):
-DeepL translates the Greek text into English and disperses:
-> **nikos** (Translated to EN-US):
-> The test has been completed successfully!
-> 
-> `[Button: View Context]`
+### Mirrored Translation in `#general-english`
+
+> **nikos** (EL to EN):
+> The test completed successfully!
+>
+> `[Buttons: Original | EN | IT]`
+
+### Mirrored Translation in `#general-italian`
+
+> **nikos** (EL to IT):
+> Il test è stato completato con successo!
+>
+> `[Buttons: Original | EN | IT]`
+
+> [!NOTE]
+> There is no separate `EL` button in this flow because the source Greek message is the user-authored original, not a bot-generated mirror.
 
 ---
 
-### Scenario 3: Incorrect Language in Localized Channel (Mismatch Flow)
-*Sender: `gpowe` mistakenly types English inside the Greek local room `#general-greek`:*
-> "Can we finalize the database parameters before lunch?"
+## Scenario 3: Localized Mismatch Flow
 
-#### 1. Greek Local Channel (`#general-greek`):
-Tsumari **does not delete** the user's message. It posts an inline reply translation in Greek:
-> 💬 **gpowe**: Can we finalize the database parameters before lunch?
-> ↳ 🤖 **Tsumari** (Bot): *Translation (EL):* Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα;
+The user writes English in `#general-greek`.
 
-#### 2. Master Channel (`#general`):
-Tsumari forwards the original raw English text:
+### Original Message in `#general-greek`
+
+> **gpowe**: Can we finalize the database parameters before lunch?
+
+### In-Channel Translated Reply in `#general-greek`
+
+> ↳ 🤖 **Tsumari** (Bot): *(EN to EL):* Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα;
+>
+> `[Buttons: Original | EL | EN | IT]`
+
+### Mirrored Raw Copy in `#general`
+
 > **gpowe**:
 > Can we finalize the database parameters before lunch?
-> 
-> `[Button: View Context]`
+>
+> `[Buttons: Original | EL | EN | IT]`
 
-#### 3. English Local Sibling (`#general-english`):
-Since the original message was in English, Tsumari forwards it raw directly to its home room:
+### Mirrored Raw Copy in `#general-english`
+
 > **gpowe**:
 > Can we finalize the database parameters before lunch?
-> 
-> `[Button: View Context]`
+>
+> `[Buttons: Original | EL | EN | IT]`
 
-#### 4. Italian Local Sibling (`#general-italian`):
-DeepL translates the original English text into Italian and disperses:
-> **gpowe** (Translated to IT):
+### Mirrored Translation in `#general-italian`
+
+> **gpowe** (EN to IT):
 > Possiamo definire i parametri del database prima di pranzo?
-> 
-> `[Button: View Context]`
+>
+> `[Buttons: Original | EL | EN | IT]`
+
+---
+
+## Scenario 4: The User Edits the Original Message Later
+
+Starting from Scenario 3, the user edits the original message to:
+
+> **gpowe**: Can we finalize the database parameters before lunch and share them in the release thread?
+
+### What Tsumari Updates
+
+- the raw copy in `#general`
+- the raw copy in `#general-english`
+- the translated copy in `#general-italian`
+- the translated reply in `#general-greek`
+
+### Updated Reply in `#general-greek`
+
+After edit sync, the reply remains a Discord reply message, but its **content** is rewritten into the standard mirrored format:
+
+> ↳ 🤖 **Tsumari** (Bot):
+> **gpowe** (EN to EL):
+> Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα και να τις κοινοποιήσουμε στο νήμα της έκδοσης;
+>
+> `[Buttons: Original | EL | EN | IT]`
+
+### Updated Translation in `#general-italian`
+
+> **gpowe** (EN to IT):
+> Possiamo definire i parametri del database prima di pranzo e condividerli nel thread della release?
+>
+> `[Buttons: Original | EL | EN | IT]`
+
+> [!NOTE]
+> Edit sync currently updates **text content only**. It does not re-mirror attachment edits.
