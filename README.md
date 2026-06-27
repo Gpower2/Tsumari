@@ -1,63 +1,81 @@
 # Tsumari — Discord Cross-Language Translation & Mirroring Bot
 
-Tsumari is a high-performance, production-ready Discord translation and media mirroring bot. Built using a **.NET 10 Worker Service** and the **Discord.Net (v3.19+)** library, Tsumari is architected specifically for low-memory execution boundaries (such as a 1GB RAM always-free Linux container on HidenCloud). 
+Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages across master/localized channel clusters, translates them with a selectable backend, mirrors attachments, and cross-links generated messages with Discord jump buttons.
 
-It dynamically tracks and routes messages within independent language "clusters" utilizing a parent-child relational SQLite schema and the DeepL translation engine.
+## Key Features
 
----
+- **Cluster-based routing:** one master channel can fan out to multiple localized channels, and localized channels can route back into the cluster.
+- **Bi-directional flows:** supports master-to-localized routing plus localized match/mismatch routing.
+- **Pluggable translation backends:** `DeepL`, `Ollama`, and `OpenAI` (OpenAI-compatible chat-completions endpoint).
+- **Automatic language detection:** every text message is detected before routing decisions are made.
+- **Clear translated headers:** translated messages use the format `**Author** (XX to YY):`.
+- **Jump-link buttons:** generated bot messages are edited after send so they can include `Original` plus language-code buttons for other generated copies.
+- **Edited-message synchronization:** when a user edits a recently cached text message, mirrored bot messages are updated in place.
+- **Attachment mirroring:** attachments are downloaded once and re-uploaded as native Discord files during initial fan-out.
+- **SQLite persistence:** channel mappings, mirrored message IDs, and usage tracking are stored in SQLite.
+- **DeepL quota protection:** the monthly `500,000` character guard is enforced only when `Translation.Provider` is `DeepL`.
+- **Built-in resiliency:** translation/detection calls are wrapped in a custom retry + circuit-breaker helper.
 
-## 🚀 Key Features
+## Current Behavior Notes
 
-*   **Multi-Master Clusters:** Map a single "Master" channel (e.g., `#general`) to multiple independent "Localized" channels (e.g., `#general-english`, `#general-greek`, `#general-italian`) with full bi-directional, cross-language synchronization.
-*   **Automatic Language Detection:** Seamlessly identifies the source language of incoming messages via the DeepL translation engine.
-*   **Intelligent Routing Engine:** Handles complex routing scenarios (such as localized matching and mismatching inputs) to ensure native and non-native readers see appropriate text.
-*   **Expiring CDN Re-upload Layer:** Automatically downloads and re-uploads expiring Discord attachments as native files to target rooms simultaneously, completely bypassing the 24-hour CDN link limit.
-*   **DeepL Credit Protection:** Strictly enforces a rolling calendar month limit of **500,000 characters**, safe-locking translation activities instantly to prevent billing overages.
-*   **Zero-Dependency Resiliency:** Employs a custom, thread-safe exponential backoff retry policy and a **Circuit Breaker** (Closed, Open, Half-Open states) to block transient HTTP failures without extra memory footprint.
-*   **Low-RAM Optimized SQLite WAL Mode:** Uses raw parameter-mapped ADO.NET SQLite queries (avoiding EF Core overheads) and connection pools set to Write-Ahead Logging (WAL) for maximum speed.
+- **Edit sync is text-only.** The `MessageUpdated` flow compares message content and only rewrites mirrored message text; attachment-only edits are not re-mirrored.
+- **Edit sync depends on the socket cache.** The Discord client is configured with `MessageCacheSize = 50`, so edit detection is most reliable for recently cached messages.
+- **Language buttons only exist for bot-generated copies.** The source user-authored message is always reached through the `Original` button.
+- **Mismatch replies are tracked too.** When a localized channel receives the wrong language, the bot's in-channel translated reply is stored in `MessageLinks` and participates in cross-link buttons.
 
----
+## Repository Structure
 
-## 📁 Repository Structure
-
-```
+```text
 E:\Development\Tsumari\
-├── Tsumari.slnx            # .NET 10 solution file
-├── README.md               # Main documentation
-├── docs/                   # Extended guides & diagrams
-│   ├── database.md         # Database schema & WAL mode guide
-│   ├── routing.md          # Multi-master routing engine logic
-│   ├── resiliency.md       # Circuit breaker & retry implementation
-│   ├── media.md            # Expiring CDN re-upload layer details
-│   └── examples.md         # Chat interface visual examples
+├── Tsumari.slnx
+├── README.md
+├── docs/
+│   ├── database.md
+│   ├── examples.md
+│   ├── media.md
+│   ├── resiliency.md
+│   └── routing.md
 ├── src/
-│   └── Tsumari.Bot/        # Bot application project (.NET 10 Worker)
-│       ├── Program.cs      # Host bootstrap & DI setup
-│       ├── Worker.cs       # Discord Gateway handler & routing execution
+│   └── Tsumari.Bot/
+│       ├── Program.cs
+│       ├── Worker.cs
+│       ├── InternalsVisibleTo.cs
 │       ├── appsettings.json
-│       ├── Services/
-│       │   ├── DatabaseService.cs
-│       │   ├── TranslationService.cs
-│       │   └── ResiliencyHelper.cs
-│       └── Modules/
-│           └── InteractionModule.cs  # Administrative Slash commands
+│       ├── Modules/
+│       │   └── InteractionModule.cs
+│       └── Services/
+│           ├── DatabaseService.cs
+│           ├── ResiliencyHelper.cs
+│           └── TranslationService.cs
 └── tests/
-    └── Tsumari.Bot.Tests/  # Automated xUnit test suite
+    └── Tsumari.Bot.Tests/
+        ├── DatabaseServiceTests.cs
+        ├── ResiliencyHelperTests.cs
+        ├── TranslationServiceTests.cs
+        └── WorkerEditTests.cs
 ```
 
----
-
-## ⚙️ Configuration (`appsettings.json`)
-
-Populate your credentials in the `src/Tsumari.Bot/appsettings.json` slot:
+## Configuration (`src/Tsumari.Bot/appsettings.json`)
 
 ```json
 {
   "Discord": {
-    "Token": "YOUR_DISCORD_BOT_TOKEN"
+    "Token": ""
+  },
+  "Translation": {
+    "Provider": "Ollama",
+    "Ollama": {
+      "ApiUrl": "http://localhost:11434/api/generate",
+      "Model": "translategemma:12b"
+    },
+    "OpenAI": {
+      "ApiUrl": "http://localhost:8080/v1/chat/completions",
+      "ApiKey": "",
+      "Model": "mistral-7b"
+    }
   },
   "DeepL": {
-    "ApiKey": "YOUR_DEEPL_API_KEY"
+    "ApiKey": ""
   },
   "Database": {
     "FilePath": "tsumari.db"
@@ -65,46 +83,47 @@ Populate your credentials in the `src/Tsumari.Bot/appsettings.json` slot:
 }
 ```
 
-> [!IMPORTANT]
-> **DeepL API Free Tier Auto-Routing:**
-> If your DeepL API key ends with `:fx` (the Free tier suffix), Tsumari's connection engine will explicitly override default endpoints and route traffic to the free portal: `https://api-free.deepl.com`.
+### Translation Provider Notes
 
----
+- `Translation.Provider` accepts `DeepL`, `Ollama`, or `OpenAI`.
+- The checked-in default configuration currently uses **Ollama** with `translategemma:12b`.
+- `DeepL.ApiKey` is only required when `Translation.Provider` is `DeepL`.
+- If a DeepL key ends with `:fx`, Tsumari routes requests to `https://api-free.deepl.com`.
+- The `UsageTracker` quota guard is only enforced for DeepL; local/self-hosted LLM providers do not use the monthly character limit.
 
-## 🛠️ Administrative Slash Commands
+## Administrative Slash Commands
 
-All configuration operations are built using the Discord.Net Interaction Framework and restricted to users with **Administrator** permissions:
+All configuration commands live under the `/tsumari` group and require **Administrator** permissions:
 
-*   `/tsumari add-master [channel]`: Registers a text channel as an independent **Master Channel** in the `MasterChannels` table.
-*   `/tsumari register-local [localChannel] [masterChannel] [languageCode]`: Links a target text channel to a specific parent Master Channel, setting its target language (e.g., `el` for Greek, `it` for Italian) in `LocalizedChannels`.
-*   `/tsumari unregister [channel]`: Deletes the channel configuration from the database. Deleting a Master channel automatically purges all connected localized channels via SQL cascading deletes (`ON DELETE CASCADE`).
+- `/tsumari add-master [channel]`
+- `/tsumari register-local [local-channel] [master-channel] [language-code]`
+- `/tsumari unregister [channel]`
 
----
+`register-local` stores language codes in lowercase, and re-registering an existing localized channel updates its mapping because the database operation uses `INSERT OR REPLACE`.
 
-## 🏗️ Building and Deploying
+## Build, Test, and Publish
 
-### Running Tests Locally
-Verify all 12 unit and integration tests compile and execute cleanly:
-```bash
+Run the full local verification suite:
+
+```powershell
+dotnet build
 dotnet test
 ```
 
-### Publishing Standalone Linux Binary
-To compile a fully self-contained release package for your HidenCloud server (does not require the .NET SDK to be pre-installed on the host environment), run:
-```bash
-dotnet publish src/Tsumari.Bot/Tsumari.Bot.csproj -c Release -r linux-x64 --self-contained
+Publish a self-contained Linux build:
+
+```powershell
+dotnet publish src\Tsumari.Bot\Tsumari.Bot.csproj -c Release -r linux-x64 --self-contained
 ```
 
-The output standalone executables and target assets will be located in:
-`src/Tsumari.Bot/bin/Release/net10.0/linux-x64/publish/`
+Publish output is written under:
 
----
+`src\Tsumari.Bot\bin\Release\net10.0\linux-x64\publish\`
 
-## 📚 Extended Documentation
+## Extended Documentation
 
-For in-depth guides on Tsumari's architecture, review the files in the `docs` directory:
-1.  [SQLite Database Guide](docs/database.md): Tables structure, WAL configurations, and usage trackers.
-2.  [Routing Engine Logic](docs/routing.md): Master-to-local and local-to-master (match and mismatch) flow diagrams.
-3.  [Resiliency & Circuit Breakers](docs/resiliency.md): Retry state machine and exponential backoff configuration.
-4.  [Media Mirroring Layer](docs/media.md): CDN downloads and stream memory footprint optimizations.
-5.  [Chat Interface & Live Examples](docs/examples.md): Visual representations of Discord message formatting under all workflows.
+- [Routing flows and edit synchronization](docs/routing.md)
+- [SQLite schema and message-link usage](docs/database.md)
+- [Attachment mirroring behavior](docs/media.md)
+- [Resiliency helper details](docs/resiliency.md)
+- [Discord message examples](docs/examples.md)

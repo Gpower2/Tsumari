@@ -1,48 +1,55 @@
-# Expiring CDN Media Re-Upload Layer
+# Attachment Mirroring
 
-Discord's Content Delivery Network (CDN) links expire after 24 hours due to attached security signatures (`ex`, `is`, `hm` query parameters). Direct mirroring of URLs results in broken image and video attachments after the signature window closes.
+Discord CDN attachment URLs expire. Tsumari avoids stale CDN links by downloading attachments during the initial routing pass and re-uploading them as native Discord files in destination channels.
 
-Tsumari completely avoids this issue by downloading assets instantly when captured and re-uploading them directly as fresh native attachments to target rooms.
+## Initial Send Path
 
----
+During `ProcessMessageRoutingPipelineAsync`:
 
-## 💾 Memory-Efficient Stream Management
+1. Each inbound attachment URL is downloaded once with `HttpClient.GetByteArrayAsync(...)`.
+2. The downloaded bytes are stored as:
+   - filename
+   - `byte[]`
+3. Every outbound destination gets a fresh `MemoryStream` created from the shared `byte[]`.
+4. `SendFilesAsync(...)` sends those streams as native Discord attachments.
 
-Downloading and re-uploading large attachments can quickly exhaust the RAM limits of a container (especially HidenCloud's 1GB memory boundary). Tsumari implements a strict allocation strategy to keep footprint to an absolute minimum:
+## Why Separate Streams Are Created
 
+Discord.Net consumes stream instances during upload. Reusing the same stream across destinations would break later sends, so Tsumari creates a new `MemoryStream` per destination while still reusing the same downloaded bytes.
+
+## Disposal Behavior
+
+`SendMessageWithFilesAsync(...)` keeps a list of temporary streams and disposes all of them in a `finally` block after the send attempt finishes.
+
+That keeps the message-routing path memory-conscious while still allowing multi-destination fan-out.
+
+## Fallback Behavior
+
+If `SendFilesAsync(...)` fails for a destination, Tsumari falls back to a plain text send:
+
+```text
+original text
+*(Media attachments failed to mirror)*
 ```
- Incoming Message (with Attachments)
-                 |
-        Download Bytes Once
-      (Single byte[] in memory)
-                 |
-      +----------+----------+
-      |                     |
-Create Stream A       Create Stream B
-  (MemStream)           (MemStream)
-      |                     |
-Upload to Channel 1   Upload to Channel 2
-      |                     |
-   Dispose               Dispose
-```
 
-### 1. Single Download Pattern
-Instead of opening multiple network connections or creating separate duplicate byte arrays, Tsumari's `ProcessMessageRoutingPipelineAsync` downloads each attachment from the Discord CDN exactly once into a shared `byte[]` in memory.
+The same button components are still attached to that fallback text message.
 
-### 2. Isolated Stream Instantiation
-Discord.Net's `SendFilesAsync` consumes and advances streams during transmission. To support concurrent uploads to multiple channel rooms:
-*   A new, isolated `MemoryStream` is created from the shared `byte[]` for each destination.
-*   The stream is wrapped inside a `FileAttachment` model along with its original filename.
+## Interaction with Message Edit Sync
 
-### 3. Immediate Garbage Collection & Disposal
-All upload actions are bound inside structural `try/finally` blocks:
-```csharp
-finally
-{
-    foreach (var stream in streams)
-    {
-        stream.Dispose(); // CRITICAL: Free bytes immediately
-    }
-}
-```
-As soon as the Discord API confirms file delivery (or fails), `.Dispose()` is instantly called on all temporary memory streams. This releases the buffers immediately rather than waiting for the .NET Garbage Collector, preventing RAM memory leak scaling inside the HidenCloud container.
+The edited-message path does **not** re-download or re-upload attachments.
+
+Current edit behavior:
+
+- mirrored message **content** is updated with `ModifyAsync(...)`
+- existing buttons remain in place
+- existing attachments remain as they were on the previously generated bot message
+
+So:
+
+- text edits are synchronized
+- attachment-only edits are not
+- new or removed attachments on the original message are not propagated to mirrored copies
+
+## Attachment-Only Source Messages
+
+If a source message has attachments but no text, Tsumari still routes the message and mirrors the files. The generated text body in those cases is just the author header, because there is no text payload to translate.

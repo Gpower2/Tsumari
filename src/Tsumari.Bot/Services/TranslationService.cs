@@ -238,9 +238,18 @@ namespace Tsumari.Bot.Services
 
         private async Task<string> TranslateTextWithLLMAsync(string text, string targetLanguage)
         {
-            var systemPrompt = $"You are a professional translation assistant for a Discord server. Translate the user text directly into the target language code: {targetLanguage}. Maintain the exact original tone, emojis, and markdown formatting. Do NOT sanitize, censor, tone down, or filter profanity, insults, or harsh slang. Preserve the exact raw intent, cultural meaning, slang equivalents and emotional weight of the target language. Return ONLY the translated text, with absolutely no explanation, notes, conversational filler, commentary, or introductory text.";
+            //var systemPrompt = $"You are a professional translation assistant for a Discord server. Translate the user text directly into the target language code: {targetLanguage}. Maintain the exact original tone, emojis, and markdown formatting. Do NOT sanitize, censor, tone down, or filter profanity, insults, or harsh slang. Preserve the exact raw intent, cultural meaning, slang equivalents and emotional weight of the target language. Return ONLY the translated text, with absolutely no explanation, notes, conversational filler, commentary, or introductory text.";
 
-            var userPrompt = $"Text to translate:\n{text}";
+            //var userPrompt = $"Text to translate:\n{text}";
+
+            // 1. Reframe the system rules, explicitly reminding it that short inputs are the main focus
+            var systemPrompt = $"You are an elite machine translation backend for a Discord bot. Translate the requested text directly into the target language code: {targetLanguage}. Maintain the exact original tone, emojis, and markdown formatting. Do NOT sanitize, censor, tone down, or filter profanity, insults, or harsh slang. Preserve the exact raw intent, cultural meaning, slang equivalents, and emotional weight in the target language. Return ONLY the translated text, with absolutely no explanation, notes, conversational filler, commentary, or introductory text.";
+
+            // 2. Use structural XML-style tags to fence the user's text cleanly
+            var userPrompt =
+                "Please read the isolated text below, identify the language, and execute the conversion rule.\n\n" +
+                $"<text>\n{text}\n</text>\n\n" +
+                $"Task: Output ONLY the direct translation of the above text into language: {targetLanguage}.";
 
             var result = await CallLLMApiAsync(systemPrompt, userPrompt);
             
@@ -267,7 +276,7 @@ namespace Tsumari.Bot.Services
                     options = new 
                     { 
                         temperature = 0.0f, // Low temperature for high precision, strips away all creative seed variation
-                        top_p = 0.80f, // Forces the model to choose the most accurate words
+                        top_p = 0.10f, // DROP THIS FROM 0.80 TO 0.10: Forces the model to pick highly accurate words and stops it from defaulting to a lazy text copy
                         num_ctx = 4096, // Limit context size to save VRAM and maintain speed
                     }
                 };

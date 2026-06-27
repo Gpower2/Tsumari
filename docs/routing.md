@@ -1,52 +1,134 @@
-# Multi-Master Routing Engine
+# Routing Flows and Edit Synchronization
 
-Tsumari manages bi-directional cross-language translation using two distinct execution flows depending on which channel catches the user's message.
+Tsumari has two live routing paths for new messages and one follow-up path for edited messages.
 
----
+## Event Entry Points
 
-## 🛣️ Pipeline Routing Flows
+`Worker` subscribes to:
 
-### Branch A: Message Received in a Master Channel (e.g., `#general`)
-When a member posts in the master hub, the bot keeps the original message untouched inside the room and routes copies into localized child rooms.
+- `MessageReceived` for new user-authored messages
+- `MessageUpdated` for edited user-authored messages
+- `InteractionCreated` for `/tsumari` admin commands
 
-1.  **Context Check**: The bot verifies that the channel exists in `MasterChannels`.
-2.  **Language Detection**: DeepL identifies the message's language code.
-3.  **Target Dispatch**: The engine queries all child channels linked to this Master.
-4.  **Translation Rules**:
-    *   **Mismatch:** If the message language *does not* match a child's target language, the bot translates the content into the target language and posts it.
-    *   **Match:** If the message language *matches* the child's target language, the bot forwards the original text as-is.
-5.  **Tracking**: All generated mirrored snowflake IDs are mapped into the `MessageLinks` table.
+Only user messages are processed. Bot messages are ignored.
 
----
+## New Message Intake
 
-### Branch B: Message Received in a Localized Channel (e.g., `#general-greek`)
-When a member posts inside a localized room, the bot routes translations based on whether the input language matches that room's target settings.
+For a new message, the routing pipeline:
 
-```
-                  Message in Localized Room (e.g., #general-greek)
-                                    |
-                       Detect Language & Compare
-                                    |
-                     +--------------+--------------+
-                     |                             |
-             MATCH (Greek input)            MISMATCH (English input)
-                     |                             |
-      1. Broadcast raw to #general        1. Leave untouched in current
-      2. Translate & broadcast to         2. Translate to Greek and reply 
-         siblings (#general-english,         as inline follow-up in current
-         #general-italian, etc.)          3. Broadcast raw to #general and 
-                                             home sibling (#general-english)
-                                          4. Translate & broadcast to 
-                                             other siblings (#general-italian)
-```
+1. Checks whether the channel is registered as a master or localized channel.
+2. Detects the source language when text exists.
+3. Downloads each attachment once into memory.
+4. Builds outbound messages for the relevant cluster targets.
+5. Stores generated message IDs in `MessageLinks`.
+6. Edits generated bot messages to add the final jump-button set.
 
-#### Flow 1: Match Flow (User types Greek in `#general-greek`):
-*   **Action A:** Broadcasts the original, untouched text payload directly to its parent Master Channel (`#general`).
-*   **Action B:** Queries all other sibling channels (e.g., `#general-english`, `#general-italian`). It translates the message into each sibling's target language and posts it there.
+If language detection fails, the pipeline falls back to `EN`.
 
-#### Flow 2: Mismatch Flow (User types English in `#general-greek`):
-*   **Action A:** **Does not delete** the user's message. The raw text is left untouched inside `#general-greek`.
-*   **Action B:** Translates the text into Greek and posts it as an inline reply or immediate follow-up message inside `#general-greek` so native readers understand it.
-*   **Action C:** Posts the original raw English text as-is to the parent Master Channel (`#general`) and to its proper home channel (`#general-english`).
-*   **Action D:** Translates the input into all other remaining sibling channels (e.g., `#general-italian`) and posts it there.
-*   **Action E:** Logs all newly generated message Snowflake IDs into `MessageLinks`.
+## Branch A: Message Received in a Master Channel
+
+When a user posts in a master channel:
+
+1. The original user message stays untouched in the master channel.
+2. Tsumari queries every localized child channel for that master.
+3. For each child:
+   - If `detectedLang != child.TargetLanguageCode` and the message has text, Tsumari translates the content and sends:
+     - `**Author** (SRC to TARGET):`
+   - Otherwise, it sends the raw content:
+     - `**Author**:`
+4. Each outbound message is initially sent with a temporary `Original` button.
+5. After all sends complete, Tsumari edits every generated copy to include:
+   - `Original`
+   - one button for every generated localized copy in that fan-out
+
+### Resulting Button Behavior
+
+In master flow, each generated localized copy receives the same final button set. That includes a button for its own language copy, because the final component layout is built from all generated bot messages.
+
+## Branch B: Message Received in a Localized Channel
+
+When a user posts in a localized channel, Tsumari compares the detected source language with that channel's configured target language.
+
+### Match Flow
+
+If the detected language matches the localized channel's target:
+
+1. The original localized message stays untouched.
+2. Tsumari sends the raw message to the parent master channel.
+3. Tsumari translates the content into every sibling localized channel.
+4. Tsumari records every generated bot message in `MessageLinks`.
+5. Tsumari edits the generated master/sibling bot messages to add jump buttons.
+
+### Important Match-Flow Button Detail
+
+There is **no separate button for the source localized channel** in match flow, because no bot-generated copy exists in that source channel. The original user-authored message is reached through the `Original` button instead.
+
+### Mismatch Flow
+
+If the detected language does **not** match the localized channel's target:
+
+1. The original localized message stays untouched.
+2. Tsumari posts a translated reply in the same localized channel:
+   - `*(SRC to LOCAL):* translated text`
+3. Tsumari sends the raw message to the parent master channel.
+4. Tsumari sends the raw message to the sibling localized channel whose target language matches the detected source language, if one exists.
+5. Tsumari translates the message for every remaining sibling localized channel.
+6. Tsumari stores the in-channel reply and every generated mirror in `MessageLinks`.
+7. Tsumari edits all bot-generated messages to add jump buttons.
+
+### Important Mismatch-Flow Button Detail
+
+Because the translated in-channel reply is stored in `MessageLinks`, it participates in the final button layout. In mismatch flow, generated messages can therefore include buttons for:
+
+- `Original`
+- the localized reply's language
+- the detected-language sibling
+- every other translated sibling
+
+## Button Generation Rules
+
+The final button set is created in `EditJumpButtonsIntoSentMessagesAsync`.
+
+- `Original` always links to the source user-authored message.
+- Language buttons use the uppercased target language code for the generated bot message in that channel.
+- Only bot-generated messages found in `sentMessages` become language buttons.
+- Buttons are added by editing bot messages after all destination URLs are known.
+
+## Edited Message Synchronization
+
+When a user edits a message, `OnMessageUpdatedAsync` runs.
+
+### Current Behavior
+
+1. Ignore bot edits and non-user edits.
+2. Compare cached previous text with the current text.
+3. If the text is unchanged, do nothing.
+4. Look up all mirrored/generated messages for the original message ID through `MessageLinks`.
+5. For each mirrored message:
+   - If the destination channel's target language matches the detected source language, rewrite it as raw:
+     - `**Author**:`
+   - Otherwise translate it and rewrite it as:
+     - `**Author** (SRC to TARGET):`
+6. Update the mirrored message content in place with `ModifyAsync`.
+
+### What Stays the Same During Edit Sync
+
+- Existing jump buttons remain on the mirrored messages.
+- Existing reply linkage remains on reply messages created by `ReplyAsync`.
+- Attachments are not re-downloaded or replaced.
+
+### Current Limitations
+
+- The handler only reacts to **text content changes**.
+- Attachment-only edits are ignored.
+- The comparison relies on the Discord.Net message cache. The current client cache is `50` messages, so older edits may not have the pre-edit text available.
+- The localized reply created during mismatch flow is initially sent as `*(SRC to LOCAL):* ...`, but if the source message is edited later, that reply's content is rewritten into the standard mirrored format:
+  - `**Author** (SRC to LOCAL):`
+
+## Attachment Handling During New Message Routing
+
+Attachment downloads happen before outbound routing. The same downloaded `byte[]` is reused across destinations, and each send gets its own `MemoryStream`.
+
+If attachment upload fails for a destination, Tsumari falls back to sending plain text with:
+
+`*(Media attachments failed to mirror)*`
