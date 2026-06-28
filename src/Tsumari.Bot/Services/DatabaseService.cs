@@ -365,6 +365,26 @@ namespace Tsumari.Bot.Services
             await cmd.ExecuteNonQueryAsync();
         }
 
+        public async Task DeleteMessageLinksAsync(ulong originalMessageId)
+        {
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM MessageLinks WHERE OriginalMessageId = $orig;";
+            cmd.Parameters.AddWithValue("$orig", originalMessageId.ToString());
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task DeleteMessageLinkByMirroredMessageIdAsync(ulong mirroredMessageId)
+        {
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM MessageLinks WHERE MirroredMessageId = $mirror;";
+            cmd.Parameters.AddWithValue("$mirror", mirroredMessageId.ToString());
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         public async Task<List<MirroredMessageLink>> GetMirroredMessagesAsync(ulong originalMessageId)
         {
             var results = new List<MirroredMessageLink>();

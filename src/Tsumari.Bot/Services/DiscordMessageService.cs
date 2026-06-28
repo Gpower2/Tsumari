@@ -23,6 +23,18 @@ namespace Tsumari.Bot.Services
             return await _client.GetChannelAsync(channelId) as IMessageChannel;
         }
 
+        public async Task<bool> DeleteMessageAsync(ulong channelId, ulong messageId)
+        {
+            var channel = await GetChannelAsync(channelId);
+            if (channel == null)
+            {
+                return false;
+            }
+
+            await channel.DeleteMessageAsync(messageId);
+            return true;
+        }
+
         public Task AddReactionAsync(IMessage message, IEmote emote)
         {
             return message switch

@@ -20,6 +20,7 @@ namespace Tsumari.Bot
         private readonly InteractionService _interactionService;
         private readonly DatabaseService _dbService;
         private readonly TranslationService _translationService;
+        private readonly LinkedMessageDeletionService _linkedMessageDeletionService;
         private readonly ReactionMirroringService _reactionMirroringService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IServiceProvider _serviceProvider;
@@ -31,6 +32,7 @@ namespace Tsumari.Bot
             InteractionService interactionService,
             DatabaseService dbService,
             TranslationService translationService,
+            LinkedMessageDeletionService linkedMessageDeletionService,
             ReactionMirroringService reactionMirroringService,
             IHttpClientFactory httpClientFactory,
             IServiceProvider serviceProvider,
@@ -41,6 +43,7 @@ namespace Tsumari.Bot
             _interactionService = interactionService;
             _dbService = dbService;
             _translationService = translationService;
+            _linkedMessageDeletionService = linkedMessageDeletionService;
             _reactionMirroringService = reactionMirroringService;
             _httpClientFactory = httpClientFactory;
             _serviceProvider = serviceProvider;
@@ -55,6 +58,8 @@ namespace Tsumari.Bot
             _client.Log += OnLogAsync;
             _client.Ready += OnReadyAsync;
             _client.MessageReceived += OnMessageReceivedAsync;
+            _client.MessageDeleted += OnMessageDeletedAsync;
+            _client.MessagesBulkDeleted += OnMessagesBulkDeletedAsync;
             _client.MessageUpdated += OnMessageUpdatedAsync;
             _client.ReactionAdded += OnReactionAddedAsync;
             _client.ReactionRemoved += OnReactionRemovedAsync;
@@ -168,6 +173,46 @@ namespace Tsumari.Bot
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Unhandled error inside routing pipeline for message {MsgId}.", message.Id);
+                }
+            });
+
+            return Task.CompletedTask;
+        }
+
+        private Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _linkedMessageDeletionService.HandleMessageDeletedAsync(messageCache.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unhandled error synchronizing delete for message {MessageId}.", messageCache.Id);
+                }
+            });
+
+            return Task.CompletedTask;
+        }
+
+        private Task OnMessagesBulkDeletedAsync(IReadOnlyCollection<Cacheable<IMessage, ulong>> messageCaches, Cacheable<IMessageChannel, ulong> channelCache)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var messageIds = new List<ulong>(messageCaches.Count);
+                    foreach (var messageCache in messageCaches)
+                    {
+                        messageIds.Add(messageCache.Id);
+                    }
+
+                    await _linkedMessageDeletionService.HandleMessagesDeletedAsync(messageIds);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unhandled error synchronizing bulk delete in channel {ChannelId}.", channelCache.Id);
                 }
             });
 

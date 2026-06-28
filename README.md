@@ -12,6 +12,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Clear translated headers:** translated messages use the format `**Author** (XX to YY):`.
 - **Jump-link buttons:** generated bot messages are edited after send so they can include `Original` plus language-code buttons for other generated copies.
 - **Edited-message synchronization:** when a user edits a text message, mirrored bot messages are updated in place.
+- **Delete synchronization:** when a source message is deleted, existing linked bot messages are deleted too.
 - **Reaction mirroring:** standard reactions added to one linked message are reconciled across the rest of the linked message family.
 - **Attachment mirroring:** attachments are downloaded once and re-uploaded as native Discord files during initial fan-out.
 - **SQLite persistence:** channel mappings, mirrored message IDs, and usage tracking are stored in SQLite.
@@ -24,6 +25,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Edit sync uses cache when available.** The Discord client keeps `MessageCacheSize = 50` messages cached so unchanged edits can be skipped cheaply, but cache misses are still re-synchronized instead of being ignored.
 - **Reaction mirroring is link-driven and in-place.** Only existing linked messages participate; reaction handling never creates new messages or reorders the conversation.
 - **Reaction mirroring currently tracks standard reactions only.** Burst reactions are ignored because the bot can only mirror normal reactions reliably.
+- **Delete sync is link-driven and in-place.** Deleting an original source message removes its existing linked bot messages; deleting a mirrored bot message only removes its stale link row.
 - **Language buttons only exist for bot-generated copies.** The source user-authored message is always reached through the `Original` button.
 - **Mismatch replies are tracked too.** When a localized channel receives the wrong language, the bot's in-channel translated reply is stored in `MessageLinks` and participates in cross-link buttons.
 - **Stored locale tags are normalized.** Inputs such as `pt_BR` are normalized to `pt-br` for storage and display, while target-channel routing keeps locale variants separate.
@@ -57,6 +59,7 @@ E:\Development\Tsumari\
 │           ├── ITranslationProvider.cs
 │           ├── LanguageCodeService.cs
 │           ├── LinkedMessageFamily.cs
+│           ├── LinkedMessageDeletionService.cs
 │           ├── OllamaTranslationProvider.cs
 │           ├── OpenAITranslationProvider.cs
 │           ├── ReactionMirroringService.cs
@@ -70,12 +73,14 @@ E:\Development\Tsumari\
         ├── DeepLTranslationProviderTests.cs
         ├── DeepLLanguageServiceTests.cs
         ├── LanguageCodeServiceTests.cs
+        ├── LinkedMessageDeletionServiceTests.cs
         ├── OllamaTranslationProviderTests.cs
         ├── OpenAITranslationProviderTests.cs
         ├── ReactionMirroringServiceTests.cs
         ├── ResiliencyHelperTests.cs
         ├── TranslationServiceTests.cs
         ├── TranslationProviderResolverTests.cs
+        ├── WorkerDeleteTests.cs
         └── WorkerEditTests.cs
 ```
 

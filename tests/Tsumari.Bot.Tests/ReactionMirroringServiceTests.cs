@@ -474,6 +474,11 @@ namespace Tsumari.Bot.Tests
                 return Task.CompletedTask;
             }
 
+            public Task<bool> DeleteMessageAsync(ulong channelId, ulong messageId)
+            {
+                throw new NotSupportedException("DeleteMessageAsync is not used by reaction mirroring tests.");
+            }
+
             public Task RemoveOwnReactionAsync(IMessage message, IEmote emote)
             {
                 RemovedReactions.Add(new ReactionOperation(message, ReactionMirroringService.GetReactionKey(emote)));

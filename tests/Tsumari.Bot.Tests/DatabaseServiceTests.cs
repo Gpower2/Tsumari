@@ -242,6 +242,41 @@ namespace Tsumari.Bot.Tests
         }
 
         [Fact]
+        public async Task DeleteMessageLinksAsync_RemovesAllLinksForOriginalMessage_WithoutTouchingOthers()
+        {
+            await _dbService.InitializeDatabaseAsync();
+
+            await _dbService.LinkMessagesAsync(55555UL, 11111UL, 66661UL, 10001UL, "el");
+            await _dbService.LinkMessagesAsync(55555UL, 11111UL, 66662UL, 10002UL, "it");
+            await _dbService.LinkMessagesAsync(77777UL, 22222UL, 88881UL, 20001UL, "de");
+
+            await _dbService.DeleteMessageLinksAsync(55555UL);
+
+            var deletedFamily = await _dbService.GetMirroredMessagesAsync(55555UL);
+            var remainingFamily = await _dbService.GetMirroredMessagesAsync(77777UL);
+
+            Assert.Empty(deletedFamily);
+            Assert.Single(remainingFamily);
+            Assert.Equal(88881UL, remainingFamily[0].MirroredMessageId);
+        }
+
+        [Fact]
+        public async Task DeleteMessageLinkByMirroredMessageIdAsync_RemovesOnlyTheTargetLink()
+        {
+            await _dbService.InitializeDatabaseAsync();
+
+            await _dbService.LinkMessagesAsync(55555UL, 11111UL, 66661UL, 10001UL, "el");
+            await _dbService.LinkMessagesAsync(55555UL, 11111UL, 66662UL, 10002UL, "it");
+
+            await _dbService.DeleteMessageLinkByMirroredMessageIdAsync(66661UL);
+
+            var links = await _dbService.GetMirroredMessagesAsync(55555UL);
+
+            Assert.Single(links);
+            Assert.Equal(66662UL, links[0].MirroredMessageId);
+        }
+
+        [Fact]
         public async Task GetLinkedMessageFamilyAsync_ReturnsNull_ForUnlinkedMessage()
         {
             await _dbService.InitializeDatabaseAsync();

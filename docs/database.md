@@ -59,9 +59,8 @@ Current uses in code:
 - generating jump-link buttons after a message fan-out completes
 - looking up mirrored bot messages when a source message is edited later
 - tracking the mismatch-flow translated reply created in the source localized channel
+- deleting linked bot messages when the original source message is deleted
 - resolving a full linked-message family from either an original message ID or a mirrored message ID during reaction mirroring
-
-This table is **not** currently used for delete synchronization.
 
 ### `UsageTracker`
 
@@ -93,6 +92,8 @@ Discord Snowflake IDs are 64-bit values. Storing them as `TEXT` avoids cross-lay
 
 - `LinkMessagesAsync()` stores generated bot messages during routing
 - `EnsureOriginalChannelIdAsync()` backfills the source channel for pre-existing link rows when the original message is observed again
+- `DeleteMessageLinksAsync()` removes an original message's linked bot-message rows during delete sync
+- `DeleteMessageLinkByMirroredMessageIdAsync()` prunes stale rows when a mirrored bot message is deleted independently
 - `GetMirroredMessagesAsync()` returns all generated bot messages tied to an original user message
 - `GetLinkedMessageFamilyAsync()` resolves the original message plus its linked bot-generated copies for reaction mirroring
 

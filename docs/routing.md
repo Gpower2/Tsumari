@@ -1,12 +1,13 @@
-# Routing Flows, Edit Synchronization, and Reaction Mirroring
+# Routing Flows, Edit Synchronization, Delete Synchronization, and Reaction Mirroring
 
-Tsumari has two live routing paths for new messages and one follow-up path for edited messages.
+Tsumari has two live routing paths for new messages plus follow-up paths for edited messages, deleted messages, and linked reaction changes.
 
 ## Event Entry Points
 
 `Worker` subscribes to:
 
 - `MessageReceived` for new user-authored messages
+- `MessageDeleted` and `MessagesBulkDeleted` for linked message cleanup
 - `MessageUpdated` for edited user-authored messages
 - `ReactionAdded`, `ReactionRemoved`, `ReactionsCleared`, and `ReactionsRemovedForEmote` for linked reaction reconciliation
 - `InteractionCreated` for `/tsumari` admin commands
@@ -130,6 +131,32 @@ When a user edits a message, `OnMessageUpdatedAsync` runs.
 - The handler only reacts to **text content changes**.
 - Attachment-only edits are ignored.
 - The current client cache is `50` messages. When a cached pre-edit snapshot is unavailable, Tsumari still re-synchronizes linked messages; it just cannot skip the update based on a before/after text comparison.
+
+## Delete Synchronization
+
+When an original source message is deleted, Tsumari deletes its existing linked bot-generated messages so the cluster does not keep orphaned mirrors.
+
+### Current Behavior
+
+1. On `MessageDeleted`, look up generated bot-message links by the deleted message ID.
+2. If the deleted message is an original source message with linked bot messages:
+   - delete each linked bot-generated message in place
+   - remove that original message's `MessageLinks` rows
+3. If the deleted message is itself a mirrored bot message:
+   - remove only that stale `MessageLinks` row
+   - do not delete any other messages
+4. On `MessagesBulkDeleted`, repeat the same cleanup for each deleted message ID in the batch.
+
+### Delete Synchronization Rules
+
+- Delete sync only affects **existing linked bot messages**. It never creates replacement messages.
+- The user's original source message is never re-created or otherwise modified.
+- The same-channel translated reply created during localized mismatch flow is treated like any other linked bot message and is deleted when its source message is deleted.
+
+### Current Limitations
+
+- Cleanup is best-effort. If Discord rejects deletion of one linked bot message, Tsumari logs the failure and still removes the stale database rows for that original message family.
+- Legacy rows created before `OriginalChannelId` existed are still cleaned up correctly when the **original** message is deleted, because delete sync for originals only depends on `OriginalMessageId`.
 
 ## Reaction Mirroring
 

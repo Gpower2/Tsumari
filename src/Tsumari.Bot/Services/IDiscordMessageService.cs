@@ -10,6 +10,8 @@ namespace Tsumari.Bot.Services
 
         Task<IMessageChannel?> GetChannelAsync(ulong channelId);
 
+        Task<bool> DeleteMessageAsync(ulong channelId, ulong messageId);
+
         Task AddReactionAsync(IMessage message, IEmote emote);
 
         Task RemoveOwnReactionAsync(IMessage message, IEmote emote);
