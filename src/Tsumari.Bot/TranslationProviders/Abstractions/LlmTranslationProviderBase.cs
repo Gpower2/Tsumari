@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
+using Tsumari.Bot.Services;
 
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.TranslationProviders.Abstractions
 {
     public abstract class LlmTranslationProviderBase : ITranslationProvider
     {

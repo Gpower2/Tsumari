@@ -1,4 +1,4 @@
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.Constants
 {
     public static class HttpClientNames
     {

@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
 
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.Extensions
 {
     public static class HttpResponseExtensions
     {

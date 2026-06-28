@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.TranslationProviders.Abstractions
 {
     public interface ITranslationProvider
     {

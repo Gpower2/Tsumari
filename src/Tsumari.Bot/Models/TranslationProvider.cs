@@ -1,4 +1,4 @@
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.Models
 {
     public enum TranslationProvider
     {

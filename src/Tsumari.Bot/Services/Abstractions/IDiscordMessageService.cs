@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Discord;
 
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.Services.Abstractions
 {
     public interface IDiscordMessageService
     {

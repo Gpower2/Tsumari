@@ -46,31 +46,40 @@ E:\Development\Tsumari\
 │   └── routing.md
 ├── src/
 │   └── Tsumari.Bot/
+│       ├── Constants/
+│       │   └── HttpClientNames.cs
+│       ├── Extensions/
+│       │   └── HttpResponseExtensions.cs
+│       ├── GlobalUsings.cs
 │       ├── Program.cs
 │       ├── Worker.cs
 │       ├── appsettings.json
+│       ├── Models/
+│       │   ├── DiscordReactionEvent.cs
+│       │   ├── LinkedMessageFamily.cs
+│       │   ├── ReplyMirroringContext.cs
+│       │   └── TranslationProvider.cs
 │       ├── Modules/
 │       │   └── InteractionModule.cs
+│       ├── TranslationProviders/
+│       │   ├── Abstractions/
+│       │   │   ├── ITranslationProvider.cs
+│       │   │   └── LlmTranslationProviderBase.cs
+│       │   ├── DeepLLanguageService.cs
+│       │   ├── DeepLTranslationProvider.cs
+│       │   ├── OllamaTranslationProvider.cs
+│       │   ├── OpenAITranslationProvider.cs
+│       │   └── TranslationProviderResolver.cs
 │       └── Services/
+│           ├── Abstractions/
+│           │   └── IDiscordMessageService.cs
 │           ├── DiscordMessageService.cs
 │           ├── DatabaseService.cs
-│           ├── DeepLTranslationProvider.cs
-│           ├── DeepLLanguageService.cs
-│           ├── DiscordReactionEvent.cs
-│           ├── HttpClientNames.cs
-│           ├── IDiscordMessageService.cs
-│           ├── ITranslationProvider.cs
 │           ├── LanguageCodeService.cs
-│           ├── LinkedMessageFamily.cs
 │           ├── LinkedMessageDeletionService.cs
-│           ├── OllamaTranslationProvider.cs
-│           ├── OpenAITranslationProvider.cs
-│           ├── ReplyMirroringContext.cs
 │           ├── ReplyMirroringService.cs
 │           ├── ReactionMirroringService.cs
 │           ├── ResiliencyHelper.cs
-│           ├── TranslationProvider.cs
-│           ├── TranslationProviderResolver.cs
 │           └── TranslationService.cs
 └── tests/
     └── Tsumari.Bot.Tests/

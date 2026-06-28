@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.Models
 {
     public sealed class MirroredMessageLink
     {

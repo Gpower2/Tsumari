@@ -1,6 +1,6 @@
 using Discord;
 
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.Models
 {
     public sealed class DiscordReactionEvent
     {

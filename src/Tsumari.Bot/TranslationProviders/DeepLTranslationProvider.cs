@@ -4,7 +4,7 @@ using DeepL;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace Tsumari.Bot.Services
+namespace Tsumari.Bot.TranslationProviders
 {
     public class DeepLTranslationProvider : ITranslationProvider
     {
