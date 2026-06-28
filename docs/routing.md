@@ -47,7 +47,13 @@ In master flow, each generated localized copy receives the same final button set
 
 ## Branch B: Message Received in a Localized Channel
 
-When a user posts in a localized channel, Tsumari compares the detected source language with that channel's configured target language.
+When a user posts in a localized channel, Tsumari first resolves the effective source locale for that message, then compares it with the channel configuration.
+
+Routing comparisons are locale-aware:
+
+- target-channel raw/translate decisions use exact locale matching (`PT` != `PT-BR`)
+- source localized-channel matching can fall back from a generic detected code to that channel's configured locale (`PT` can be treated as `PT-BR` when the user posted inside a `pt-br` channel)
+- locale-specific variants remain separate (`PT-BR` does not match `PT-PT`)
 
 ### Match Flow
 
@@ -71,7 +77,7 @@ If the detected language does **not** match the localized channel's target:
 2. Tsumari posts a translated reply in the same localized channel:
    - `*(SRC to LOCAL):* translated text`
 3. Tsumari sends the raw message to the parent master channel.
-4. Tsumari sends the raw message to the sibling localized channel whose target language matches the detected source language, if one exists.
+4. Tsumari sends the raw message to the sibling localized channel whose target language exactly matches the resolved source locale, if one exists.
 5. Tsumari translates the message for every remaining sibling localized channel.
 6. Tsumari stores the in-channel reply and every generated mirror in `MessageLinks`.
 7. Tsumari edits all bot-generated messages to add jump buttons.
@@ -105,7 +111,7 @@ When a user edits a message, `OnMessageUpdatedAsync` runs.
 3. If the text is unchanged, do nothing.
 4. Look up all mirrored/generated messages for the original message ID through `MessageLinks`.
 5. For each mirrored message:
-   - If the destination channel's target language matches the detected source language, rewrite it as raw:
+   - If the destination channel's target language exactly matches the resolved source locale, rewrite it as raw:
      - `**Author**:`
    - Otherwise translate it and rewrite it as:
      - `**Author** (SRC to TARGET):`

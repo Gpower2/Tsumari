@@ -16,6 +16,8 @@ namespace Tsumari.Bot.Tests
             Assert.Equal("(EN to DE)", result);
             result = Worker.FormatLanguagePair("EN-US", "el");
             Assert.Equal("(EN-US to EL)", result);
+            result = Worker.FormatLanguagePair("pt_br", "en-us");
+            Assert.Equal("(PT-BR to EN-US)", result);
         }
 
         [Fact]

@@ -63,7 +63,7 @@ namespace Tsumari.Bot.Modules
         public async Task RegisterLocalAsync(
             [Summary("local-channel", "The localized channel to register")] IChannel localChannel,
             [Summary("master-channel", "The parent Master channel")] IChannel masterChannel,
-            [Summary("language-code", "DeepL target language code (e.g. en, el, it, es)")] string languageCode)
+            [Summary("language-code", "Target language or locale code (e.g. en, el, it, pt-br)")] string languageCode)
         {
             // Fail-fast validation
             if (localChannel is not ITextChannel localTextChannel || masterChannel is not ITextChannel masterTextChannel)
@@ -101,14 +101,14 @@ namespace Tsumari.Bot.Modules
                     return;
                 }
 
-                string lang = languageCode.Trim().ToLowerInvariant();
+                string lang = LanguageCodeService.NormalizeStoredLanguageCode(languageCode);
 
                 bool registered = await _dbService.RegisterLocalChannelAsync(localChannel.Id, masterChannel.Id, lang);
                 if (registered)
                 {
                     _logger.LogInformation("Local channel {Local} registered to Master {Master} with language {Lang} by {User}.", 
                         localTextChannel.Name, masterTextChannel.Name, lang, Context.User.Username);
-                    await RespondAsync($"✅ Success: Linked localized channel <#{localChannel.Id}> to Master <#{masterChannel.Id}> with target language **{lang.ToUpper()}**.", ephemeral: false);
+                    await RespondAsync($"✅ Success: Linked localized channel <#{localChannel.Id}> to Master <#{masterChannel.Id}> with target language **{LanguageCodeService.NormalizeLanguageCode(lang)}**.", ephemeral: false);
                 }
                 else
                 {

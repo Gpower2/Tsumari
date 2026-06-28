@@ -162,7 +162,7 @@ namespace Tsumari.Bot.Services
             
             cmd.Parameters.AddWithValue("$localId", localChannelId.ToString());
             cmd.Parameters.AddWithValue("$parentMasterId", parentMasterChannelId.ToString());
-            cmd.Parameters.AddWithValue("$langCode", targetLanguageCode.Trim().ToLowerInvariant());
+            cmd.Parameters.AddWithValue("$langCode", LanguageCodeService.NormalizeStoredLanguageCode(targetLanguageCode));
 
             int rows = await cmd.ExecuteNonQueryAsync();
             return rows > 0;
@@ -309,7 +309,7 @@ namespace Tsumari.Bot.Services
             cmd.Parameters.AddWithValue("$orig", originalMessageId.ToString());
             cmd.Parameters.AddWithValue("$mirror", mirroredMessageId.ToString());
             cmd.Parameters.AddWithValue("$chan", channelId.ToString());
-            cmd.Parameters.AddWithValue("$lang", languageCode.Trim().ToLowerInvariant());
+            cmd.Parameters.AddWithValue("$lang", LanguageCodeService.NormalizeStoredLanguageCode(languageCode));
 
             await cmd.ExecuteNonQueryAsync();
         }

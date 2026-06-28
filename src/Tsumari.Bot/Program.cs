@@ -47,9 +47,20 @@ namespace Tsumari.Bot
                 ));
 
             // Register Custom services
+            builder.Services.AddHttpClient(HttpClientNames.DiscordCdn);
+            builder.Services.AddHttpClient(HttpClientNames.DeepLLanguageMetadata);
+            builder.Services.AddHttpClient(HttpClientNames.OllamaTranslation);
+            builder.Services.AddHttpClient(HttpClientNames.OpenAITranslation);
+
             builder.Services.AddSingleton<DatabaseService>();
+            builder.Services.AddSingleton<DeepLLanguageService>();
+            builder.Services.AddSingleton<DeepLTranslationProvider>();
+            builder.Services.AddSingleton<OllamaTranslationProvider>();
+            builder.Services.AddSingleton<OpenAITranslationProvider>();
+            builder.Services.AddSingleton<TranslationProviderResolver>();
+            builder.Services.AddSingleton<ITranslationProvider>(provider =>
+                provider.GetRequiredService<TranslationProviderResolver>().Resolve());
             builder.Services.AddSingleton<TranslationService>();
-            builder.Services.AddHttpClient();
 
             // Main Background Bot Service
             builder.Services.AddHostedService<Worker>();

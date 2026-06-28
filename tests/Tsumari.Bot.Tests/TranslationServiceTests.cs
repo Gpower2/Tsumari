@@ -16,9 +16,6 @@ namespace Tsumari.Bot.Tests
         public async Task CanTranslateAsync_ReturnsTrue_WhenUsageIsUnderQuota()
         {
             // Arrange
-            var configMock = new Mock<IConfiguration>();
-            configMock.Setup(c => c["DeepL:ApiKey"]).Returns("dummy-api-key");
-
             var dbLogger = NullLogger<DatabaseService>.Instance;
             var dbPath = $"test_tsumari_trans_{Guid.NewGuid():N}.db";
             
@@ -30,9 +27,10 @@ namespace Tsumari.Bot.Tests
 
             var transLogger = NullLogger<TranslationService>.Instance;
             var loggerFactory = new NullLoggerFactory();
-            
-            var httpClientFactory = new Mock<IHttpClientFactory>();
-            var transService = new TranslationService(configMock.Object, dbService, transLogger, loggerFactory, httpClientFactory.Object);
+            var providerMock = new Mock<ITranslationProvider>();
+            providerMock.SetupGet(p => p.UsesCharacterQuota).Returns(true);
+            providerMock.SetupGet(p => p.IsActive).Returns(true);
+            var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
 
             try
             {
@@ -66,21 +64,50 @@ namespace Tsumari.Bot.Tests
         }
 
         [Fact]
-        public void ServiceInitialization_SetsActiveFalse_WhenKeyIsEmpty()
+        public async Task CanTranslateAsync_IgnoresQuota_ForNonQuotaProvider()
         {
-            // Arrange
-            var configMock = new Mock<IConfiguration>();
-            configMock.Setup(c => c["DeepL:ApiKey"]).Returns(string.Empty);
+            var dbLogger = NullLogger<DatabaseService>.Instance;
+            var dbPath = $"test_tsumari_trans_{Guid.NewGuid():N}.db";
+            var dbConfigMock = new Mock<IConfiguration>();
+            dbConfigMock.Setup(c => c["Database:FilePath"]).Returns(dbPath);
+            var dbService = new DatabaseService(dbConfigMock.Object, dbLogger);
+            await dbService.InitializeDatabaseAsync();
+            await dbService.IncrementUsageAsync(TranslationService.MonthlyCharacterLimit);
 
+            var transLogger = NullLogger<TranslationService>.Instance;
+            var loggerFactory = new NullLoggerFactory();
+            var providerMock = new Mock<ITranslationProvider>();
+            providerMock.SetupGet(p => p.UsesCharacterQuota).Returns(false);
+            providerMock.SetupGet(p => p.IsActive).Returns(true);
+            var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
+
+            try
+            {
+                Assert.True(await transService.CanTranslateAsync(1000));
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(dbPath)) File.Delete(dbPath);
+                    var wal = $"{dbPath}-wal";
+                    if (File.Exists(wal)) File.Delete(wal);
+                }
+                catch {}
+            }
+        }
+
+        [Fact]
+        public void IsActive_ReflectsProviderState()
+        {
             var dbMock = new Mock<DatabaseService>(new Mock<IConfiguration>().Object, NullLogger<DatabaseService>.Instance);
             var transLogger = NullLogger<TranslationService>.Instance;
             var loggerFactory = new NullLoggerFactory();
-            var httpClientFactory = new Mock<IHttpClientFactory>();
+            var providerMock = new Mock<ITranslationProvider>();
+            providerMock.SetupGet(p => p.IsActive).Returns(false);
 
-            // Act
-            var transService = new TranslationService(configMock.Object, dbMock.Object, transLogger, loggerFactory, httpClientFactory.Object);
+            var transService = new TranslationService(dbMock.Object, providerMock.Object, transLogger, loggerFactory);
 
-            // Assert
             Assert.False(transService.IsActive);
         }
     }

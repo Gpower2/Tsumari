@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,7 +20,7 @@ namespace Tsumari.Bot
         private readonly InteractionService _interactionService;
         private readonly DatabaseService _dbService;
         private readonly TranslationService _translationService;
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
         private readonly ILogger<Worker> _logger;
@@ -31,7 +30,7 @@ namespace Tsumari.Bot
             InteractionService interactionService,
             DatabaseService dbService,
             TranslationService translationService,
-            HttpClient httpClient,
+            IHttpClientFactory httpClientFactory,
             IServiceProvider serviceProvider,
             IConfiguration configuration,
             ILogger<Worker> logger)
@@ -40,7 +39,7 @@ namespace Tsumari.Bot
             _interactionService = interactionService;
             _dbService = dbService;
             _translationService = translationService;
-            _httpClient = httpClient;
+            _httpClientFactory = httpClientFactory;
             _serviceProvider = serviceProvider;
             _configuration = configuration;
             _logger = logger;
@@ -222,6 +221,9 @@ namespace Tsumari.Bot
                     authorName = guildUser.Nickname ?? guildUser.GlobalName ?? guildUser.Username;
                 }
 
+                var sourceChannelLang = await _dbService.GetTargetLanguageCodeAsync(message.Channel.Id);
+                var sourceLang = LanguageCodeService.ResolveSourceLanguageCode(detectedLang, sourceChannelLang);
+
                 var mirrored = await _dbService.GetMirroredMessagesAsync(message.Id);
                 foreach (var link in mirrored)
                 {
@@ -236,7 +238,7 @@ namespace Tsumari.Bot
                         var targetLang = await _dbService.GetTargetLanguageCodeAsync(chanId); // null for master channel
                         string newText;
 
-                        if (targetLang == null || string.Equals(targetLang, detectedLang, StringComparison.OrdinalIgnoreCase))
+                        if (targetLang == null || LanguageCodeService.AreSameLanguageCode(sourceLang, targetLang))
                         {
                             newText = $"**{authorName}**:\n{afterContent}";
                         }
@@ -245,7 +247,7 @@ namespace Tsumari.Bot
                             try
                             {
                                 var translated = await _translationService.TranslateTextAsync(afterContent, targetLang);
-                                newText = $"**{authorName}** ({detectedLang.ToUpperInvariant()} to {targetLang.ToUpperInvariant()}):\n{translated}";
+                                newText = $"**{authorName}** {FormatLanguagePair(sourceLang, targetLang)}:\n{translated}";
                             }
                             catch (Exception ex)
                             {
@@ -310,17 +312,23 @@ namespace Tsumari.Bot
             else if (isLocal)
             {
                 var localLang = await _dbService.GetTargetLanguageCodeAsync(channelId);
-                if (localLang != null) detectedLang = localLang.ToUpperInvariant();
+                if (localLang != null) detectedLang = LanguageCodeService.NormalizeLanguageCode(localLang);
             }
+
+            string sourceLang = LanguageCodeService.NormalizeLanguageCode(detectedLang);
 
             var mediaAssets = new List<(string Filename, byte[] Bytes)>();
             if (hasAttachments)
             {
+                using var discordCdnClient = _httpClientFactory.CreateClient(HttpClientNames.DiscordCdn);
                 foreach (var attachment in message.Attachments)
                 {
                     try
                     {
-                        var bytes = await _httpClient.GetByteArrayAsync(attachment.Url);
+                        using var response = await discordCdnClient.GetAsync(attachment.Url, HttpCompletionOption.ResponseHeadersRead);
+                        var bytes = await response.ReadBytesWithStatusCheckAsync(
+                            _logger,
+                            $"downloading Discord attachment '{attachment.Filename}'");
                         mediaAssets.Add((attachment.Filename, bytes));
                     }
                     catch (Exception ex)
@@ -362,12 +370,12 @@ namespace Tsumari.Bot
                     if (childChannel == null) continue;
 
                     string textToSend;
-                    if (!string.Equals(detectedLang, child.TargetLanguageCode, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(content))
+                    if (!LanguageCodeService.AreSameLanguageCode(sourceLang, child.TargetLanguageCode) && !string.IsNullOrWhiteSpace(content))
                     {
                         try
                         {
                             var translatedText = await _translationService.TranslateTextAsync(content, child.TargetLanguageCode);
-                            textToSend = $"**{authorName}** {FormatLanguagePair(detectedLang, child.TargetLanguageCode)}:\n{translatedText}";
+                            textToSend = $"**{authorName}** {FormatLanguagePair(sourceLang, child.TargetLanguageCode)}:\n{translatedText}";
                         }
                         catch (Exception ex)
                         {
@@ -385,7 +393,7 @@ namespace Tsumari.Bot
                     {
                         sentMessages.Add(child.ChannelId, sentMsg);
                         await _dbService.LinkMessagesAsync(message.Id, sentMsg.Id, childChannel.Id, child.TargetLanguageCode);
-                        targetsList.Add((child.ChannelId, child.TargetLanguageCode.ToUpperInvariant(), child.TargetLanguageCode));
+                        targetsList.Add((child.ChannelId, LanguageCodeService.NormalizeLanguageCode(child.TargetLanguageCode), child.TargetLanguageCode));
                     }
                 }
 
@@ -409,10 +417,11 @@ namespace Tsumari.Bot
                 var parentChannel = await _client.GetChannelAsync(parentMasterId.Value) as IMessageChannel;
                 if (parentChannel == null) return;
 
-                bool isMatch = string.Equals(detectedLang, targetLang, StringComparison.OrdinalIgnoreCase);
+                sourceLang = LanguageCodeService.ResolveSourceLanguageCode(detectedLang, targetLang);
+                bool isMatch = LanguageCodeService.AreSameLanguageCode(sourceLang, targetLang);
 
                 // Initialize target lists
-                targetsList.Add((channelId, targetLang.ToUpperInvariant(), targetLang));
+                targetsList.Add((channelId, LanguageCodeService.NormalizeLanguageCode(targetLang), targetLang));
                 targetsList.Add((parentMasterId.Value, "Original", "master"));
 
                 var initBuilder = new ComponentBuilder()
@@ -443,7 +452,7 @@ namespace Tsumari.Bot
                             try
                             {
                                 var translatedText = await _translationService.TranslateTextAsync(content, sibling.TargetLanguageCode);
-                                textToSibling = $"**{authorName}** {FormatLanguagePair(detectedLang, sibling.TargetLanguageCode)}:\n{translatedText}";
+                                textToSibling = $"**{authorName}** {FormatLanguagePair(sourceLang, sibling.TargetLanguageCode)}:\n{translatedText}";
                             }
                             catch (Exception ex)
                             {
@@ -461,7 +470,7 @@ namespace Tsumari.Bot
                         {
                             sentMessages.Add(sibling.ChannelId, siblingSent);
                             await _dbService.LinkMessagesAsync(message.Id, siblingSent.Id, siblingChannel.Id, sibling.TargetLanguageCode);
-                            targetsList.Add((sibling.ChannelId, sibling.TargetLanguageCode.ToUpperInvariant(), sibling.TargetLanguageCode));
+                            targetsList.Add((sibling.ChannelId, LanguageCodeService.NormalizeLanguageCode(sibling.TargetLanguageCode), sibling.TargetLanguageCode));
                         }
                     }
 
@@ -478,7 +487,7 @@ namespace Tsumari.Bot
                         try
                         {
                             var nativeTranslation = await _translationService.TranslateTextAsync(content, targetLang);
-                            nativeReply = await message.ReplyAsync($"*{FormatLanguagePair(detectedLang, targetLang)}:* {nativeTranslation}");
+                            nativeReply = await message.ReplyAsync($"*{FormatLanguagePair(sourceLang, targetLang)}:* {nativeTranslation}");
                         }
                         catch (Exception ex)
                         {
@@ -509,7 +518,7 @@ namespace Tsumari.Bot
                         if (siblingChannel == null) continue;
 
                         string textToSibling;
-                        bool siblingIsHome = string.Equals(detectedLang, sibling.TargetLanguageCode, StringComparison.OrdinalIgnoreCase);
+                        bool siblingIsHome = LanguageCodeService.AreSameLanguageCode(sourceLang, sibling.TargetLanguageCode);
 
                         if (siblingIsHome)
                         {
@@ -520,7 +529,7 @@ namespace Tsumari.Bot
                             try
                             {
                                 var translatedText = await _translationService.TranslateTextAsync(content, sibling.TargetLanguageCode);
-                                textToSibling = $"**{authorName}** {FormatLanguagePair(detectedLang, sibling.TargetLanguageCode)}:\n{translatedText}";
+                                textToSibling = $"**{authorName}** {FormatLanguagePair(sourceLang, sibling.TargetLanguageCode)}:\n{translatedText}";
                             }
                             catch (Exception ex)
                             {
@@ -538,7 +547,7 @@ namespace Tsumari.Bot
                         {
                             sentMessages.Add(sibling.ChannelId, siblingSent);
                             await _dbService.LinkMessagesAsync(message.Id, siblingSent.Id, siblingChannel.Id, sibling.TargetLanguageCode);
-                            targetsList.Add((sibling.ChannelId, sibling.TargetLanguageCode.ToUpperInvariant(), sibling.TargetLanguageCode));
+                            targetsList.Add((sibling.ChannelId, LanguageCodeService.NormalizeLanguageCode(sibling.TargetLanguageCode), sibling.TargetLanguageCode));
                         }
                     }
 
@@ -637,14 +646,14 @@ namespace Tsumari.Bot
             }
         }
 
-        internal static string FormatLanguagePair(string sourceLang, string targetLang)
+        public static string FormatLanguagePair(string sourceLang, string targetLang)
         {
-            sourceLang = (sourceLang ?? "").ToUpperInvariant();
-            targetLang = (targetLang ?? "").ToUpperInvariant();
+            sourceLang = LanguageCodeService.NormalizeLanguageCode(sourceLang);
+            targetLang = LanguageCodeService.NormalizeLanguageCode(targetLang);
             return $"({sourceLang} to {targetLang})";
         }
 
-        internal static async Task<bool> TryModifyMessageContentAsync(IMessageChannel channel, ulong messageId, string newText)
+        public static async Task<bool> TryModifyMessageContentAsync(IMessageChannel channel, ulong messageId, string newText)
         {
             if (channel == null) return false;
             try
@@ -664,4 +673,3 @@ namespace Tsumari.Bot
         }
     }
 }
-

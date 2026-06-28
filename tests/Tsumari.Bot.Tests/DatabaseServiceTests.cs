@@ -100,6 +100,20 @@ namespace Tsumari.Bot.Tests
         }
 
         [Fact]
+        public async Task RegisterLocalChannel_Normalizes_LocaleCode()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            ulong masterId = 222111333;
+            ulong localId = 444555666;
+
+            await _dbService.AddMasterChannelAsync(masterId);
+            bool localRegistered = await _dbService.RegisterLocalChannelAsync(localId, masterId, "pt_BR");
+
+            Assert.True(localRegistered);
+            Assert.Equal("pt-br", await _dbService.GetTargetLanguageCodeAsync(localId));
+        }
+
+        [Fact]
         public async Task SiblingChannelsRetrieval_ReturnsOtherLocalChannelsOnly()
         {
             // Arrange
