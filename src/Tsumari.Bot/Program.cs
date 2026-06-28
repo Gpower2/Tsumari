@@ -18,12 +18,16 @@ namespace Tsumari.Bot
 
             // Configure Console Logging
             builder.Logging.ClearProviders();
-            builder.Logging.AddSimpleConsole(options =>
+            builder.Logging.AddConsole(options =>
+            {
+                options.FormatterName = TsumariConsoleFormatter.FormatterName;
+            });
+            builder.Logging.AddConsoleFormatter<TsumariConsoleFormatter, TsumariConsoleFormatterOptions>(options =>
             {
                 options.SingleLine = true;
-                options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz ";
+                options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz";
                 options.UseUtcTimestamp = true;
-                options.IncludeScopes = true;
+                options.IncludeScopes = false;
                 options.ColorBehavior = LoggerColorBehavior.Enabled;
             });
             builder.Logging.AddDebug();
