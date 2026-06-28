@@ -301,6 +301,40 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
+        public async Task MirrorReactionAddedAsync_DoesNotEchoBackToNativeReplyTrigger_WhenMetadataIsStale()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await SeedLinkedFamilyAsync(
+                originalMessageId: 1170UL,
+                originalChannelId: 17UL,
+                (2170UL, 17UL, "en"),
+                (3170UL, 37UL, "master"),
+                (4170UL, 47UL, "de"));
+
+            var thumbsUp = new Emoji("👍");
+            var originalState = CreateMessageState();
+            var nativeReplyState = CreateMessageState();
+            var masterState = CreateMessageState();
+            var siblingState = CreateMessageState();
+
+            var discordMessageService = new TestDiscordMessageService();
+            discordMessageService.RegisterMessage(17UL, 1170UL, originalState);
+            discordMessageService.RegisterMessage(17UL, 2170UL, nativeReplyState);
+            discordMessageService.RegisterMessage(37UL, 3170UL, masterState);
+            discordMessageService.RegisterMessage(47UL, 4170UL, siblingState);
+
+            var service = CreateService(discordMessageService);
+
+            await service.MirrorReactionAddedAsync(2170UL, 17UL, thumbsUp, ReactionType.Normal, 999UL);
+
+            Assert.Equal(3, discordMessageService.AddedReactions.Count);
+            Assert.DoesNotContain(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, nativeReplyState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, originalState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, masterState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, siblingState.Message));
+        }
+
+        [Fact]
         public async Task MirrorReactionRemovedAsync_RemovesBotReaction_FromAllMessages_WhenNoHumanReactionRemains()
         {
             await _dbService.InitializeDatabaseAsync();
@@ -541,6 +575,7 @@ namespace Tsumari.Bot.Tests.Component
         private sealed class TestDiscordMessageService : IDiscordMessageService
         {
             private readonly Dictionary<ulong, IMessageChannel?> _channels = [];
+            private readonly Dictionary<ulong, Dictionary<ulong, IMessage?>> _channelMessages = [];
             private readonly Dictionary<IMessage, Dictionary<IEmote, ReactionMetadata>> _messageStates = [];
             private readonly Dictionary<(IMessage Message, string EmoteKey), List<IReadOnlyCollection<IUser>>> _reactionUsers = [];
             private readonly IUser _botUser = CreateUser(isBot: true);
@@ -618,11 +653,20 @@ namespace Tsumari.Bot.Tests.Component
             public void RegisterMessage(ulong channelId, ulong messageId, TestMessageState messageState)
             {
                 _messageStates[messageState.Message] = messageState.Reactions;
-                RegisterChannel(channelId, new Dictionary<ulong, IMessage?> { [messageId] = messageState.Message });
+
+                if (!_channelMessages.TryGetValue(channelId, out var messagesById))
+                {
+                    messagesById = [];
+                    RegisterChannel(channelId, messagesById);
+                }
+
+                messagesById[messageId] = messageState.Message;
             }
 
             public void RegisterChannel(ulong channelId, Dictionary<ulong, IMessage?> messagesById)
             {
+                _channelMessages[channelId] = messagesById;
+
                 var channelMock = new Mock<IMessageChannel>();
                 channelMock
                     .Setup(channel => channel.GetMessageAsync(It.IsAny<ulong>(), It.IsAny<CacheMode>(), It.IsAny<RequestOptions>()))

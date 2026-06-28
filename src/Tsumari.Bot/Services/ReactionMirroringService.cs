@@ -213,10 +213,15 @@ namespace Tsumari.Bot.Services
                 {
                     if (hasHumanReaction)
                     {
-                        // When the trigger is a human add event, skip echoing the reaction back onto
-                        // the same message. Discord already applied it there, even if our fetched
-                        // metadata has not caught up yet.
-                        if (!hasNormalReaction && !(humanReactionKnownPresent && isTriggerMessage))
+                        // The trigger message is never a mirror target for ReactionAdded. This keeps
+                        // the bot from racing Discord and adding its own copy of the same emoji back
+                        // onto the message that already emitted the human reaction event.
+                        if (humanReactionKnownPresent && isTriggerMessage)
+                        {
+                            continue;
+                        }
+
+                        if (!hasNormalReaction)
                         {
                             await _discordMessageService.AddReactionAsync(state.Message, emote);
                         }
