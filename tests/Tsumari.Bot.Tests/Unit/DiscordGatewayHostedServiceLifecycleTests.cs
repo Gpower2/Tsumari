@@ -144,6 +144,131 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task EnsureInteractionCommandsInitializedAsync_OnlyLoadsModulesAndRegistersCommandsOnce()
+        {
+            var client = new DiscordSocketClient(new DiscordSocketConfig
+            {
+                GatewayIntents = GatewayIntents.None
+            });
+            var interactionService = new InteractionService(client, new InteractionServiceConfig());
+            var configMock = new Mock<IConfiguration>();
+            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
+            var hostedService = new DiscordGatewayHostedService(
+                client,
+                interactionService,
+                null!,
+                null!,
+                processorMock.Object,
+                null!,
+                configMock.Object,
+                NullLogger<DiscordGatewayHostedService>.Instance);
+            var addModulesCallCount = 0;
+            var registerCommandsCallCount = 0;
+
+            try
+            {
+                await InvokeHostedServiceAsync(
+                    hostedService,
+                    "EnsureInteractionCommandsInitializedAsync",
+                    new Func<Task>(() =>
+                    {
+                        addModulesCallCount++;
+                        return Task.CompletedTask;
+                    }),
+                    new Func<Task>(() =>
+                    {
+                        registerCommandsCallCount++;
+                        return Task.CompletedTask;
+                    }));
+
+                await InvokeHostedServiceAsync(
+                    hostedService,
+                    "EnsureInteractionCommandsInitializedAsync",
+                    new Func<Task>(() =>
+                    {
+                        addModulesCallCount++;
+                        return Task.CompletedTask;
+                    }),
+                    new Func<Task>(() =>
+                    {
+                        registerCommandsCallCount++;
+                        return Task.CompletedTask;
+                    }));
+
+                Assert.Equal(1, addModulesCallCount);
+                Assert.Equal(1, registerCommandsCallCount);
+            }
+            finally
+            {
+                hostedService.Dispose();
+                client.Dispose();
+            }
+        }
+
+        [Fact]
+        public async Task EnsureInteractionCommandsInitializedAsync_RetriesCommandRegistrationWithoutReloadingModules()
+        {
+            var client = new DiscordSocketClient(new DiscordSocketConfig
+            {
+                GatewayIntents = GatewayIntents.None
+            });
+            var interactionService = new InteractionService(client, new InteractionServiceConfig());
+            var configMock = new Mock<IConfiguration>();
+            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
+            var hostedService = new DiscordGatewayHostedService(
+                client,
+                interactionService,
+                null!,
+                null!,
+                processorMock.Object,
+                null!,
+                configMock.Object,
+                NullLogger<DiscordGatewayHostedService>.Instance);
+            var addModulesCallCount = 0;
+            var registerCommandsCallCount = 0;
+
+            try
+            {
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    InvokeHostedServiceAsync(
+                        hostedService,
+                        "EnsureInteractionCommandsInitializedAsync",
+                        new Func<Task>(() =>
+                        {
+                            addModulesCallCount++;
+                            return Task.CompletedTask;
+                        }),
+                        new Func<Task>(() =>
+                        {
+                            registerCommandsCallCount++;
+                            throw new InvalidOperationException("register failed");
+                        })));
+
+                await InvokeHostedServiceAsync(
+                    hostedService,
+                    "EnsureInteractionCommandsInitializedAsync",
+                    new Func<Task>(() =>
+                    {
+                        addModulesCallCount++;
+                        return Task.CompletedTask;
+                    }),
+                    new Func<Task>(() =>
+                    {
+                        registerCommandsCallCount++;
+                        return Task.CompletedTask;
+                    }));
+
+                Assert.Equal(1, addModulesCallCount);
+                Assert.Equal(2, registerCommandsCallCount);
+            }
+            finally
+            {
+                hostedService.Dispose();
+                client.Dispose();
+            }
+        }
+
+        [Fact]
         public void RegisterAndUnregisterEventHandlers_AreIdempotent_AndRestoreSubscriberCounts()
         {
             var client = new DiscordSocketClient(new DiscordSocketConfig

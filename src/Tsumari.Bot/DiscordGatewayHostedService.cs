@@ -20,7 +20,10 @@ namespace Tsumari.Bot
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
         private readonly ILogger<DiscordGatewayHostedService> _logger;
+        private readonly SemaphoreSlim _readyInitializationLock = new(1, 1);
         private bool _eventHandlersRegistered;
+        private bool _interactionModulesLoaded;
+        private bool _globalCommandsRegistered;
 
         public DiscordGatewayHostedService(
             DiscordSocketClient client,
@@ -115,15 +118,42 @@ namespace Tsumari.Bot
             try
             {
                 await _dbService.InitializeDatabaseAsync();
-
-                await _interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), _serviceProvider);
-                await _interactionService.RegisterCommandsGloballyAsync();
-
-                _logger.LogAdministrativeCommandsRegistered();
+                await EnsureInteractionCommandsInitializedAsync(
+                    async () => await _interactionService.AddModulesAsync(typeof(Program).Assembly, _serviceProvider),
+                    async () =>
+                    {
+                        await _interactionService.RegisterCommandsGloballyAsync();
+                        _logger.LogAdministrativeCommandsRegistered();
+                    });
             }
             catch (Exception ex)
             {
                 _logger.LogReadyInitializationFailed(ex);
+            }
+        }
+
+        private async Task EnsureInteractionCommandsInitializedAsync(Func<Task> addModulesAsync, Func<Task> registerCommandsAsync)
+        {
+            await _readyInitializationLock.WaitAsync();
+            try
+            {
+                if (!_interactionModulesLoaded)
+                {
+                    await addModulesAsync();
+                    _interactionModulesLoaded = true;
+                }
+
+                if (_globalCommandsRegistered)
+                {
+                    return;
+                }
+
+                await registerCommandsAsync();
+                _globalCommandsRegistered = true;
+            }
+            finally
+            {
+                _readyInitializationLock.Release();
             }
         }
 
