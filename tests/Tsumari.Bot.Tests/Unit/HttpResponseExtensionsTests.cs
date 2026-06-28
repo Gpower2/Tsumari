@@ -4,7 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Tsumari.Bot.Services;
 
-namespace Tsumari.Bot.Tests
+namespace Tsumari.Bot.Tests.Unit
 {
     public class HttpResponseExtensionsTests
     {

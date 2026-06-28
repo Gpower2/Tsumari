@@ -5,7 +5,7 @@ using Moq;
 using Tsumari.Bot;
 using Xunit;
 
-namespace Tsumari.Bot.Tests
+namespace Tsumari.Bot.Tests.Unit
 {
     public class WorkerEditTests
     {

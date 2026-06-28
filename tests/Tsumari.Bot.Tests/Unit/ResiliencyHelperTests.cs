@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Tsumari.Bot.Services;
 using Xunit;
 
-namespace Tsumari.Bot.Tests
+namespace Tsumari.Bot.Tests.Unit
 {
     public class ResiliencyHelperTests
     {

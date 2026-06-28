@@ -4,7 +4,7 @@ using Moq;
 using Tsumari.Bot.Services;
 using Xunit;
 
-namespace Tsumari.Bot.Tests
+namespace Tsumari.Bot.Tests.Unit
 {
     public class DeepLTranslationProviderTests
     {

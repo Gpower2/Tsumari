@@ -12,7 +12,7 @@ using Tsumari.Bot;
 using Tsumari.Bot.Services;
 using Xunit;
 
-namespace Tsumari.Bot.Tests
+namespace Tsumari.Bot.Tests.Component
 {
     public class WorkerComponentTests : IDisposable
     {

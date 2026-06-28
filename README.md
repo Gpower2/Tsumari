@@ -83,22 +83,26 @@ E:\Development\Tsumari\
 │           └── TranslationService.cs
 └── tests/
     └── Tsumari.Bot.Tests/
-        ├── DatabaseServiceTests.cs
-        ├── DeepLTranslationProviderTests.cs
-        ├── DeepLLanguageServiceTests.cs
-        ├── LanguageCodeServiceTests.cs
-        ├── LinkedMessageDeletionServiceTests.cs
-        ├── OllamaTranslationProviderTests.cs
-        ├── OpenAITranslationProviderTests.cs
-        ├── ReplyMirroringServiceTests.cs
-        ├── ReactionMirroringServiceTests.cs
-        ├── ResiliencyHelperTests.cs
-        ├── TranslationServiceTests.cs
-        ├── TranslationProviderResolverTests.cs
-        ├── WorkerComponentTests.cs
-        ├── WorkerDeleteTests.cs
-        ├── WorkerEditTests.cs
-        └── WorkerReplyTests.cs
+        ├── Component/
+        │   ├── DatabaseServiceTests.cs
+        │   ├── LinkedMessageDeletionServiceTests.cs
+        │   ├── ReactionMirroringServiceTests.cs
+        │   ├── ReplyMirroringServiceTests.cs
+        │   ├── TranslationServiceTests.cs
+        │   ├── WorkerComponentTests.cs
+        │   └── WorkerDeleteTests.cs
+        ├── GlobalUsings.cs
+        └── Unit/
+            ├── DeepLTranslationProviderTests.cs
+            ├── DeepLLanguageServiceTests.cs
+            ├── HttpResponseExtensionsTests.cs
+            ├── LanguageCodeServiceTests.cs
+            ├── OllamaTranslationProviderTests.cs
+            ├── OpenAITranslationProviderTests.cs
+            ├── ResiliencyHelperTests.cs
+            ├── TranslationProviderResolverTests.cs
+            ├── WorkerEditTests.cs
+            └── WorkerReplyTests.cs
 ```
 
 ## Configuration (`src/Tsumari.Bot/appsettings.json`)
