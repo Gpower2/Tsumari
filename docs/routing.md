@@ -1,6 +1,6 @@
-# Routing Flows, Edit Synchronization, Delete Synchronization, and Reaction Mirroring
+# Routing Flows, Reply Mirroring, Edit Synchronization, Delete Synchronization, and Reaction Mirroring
 
-Tsumari has two live routing paths for new messages plus follow-up paths for edited messages, deleted messages, and linked reaction changes.
+Tsumari has two live routing paths for new messages plus follow-up paths for reply mirroring, edited messages, deleted messages, and linked reaction changes.
 
 ## Event Entry Points
 
@@ -101,6 +101,32 @@ The final button set is created in `EditJumpButtonsIntoSentMessagesAsync`.
 - Language buttons use the uppercased target language code for the generated bot message in that channel.
 - Only bot-generated messages found in `sentMessages` become language buttons.
 - Buttons are added by editing bot messages after all destination URLs are known.
+
+## Reply Mirroring
+
+When a new user-authored message is itself a Discord reply, Tsumari tries to make every generated bot message reply to the corresponding parent message in that destination channel.
+
+### Current Behavior
+
+1. Read the source message's `MessageReference`.
+2. Resolve the replied-to message family from either the original parent message ID or a mirrored bot parent message ID.
+3. For each destination channel:
+   - if that family has a corresponding parent message in the destination channel, send the mirrored message as a reply to it
+   - otherwise, send the mirrored message as a normal non-reply message
+4. If the source message created a same-channel translated reply in localized mismatch flow, that translated reply also follows the same mirrored-parent resolution rules instead of always replying to the current source message directly.
+
+### Reply Mirroring Rules
+
+- Reply mirroring only uses **existing tracked message families**. It never creates synthetic parent messages.
+- If the source reply targets the original parent message, the original channel keeps that original parent as the reply target.
+- If the source reply targets a mirrored bot message, the original channel prefers the parent's same-channel mirrored reply when one exists; otherwise it falls back to the original parent message.
+- Every other destination channel can have at most one corresponding tracked parent reply target, because `MessageLinks` stores at most one mirrored bot message per `(OriginalMessageId, ChannelId)`.
+
+### Current Limitations
+
+- If the replied-to parent message was never tracked by Tsumari, mirrored messages are sent normally without a reply reference.
+- If a destination channel no longer has a corresponding tracked parent copy, Tsumari falls back to a normal send in that channel instead of failing the whole fan-out.
+- Legacy rows created before `OriginalChannelId` existed may not resolve reply mirroring when the source reply points at an old mirrored bot message, until the original parent message is seen again and backfilled.
 
 ## Edited Message Synchronization
 

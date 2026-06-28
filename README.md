@@ -11,6 +11,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Separate locale targets:** locale tags such as `pt` and `pt-br` are preserved as distinct translation targets and are not collapsed together during fan-out.
 - **Clear translated headers:** translated messages use the format `**Author** (XX to YY):`.
 - **Jump-link buttons:** generated bot messages are edited after send so they can include `Original` plus language-code buttons for other generated copies.
+- **Reply mirroring:** when a user replies to a tracked message, mirrored bot messages reply to the corresponding linked message in each destination channel.
 - **Edited-message synchronization:** when a user edits a text message, mirrored bot messages are updated in place.
 - **Delete synchronization:** when a source message is deleted, existing linked bot messages are deleted too.
 - **Reaction mirroring:** standard reactions added to one linked message are reconciled across the rest of the linked message family.
@@ -23,6 +24,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 
 - **Edit sync is text-only.** The `MessageUpdated` flow compares message content and only rewrites mirrored message text; attachment-only edits are not re-mirrored.
 - **Edit sync uses cache when available.** The Discord client keeps `MessageCacheSize = 50` messages cached so unchanged edits can be skipped cheaply, but cache misses are still re-synchronized instead of being ignored.
+- **Reply mirroring is best-effort per destination.** If a corresponding parent copy cannot be resolved in a target channel, the mirrored message is still sent there as a normal non-reply message.
 - **Reaction mirroring is link-driven and in-place.** Only existing linked messages participate; reaction handling never creates new messages or reorders the conversation.
 - **Reaction mirroring currently tracks standard reactions only.** Burst reactions are ignored because the bot can only mirror normal reactions reliably.
 - **Delete sync is link-driven and in-place.** Deleting an original source message removes its existing linked bot messages; deleting a mirrored bot message only removes its stale link row.
@@ -54,6 +56,7 @@ E:\Development\Tsumari\
 │           ├── DatabaseService.cs
 │           ├── DeepLTranslationProvider.cs
 │           ├── DeepLLanguageService.cs
+│           ├── DiscordReactionEvent.cs
 │           ├── HttpClientNames.cs
 │           ├── IDiscordMessageService.cs
 │           ├── ITranslationProvider.cs
@@ -62,6 +65,8 @@ E:\Development\Tsumari\
 │           ├── LinkedMessageDeletionService.cs
 │           ├── OllamaTranslationProvider.cs
 │           ├── OpenAITranslationProvider.cs
+│           ├── ReplyMirroringContext.cs
+│           ├── ReplyMirroringService.cs
 │           ├── ReactionMirroringService.cs
 │           ├── ResiliencyHelper.cs
 │           ├── TranslationProvider.cs
@@ -76,12 +81,15 @@ E:\Development\Tsumari\
         ├── LinkedMessageDeletionServiceTests.cs
         ├── OllamaTranslationProviderTests.cs
         ├── OpenAITranslationProviderTests.cs
+        ├── ReplyMirroringServiceTests.cs
         ├── ReactionMirroringServiceTests.cs
         ├── ResiliencyHelperTests.cs
         ├── TranslationServiceTests.cs
         ├── TranslationProviderResolverTests.cs
+        ├── WorkerComponentTests.cs
         ├── WorkerDeleteTests.cs
-        └── WorkerEditTests.cs
+        ├── WorkerEditTests.cs
+        └── WorkerReplyTests.cs
 ```
 
 ## Configuration (`src/Tsumari.Bot/appsettings.json`)

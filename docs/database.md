@@ -57,6 +57,7 @@ Stores one generated/mirrored bot message per `(OriginalMessageId, ChannelId)`, 
 Current uses in code:
 
 - generating jump-link buttons after a message fan-out completes
+- resolving corresponding parent messages when reply mirroring needs a channel-local reply target
 - looking up mirrored bot messages when a source message is edited later
 - tracking the mismatch-flow translated reply created in the source localized channel
 - deleting linked bot messages when the original source message is deleted
@@ -95,7 +96,7 @@ Discord Snowflake IDs are 64-bit values. Storing them as `TEXT` avoids cross-lay
 - `DeleteMessageLinksAsync()` removes an original message's linked bot-message rows during delete sync
 - `DeleteMessageLinkByMirroredMessageIdAsync()` prunes stale rows when a mirrored bot message is deleted independently
 - `GetMirroredMessagesAsync()` returns all generated bot messages tied to an original user message
-- `GetLinkedMessageFamilyAsync()` resolves the original message plus its linked bot-generated copies for reaction mirroring
+- `GetLinkedMessageFamilyAsync()` resolves the original message plus its linked bot-generated copies for reply and reaction mirroring
 
 ## Concurrency and Safety Settings
 

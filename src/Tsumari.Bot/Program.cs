@@ -63,6 +63,7 @@ namespace Tsumari.Bot
                 provider.GetRequiredService<TranslationProviderResolver>().Resolve());
             builder.Services.AddSingleton<TranslationService>();
             builder.Services.AddSingleton<LinkedMessageDeletionService>();
+            builder.Services.AddSingleton<ReplyMirroringService>();
             builder.Services.AddSingleton<ReactionMirroringService>();
 
             // Main Background Bot Service

@@ -21,7 +21,9 @@ namespace Tsumari.Bot
         private readonly DatabaseService _dbService;
         private readonly TranslationService _translationService;
         private readonly LinkedMessageDeletionService _linkedMessageDeletionService;
+        private readonly ReplyMirroringService _replyMirroringService;
         private readonly ReactionMirroringService _reactionMirroringService;
+        private readonly IDiscordMessageService _discordMessageService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
@@ -33,7 +35,9 @@ namespace Tsumari.Bot
             DatabaseService dbService,
             TranslationService translationService,
             LinkedMessageDeletionService linkedMessageDeletionService,
+            ReplyMirroringService replyMirroringService,
             ReactionMirroringService reactionMirroringService,
+            IDiscordMessageService discordMessageService,
             IHttpClientFactory httpClientFactory,
             IServiceProvider serviceProvider,
             IConfiguration configuration,
@@ -44,7 +48,9 @@ namespace Tsumari.Bot
             _dbService = dbService;
             _translationService = translationService;
             _linkedMessageDeletionService = linkedMessageDeletionService;
+            _replyMirroringService = replyMirroringService;
             _reactionMirroringService = reactionMirroringService;
+            _discordMessageService = discordMessageService;
             _httpClientFactory = httpClientFactory;
             _serviceProvider = serviceProvider;
             _configuration = configuration;
@@ -158,95 +164,47 @@ namespace Tsumari.Bot
 
         private Task OnMessageReceivedAsync(SocketMessage rawMessage)
         {
-            if (rawMessage is not SocketUserMessage message) return Task.CompletedTask;
-            if (message.Source != MessageSource.User) return Task.CompletedTask;
-
-            bool hasAttachments = message.Attachments != null && message.Attachments.Count > 0;
-            if (string.IsNullOrWhiteSpace(message.Content) && !hasAttachments) return Task.CompletedTask;
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await ProcessMessageRoutingPipelineAsync(message, hasAttachments);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unhandled error inside routing pipeline for message {MsgId}.", message.Id);
-                }
-            });
+            _ = Task.Run(() => HandleMessageReceivedAsync(rawMessage));
 
             return Task.CompletedTask;
         }
 
         private Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
         {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await _linkedMessageDeletionService.HandleMessageDeletedAsync(messageCache.Id);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unhandled error synchronizing delete for message {MessageId}.", messageCache.Id);
-                }
-            });
+            _ = Task.Run(() => HandleMessageDeletedAsync(messageCache.Id));
 
             return Task.CompletedTask;
         }
 
         private Task OnMessagesBulkDeletedAsync(IReadOnlyCollection<Cacheable<IMessage, ulong>> messageCaches, Cacheable<IMessageChannel, ulong> channelCache)
         {
-            _ = Task.Run(async () =>
+            var messageIds = new List<ulong>(messageCaches.Count);
+            foreach (var messageCache in messageCaches)
             {
-                try
-                {
-                    var messageIds = new List<ulong>(messageCaches.Count);
-                    foreach (var messageCache in messageCaches)
-                    {
-                        messageIds.Add(messageCache.Id);
-                    }
+                messageIds.Add(messageCache.Id);
+            }
 
-                    await _linkedMessageDeletionService.HandleMessagesDeletedAsync(messageIds);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unhandled error synchronizing bulk delete in channel {ChannelId}.", channelCache.Id);
-                }
-            });
+            _ = Task.Run(() => HandleMessagesBulkDeletedAsync(messageIds, channelCache.Id));
 
             return Task.CompletedTask;
         }
 
         private Task OnMessageUpdatedAsync(Cacheable<IMessage, ulong> beforeCache, SocketMessage after, ISocketMessageChannel channel)
         {
-            // Only process user edits (ignore bot edits)
-            if (after is not SocketUserMessage message) return Task.CompletedTask;
-            if (message.Author.IsBot) return Task.CompletedTask;
-            if (message.Source != MessageSource.User) return Task.CompletedTask;
-
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    // If the old message is not cached, downloading it here returns the already-edited
-                    // state from Discord. In that case we must still process the update instead of
-                    // comparing "after" against another copy of "after" and skipping the edit.
                     var hadCachedSnapshot = beforeCache.HasValue;
                     var beforeMsg = hadCachedSnapshot
                         ? await beforeCache.GetOrDownloadAsync()
                         : null;
                     var beforeContent = beforeMsg?.Content ?? string.Empty;
-                    var afterContent = message.Content ?? string.Empty;
-
-                    if (!ShouldProcessEditedMessage(hadCachedSnapshot, beforeContent, afterContent)) return;
-
-                    await ProcessEditedMessageAsync(message);
+                    await HandleMessageUpdatedAsync(hadCachedSnapshot, beforeContent, after);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Unhandled error handling edited message {MsgId}.", message.Id);
+                    _logger.LogError(ex, "Unhandled error handling edited message {MsgId}.", after.Id);
                 }
             });
 
@@ -255,83 +213,166 @@ namespace Tsumari.Bot
 
         private Task OnReactionAddedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
         {
-            _ = Task.Run(async () =>
+            _ = Task.Run(() => HandleReactionAddedAsync(new DiscordReactionEvent
             {
-                try
-                {
-                    await _reactionMirroringService.MirrorReactionAddedAsync(
-                        reaction.MessageId,
-                        reaction.Channel.Id,
-                        reaction.Emote,
-                        reaction.ReactionType,
-                        reaction.UserId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unhandled error mirroring added reaction for message {MessageId}.", reaction.MessageId);
-                }
-            });
+                MessageId = reaction.MessageId,
+                ChannelId = reaction.Channel.Id,
+                Emote = reaction.Emote,
+                ReactionType = reaction.ReactionType,
+                UserId = reaction.UserId
+            }));
 
             return Task.CompletedTask;
         }
 
         private Task OnReactionRemovedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
         {
-            _ = Task.Run(async () =>
+            _ = Task.Run(() => HandleReactionRemovedAsync(new DiscordReactionEvent
             {
-                try
-                {
-                    await _reactionMirroringService.MirrorReactionRemovedAsync(
-                        reaction.MessageId,
-                        reaction.Channel.Id,
-                        reaction.Emote,
-                        reaction.ReactionType,
-                        reaction.UserId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unhandled error mirroring removed reaction for message {MessageId}.", reaction.MessageId);
-                }
-            });
+                MessageId = reaction.MessageId,
+                ChannelId = reaction.Channel.Id,
+                Emote = reaction.Emote,
+                ReactionType = reaction.ReactionType,
+                UserId = reaction.UserId
+            }));
 
             return Task.CompletedTask;
         }
 
         private Task OnReactionsClearedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
         {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await _reactionMirroringService.MirrorReactionsClearedAsync(messageCache.Id, channelCache.Id);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unhandled error mirroring cleared reactions for message {MessageId}.", messageCache.Id);
-                }
-            });
+            _ = Task.Run(() => HandleReactionsClearedAsync(messageCache.Id, channelCache.Id));
 
             return Task.CompletedTask;
         }
 
         private Task OnReactionsRemovedForEmoteAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, IEmote emote)
         {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await _reactionMirroringService.MirrorReactionsRemovedForEmoteAsync(messageCache.Id, channelCache.Id, emote);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unhandled error mirroring removed-for-emote reactions for message {MessageId}.", messageCache.Id);
-                }
-            });
+            _ = Task.Run(() => HandleReactionsRemovedForEmoteAsync(messageCache.Id, channelCache.Id, emote));
 
             return Task.CompletedTask;
         }
 
-        private async Task ProcessEditedMessageAsync(SocketUserMessage message)
+        public async Task HandleMessageReceivedAsync(IMessage rawMessage)
+        {
+            if (rawMessage is not IUserMessage message) return;
+            if (message.Source != MessageSource.User) return;
+
+            bool hasAttachments = message.Attachments != null && message.Attachments.Count > 0;
+            if (string.IsNullOrWhiteSpace(message.Content) && !hasAttachments) return;
+
+            try
+            {
+                await ProcessMessageRoutingPipelineAsync(message, hasAttachments);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error inside routing pipeline for message {MsgId}.", message.Id);
+            }
+        }
+
+        public async Task HandleMessageDeletedAsync(ulong messageId)
+        {
+            try
+            {
+                await _linkedMessageDeletionService.HandleMessageDeletedAsync(messageId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error synchronizing delete for message {MessageId}.", messageId);
+            }
+        }
+
+        public async Task HandleMessagesBulkDeletedAsync(IReadOnlyCollection<ulong> messageIds, ulong channelId)
+        {
+            try
+            {
+                await _linkedMessageDeletionService.HandleMessagesDeletedAsync(messageIds);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error synchronizing bulk delete in channel {ChannelId}.", channelId);
+            }
+        }
+
+        public async Task HandleMessageUpdatedAsync(bool hadCachedSnapshot, string? beforeContent, IMessage afterMessage)
+        {
+            if (afterMessage is not IUserMessage message) return;
+            if (message.Author.IsBot) return;
+            if (message.Source != MessageSource.User) return;
+
+            try
+            {
+                var afterContent = message.Content ?? string.Empty;
+                if (!ShouldProcessEditedMessage(hadCachedSnapshot, beforeContent ?? string.Empty, afterContent)) return;
+
+                await ProcessEditedMessageAsync(message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error handling edited message {MsgId}.", message.Id);
+            }
+        }
+
+        public async Task HandleReactionAddedAsync(DiscordReactionEvent reaction)
+        {
+            try
+            {
+                await _reactionMirroringService.MirrorReactionAddedAsync(
+                    reaction.MessageId,
+                    reaction.ChannelId,
+                    reaction.Emote,
+                    reaction.ReactionType,
+                    reaction.UserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error mirroring added reaction for message {MessageId}.", reaction.MessageId);
+            }
+        }
+
+        public async Task HandleReactionRemovedAsync(DiscordReactionEvent reaction)
+        {
+            try
+            {
+                await _reactionMirroringService.MirrorReactionRemovedAsync(
+                    reaction.MessageId,
+                    reaction.ChannelId,
+                    reaction.Emote,
+                    reaction.ReactionType,
+                    reaction.UserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error mirroring removed reaction for message {MessageId}.", reaction.MessageId);
+            }
+        }
+
+        public async Task HandleReactionsClearedAsync(ulong messageId, ulong channelId)
+        {
+            try
+            {
+                await _reactionMirroringService.MirrorReactionsClearedAsync(messageId, channelId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error mirroring cleared reactions for message {MessageId}.", messageId);
+            }
+        }
+
+        public async Task HandleReactionsRemovedForEmoteAsync(ulong messageId, ulong channelId, IEmote emote)
+        {
+            try
+            {
+                await _reactionMirroringService.MirrorReactionsRemovedForEmoteAsync(messageId, channelId, emote);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled error mirroring removed-for-emote reactions for message {MessageId}.", messageId);
+            }
+        }
+
+        private async Task ProcessEditedMessageAsync(IUserMessage message)
         {
             try
             {
@@ -372,7 +413,7 @@ namespace Tsumari.Bot
 
                     try
                     {
-                        var ch = await _client.GetChannelAsync(chanId) as IMessageChannel;
+                        var ch = await _discordMessageService.GetChannelAsync(chanId);
                         if (ch == null) continue;
 
                         var configuredTargetLang = await _dbService.GetTargetLanguageCodeAsync(chanId);
@@ -434,7 +475,7 @@ namespace Tsumari.Bot
             }
         }
 
-        private async Task ProcessMessageRoutingPipelineAsync(SocketUserMessage message, bool hasAttachments)
+        private async Task ProcessMessageRoutingPipelineAsync(IUserMessage message, bool hasAttachments)
         {
             ulong channelId = message.Channel.Id;
 
@@ -476,6 +517,7 @@ namespace Tsumari.Bot
             }
 
             string sourceLang = LanguageCodeService.NormalizeLanguageCode(detectedLang);
+            var replyContext = await _replyMirroringService.ResolveReplyContextAsync(channelId, message.Reference);
 
             var mediaAssets = new List<(string Filename, byte[] Bytes)>();
             if (hasAttachments)
@@ -522,12 +564,13 @@ namespace Tsumari.Bot
 
                 // 1. Initial sequential send with temporary placeholder button linking to Original message
                 var initBuilder = new ComponentBuilder()
-                    .WithButton("Original", style: ButtonStyle.Link, url: message.GetJumpUrl());
+                    .WithButton("Original", style: ButtonStyle.Link, url: BuildJumpUrl(message));
 
                 foreach (var child in children)
                 {
-                    var childChannel = await _client.GetChannelAsync(child.ChannelId) as IMessageChannel;
+                    var childChannel = await _discordMessageService.GetChannelAsync(child.ChannelId);
                     if (childChannel == null) continue;
+                    var childReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, childChannel.Id);
 
                     string textToSend;
                     if (!LanguageCodeService.AreSameLanguageCode(sourceLang, child.TargetLanguageCode) && !string.IsNullOrWhiteSpace(content))
@@ -548,7 +591,12 @@ namespace Tsumari.Bot
                         textToSend = $"**{authorName}**:\n{content}";
                     }
 
-                    var sentMsg = await SendMessageWithFilesAsync(childChannel, textToSend, mediaAssets, initBuilder.Build());
+                    var sentMsg = await SendMessageWithFilesAsync(
+                        childChannel,
+                        textToSend,
+                        mediaAssets,
+                        initBuilder.Build(),
+                        childReplyReference);
                     if (sentMsg != null)
                     {
                         sentMessages.Add(child.ChannelId, sentMsg);
@@ -574,7 +622,7 @@ namespace Tsumari.Bot
                     return;
                 }
 
-                var parentChannel = await _client.GetChannelAsync(parentMasterId.Value) as IMessageChannel;
+                var parentChannel = await _discordMessageService.GetChannelAsync(parentMasterId.Value);
                 if (parentChannel == null) return;
 
                 sourceLang = LanguageCodeService.ResolveSourceLanguageCode(detectedLang, targetLang);
@@ -585,14 +633,20 @@ namespace Tsumari.Bot
                 targetsList.Add((parentMasterId.Value, "Original", "master"));
 
                 var initBuilder = new ComponentBuilder()
-                    .WithButton("Original", style: ButtonStyle.Link, url: message.GetJumpUrl());
+                    .WithButton("Original", style: ButtonStyle.Link, url: BuildJumpUrl(message));
 
                 // --- MATCH FLOW (User typed Greek in #general-greek) ---
                 if (isMatch)
                 {
                     // 1. Broadcast raw to parent master channel
                     string textToParent = $"**{authorName}**:\n{content}";
-                    var parentSent = await SendMessageWithFilesAsync(parentChannel, textToParent, mediaAssets, initBuilder.Build());
+                    var parentReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, parentChannel.Id);
+                    var parentSent = await SendMessageWithFilesAsync(
+                        parentChannel,
+                        textToParent,
+                        mediaAssets,
+                        initBuilder.Build(),
+                        parentReplyReference);
                     if (parentSent != null)
                     {
                         sentMessages.Add(parentMasterId.Value, parentSent);
@@ -603,8 +657,9 @@ namespace Tsumari.Bot
                     var siblings = await _dbService.GetSiblingChannelsAsync(channelId);
                     foreach (var sibling in siblings)
                     {
-                        var siblingChannel = await _client.GetChannelAsync(sibling.ChannelId) as IMessageChannel;
+                        var siblingChannel = await _discordMessageService.GetChannelAsync(sibling.ChannelId);
                         if (siblingChannel == null) continue;
+                        var siblingReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, siblingChannel.Id);
 
                         string textToSibling;
                         if (!string.IsNullOrWhiteSpace(content))
@@ -625,7 +680,12 @@ namespace Tsumari.Bot
                             textToSibling = $"**{authorName}**:";
                         }
 
-                        var siblingSent = await SendMessageWithFilesAsync(siblingChannel, textToSibling, mediaAssets, initBuilder.Build());
+                        var siblingSent = await SendMessageWithFilesAsync(
+                            siblingChannel,
+                            textToSibling,
+                            mediaAssets,
+                            initBuilder.Build(),
+                            siblingReplyReference);
                         if (siblingSent != null)
                         {
                             sentMessages.Add(sibling.ChannelId, siblingSent);
@@ -644,10 +704,16 @@ namespace Tsumari.Bot
                     IUserMessage? nativeReply = null;
                     if (!string.IsNullOrWhiteSpace(content))
                     {
+                        var nativeReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, channelId);
                         try
                         {
                             var nativeTranslation = await _translationService.TranslateTextAsync(content, targetLang);
-                            nativeReply = await message.ReplyAsync(FormatTranslatedReplyText(sourceLang, targetLang, nativeTranslation));
+                            nativeReply = await SendMessageWithFilesAsync(
+                                message.Channel,
+                                FormatTranslatedReplyText(sourceLang, targetLang, nativeTranslation),
+                                [],
+                                components: null,
+                                nativeReplyReference);
                         }
                         catch (Exception ex)
                         {
@@ -663,7 +729,13 @@ namespace Tsumari.Bot
 
                     // 2. Post original raw to master channel
                     string textToParent = $"**{authorName}**:\n{content}";
-                    var parentSent = await SendMessageWithFilesAsync(parentChannel, textToParent, mediaAssets, initBuilder.Build());
+                    var parentReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, parentChannel.Id);
+                    var parentSent = await SendMessageWithFilesAsync(
+                        parentChannel,
+                        textToParent,
+                        mediaAssets,
+                        initBuilder.Build(),
+                        parentReplyReference);
                     if (parentSent != null)
                     {
                         sentMessages.Add(parentMasterId.Value, parentSent);
@@ -674,8 +746,9 @@ namespace Tsumari.Bot
                     var siblings = await _dbService.GetSiblingChannelsAsync(channelId);
                     foreach (var sibling in siblings)
                     {
-                        var siblingChannel = await _client.GetChannelAsync(sibling.ChannelId) as IMessageChannel;
+                        var siblingChannel = await _discordMessageService.GetChannelAsync(sibling.ChannelId);
                         if (siblingChannel == null) continue;
+                        var siblingReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, siblingChannel.Id);
 
                         string textToSibling;
                         bool siblingIsHome = LanguageCodeService.AreSameLanguageCode(sourceLang, sibling.TargetLanguageCode);
@@ -702,7 +775,12 @@ namespace Tsumari.Bot
                             textToSibling = $"**{authorName}**:";
                         }
 
-                        var siblingSent = await SendMessageWithFilesAsync(siblingChannel, textToSibling, mediaAssets, initBuilder.Build());
+                        var siblingSent = await SendMessageWithFilesAsync(
+                            siblingChannel,
+                            textToSibling,
+                            mediaAssets,
+                            initBuilder.Build(),
+                            siblingReplyReference);
                         if (siblingSent != null)
                         {
                             sentMessages.Add(sibling.ChannelId, siblingSent);
@@ -718,7 +796,7 @@ namespace Tsumari.Bot
         }
 
         private async Task EditJumpButtonsIntoSentMessagesAsync(
-            SocketUserMessage originalMessage,
+            IMessage originalMessage,
             Dictionary<ulong, IUserMessage> sentMessages,
             List<(ulong ChannelId, string LanguageLabel, string TargetLangCode)> targets)
         {
@@ -726,7 +804,7 @@ namespace Tsumari.Bot
             var finalBuilder = new ComponentBuilder();
 
             // Original post jump link
-            finalBuilder.WithButton("Original", style: ButtonStyle.Link, url: originalMessage.GetJumpUrl());
+            finalBuilder.WithButton("Original", style: ButtonStyle.Link, url: BuildJumpUrl(originalMessage));
 
             foreach (var target in targets)
             {
@@ -735,7 +813,7 @@ namespace Tsumari.Bot
 
                 if (sentMessages.TryGetValue(target.ChannelId, out var sentMsg))
                 {
-                    finalBuilder.WithButton(target.LanguageLabel, style: ButtonStyle.Link, url: sentMsg.GetJumpUrl());
+                    finalBuilder.WithButton(target.LanguageLabel, style: ButtonStyle.Link, url: BuildJumpUrl(sentMsg));
                 }
             }
 
@@ -759,7 +837,8 @@ namespace Tsumari.Bot
             IMessageChannel channel,
             string text,
             List<(string Filename, byte[] Bytes)> mediaAssets,
-            MessageComponent components)
+            MessageComponent? components,
+            MessageReference? replyReference = null)
         {
             if (channel == null) return null;
 
@@ -775,14 +854,22 @@ namespace Tsumari.Bot
                     fileAttachments.Add(new FileAttachment(ms, asset.Filename));
                 }
 
-                return await channel.SendFilesAsync(fileAttachments, text, components: components);
+                if (fileAttachments.Count == 0)
+                {
+                    return await channel.SendMessageAsync(text, components: components, messageReference: replyReference);
+                }
+
+                return await channel.SendFilesAsync(fileAttachments, text, components: components, messageReference: replyReference);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send files/message to channel {Id}. Fallback to text.", channel.Id);
                 try
                 {
-                    return await channel.SendMessageAsync(text + "\n*(Media attachments failed to mirror)*", components: components);
+                    return await channel.SendMessageAsync(
+                        text + "\n*(Media attachments failed to mirror)*",
+                        components: components,
+                        messageReference: replyReference);
                 }
                 catch (Exception sendEx)
                 {
@@ -811,6 +898,16 @@ namespace Tsumari.Bot
             sourceLang = LanguageCodeService.NormalizeLanguageCode(sourceLang);
             targetLang = LanguageCodeService.NormalizeLanguageCode(targetLang);
             return $"({sourceLang} to {targetLang})";
+        }
+
+        public static string BuildJumpUrl(IMessage message)
+        {
+            ArgumentNullException.ThrowIfNull(message);
+            ArgumentNullException.ThrowIfNull(message.Channel);
+
+            return message.Channel is IGuildChannel guildChannel
+                ? $"https://discord.com/channels/{guildChannel.GuildId}/{message.Channel.Id}/{message.Id}"
+                : $"https://discord.com/channels/@me/{message.Channel.Id}/{message.Id}";
         }
 
         public static bool ShouldProcessEditedMessage(bool hadCachedSnapshot, string? beforeContent, string? afterContent)
