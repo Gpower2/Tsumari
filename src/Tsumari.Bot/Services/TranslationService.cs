@@ -4,6 +4,7 @@ namespace Tsumari.Bot.Services
 {
     public class TranslationService
     {
+        private const int MaxLoggedTextPreviewLength = 15;
         private readonly DatabaseService _dbService;
         private readonly ITranslationProvider _translationProvider;
         private readonly ILogger<TranslationService> _logger;
@@ -77,7 +78,7 @@ namespace Tsumari.Bot.Services
             string code = await _resiliencyHelper.ExecuteAsync(() => _translationProvider.DetectLanguageAsync(text));
             await IncrementTranslationUsageAsync(charCount);
 
-            _logger.LogLanguageDetected(code, text.Substring(0, Math.Min(text.Length, 15)));
+            _logger.LogLanguageDetected(code, CreateTextPreview(text));
 
             return code;
         }
@@ -105,6 +106,13 @@ namespace Tsumari.Bot.Services
             await IncrementTranslationUsageAsync(charCount);
 
             return translatedResult;
+        }
+
+        private static string CreateTextPreview(string text)
+        {
+            return text.Length <= MaxLoggedTextPreviewLength
+                ? text
+                : new string(text.AsSpan(0, MaxLoggedTextPreviewLength));
         }
     }
 }

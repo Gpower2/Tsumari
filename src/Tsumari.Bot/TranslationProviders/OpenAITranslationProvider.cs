@@ -114,14 +114,41 @@ namespace Tsumari.Bot.TranslationProviders
 
         private static string TruncateResponseBody(string responseBody)
         {
-            if (string.IsNullOrWhiteSpace(responseBody))
+            if (TrimWhitespace(responseBody.AsSpan()).IsEmpty)
             {
                 return "(empty)";
             }
 
-            return responseBody.Length <= MaxLoggedResponsePreviewLength
-                ? responseBody
-                : responseBody.Substring(0, MaxLoggedResponsePreviewLength) + "...";
+            if (responseBody.Length <= MaxLoggedResponsePreviewLength)
+            {
+                return responseBody;
+            }
+
+            return string.Create(
+                MaxLoggedResponsePreviewLength + 3,
+                responseBody,
+                static (destination, source) =>
+                {
+                    source.AsSpan(0, MaxLoggedResponsePreviewLength).CopyTo(destination);
+                    "...".AsSpan().CopyTo(destination[MaxLoggedResponsePreviewLength..]);
+                });
+        }
+
+        private static ReadOnlySpan<char> TrimWhitespace(ReadOnlySpan<char> value)
+        {
+            var start = 0;
+            while (start < value.Length && char.IsWhiteSpace(value[start]))
+            {
+                start++;
+            }
+
+            var end = value.Length - 1;
+            while (end >= start && char.IsWhiteSpace(value[end]))
+            {
+                end--;
+            }
+
+            return value[start..(end + 1)];
         }
     }
 }

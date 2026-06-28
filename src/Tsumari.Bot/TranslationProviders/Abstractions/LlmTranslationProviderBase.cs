@@ -5,6 +5,8 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
 {
     public abstract class LlmTranslationProviderBase : ITranslationProvider
     {
+        private const int StackAllocThreshold = 128;
+
         public abstract bool IsActive { get; }
 
         public bool UsesCharacterQuota => false;
@@ -23,13 +25,7 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
             var userPrompt = $"Text to detect:\n{text}";
 
             var rawResult = await CallModelAsync(systemPrompt, userPrompt);
-            var cleanResult = rawResult.Trim().ToUpperInvariant();
-            
-            // Models occasionally wrap short answers in markdown or quotes; strip those artifacts
-            // before the routing layer compares the detected language code.
-            cleanResult = cleanResult.Replace("*", string.Empty).Replace("`", string.Empty).Trim();
-
-            return cleanResult;
+            return NormalizeDetectedLanguageCode(rawResult);
         }
 
         public async Task<string> TranslateTextAsync(string text, string targetLanguageCode)
@@ -53,17 +49,67 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
                 $"Task: Output ONLY the direct translation of the above text into language: {targetLanguage}.";
 
             var result = await CallModelAsync(systemPrompt, userPrompt);
-            var cleanResult = result.Trim();
-            if (cleanResult.StartsWith('\"') && cleanResult.EndsWith('\"') && cleanResult.Length > 2)
-            {
-                // Some chat-style models still wrap the final answer in quotes even when instructed
-                // not to; remove those so Discord messages stay clean.
-                cleanResult = cleanResult.Substring(1, cleanResult.Length - 2).Trim();
-            }
-
-            return cleanResult;
+            return NormalizeTranslationResult(result);
         }
 
         protected abstract Task<string> CallModelAsync(string systemPrompt, string userPrompt);
+
+        private static string NormalizeDetectedLanguageCode(string rawResult)
+        {
+            var trimmed = TrimWhitespace(rawResult.AsSpan());
+            if (trimmed.IsEmpty)
+            {
+                return string.Empty;
+            }
+
+            Span<char> buffer = trimmed.Length <= StackAllocThreshold
+                ? stackalloc char[trimmed.Length]
+                : new char[trimmed.Length];
+
+            var length = 0;
+            for (var index = 0; index < trimmed.Length; index++)
+            {
+                var value = trimmed[index];
+                if (value is '*' or '`')
+                {
+                    continue;
+                }
+
+                buffer[length++] = char.ToUpperInvariant(value);
+            }
+
+            var cleaned = TrimWhitespace(buffer[..length]);
+            return cleaned.IsEmpty ? string.Empty : new string(cleaned);
+        }
+
+        private static string NormalizeTranslationResult(string result)
+        {
+            var trimmed = TrimWhitespace(result.AsSpan());
+            if (trimmed.Length > 2 && trimmed[0] == '"' && trimmed[^1] == '"')
+            {
+                // Some chat-style models still wrap the final answer in quotes even when instructed
+                // not to; remove those so Discord messages stay clean.
+                trimmed = TrimWhitespace(trimmed[1..^1]);
+            }
+
+            return trimmed.IsEmpty ? string.Empty : new string(trimmed);
+        }
+
+        private static ReadOnlySpan<char> TrimWhitespace(ReadOnlySpan<char> value)
+        {
+            var start = 0;
+            while (start < value.Length && char.IsWhiteSpace(value[start]))
+            {
+                start++;
+            }
+
+            var end = value.Length - 1;
+            while (end >= start && char.IsWhiteSpace(value[end]))
+            {
+                end--;
+            }
+
+            return value[start..(end + 1)];
+        }
     }
 }

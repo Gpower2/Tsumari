@@ -35,6 +35,28 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Equal("EN", result);
         }
 
+        [Fact]
+        public async Task DetectLanguageAsync_StripsMarkdownArtifactsAndWhitespace()
+        {
+            var configMock = new Mock<IConfiguration>();
+            configMock.Setup(c => c["Translation:Ollama:ApiUrl"]).Returns("http://localhost:11434/api/generate");
+            configMock.Setup(c => c["Translation:Ollama:Model"]).Returns("aya:8b");
+
+            var httpClientFactory = new Mock<IHttpClientFactory>();
+            httpClientFactory
+                .Setup(f => f.CreateClient(HttpClientNames.OllamaTranslation))
+                .Returns(new HttpClient(new StubHttpMessageHandler("""{ "response": "  *`en`*  " }""")));
+
+            var provider = new OllamaTranslationProvider(
+                configMock.Object,
+                httpClientFactory.Object,
+                NullLogger<OllamaTranslationProvider>.Instance);
+
+            var result = await provider.DetectLanguageAsync("hello");
+
+            Assert.Equal("EN", result);
+        }
+
         private sealed class StubHttpMessageHandler : HttpMessageHandler
         {
             private readonly string _responseBody;

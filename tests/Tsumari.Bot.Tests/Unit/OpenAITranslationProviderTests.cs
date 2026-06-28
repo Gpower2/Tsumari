@@ -67,6 +67,17 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Contains("did not contain a string 'content' value in the first choice message", exception.Message);
         }
 
+        [Fact]
+        public async Task TranslateTextAsync_TruncatesInvalidResponsePreview()
+        {
+            var provider = CreateProvider(new string('x', 1024) + "TAIL");
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => provider.TranslateTextAsync("hello", "fr"));
+
+            Assert.Contains(new string('x', 1024) + "...", exception.Message);
+            Assert.DoesNotContain("TAIL", exception.Message);
+        }
+
         private static OpenAITranslationProvider CreateProvider(string responseBody)
         {
             var configMock = new Mock<IConfiguration>();

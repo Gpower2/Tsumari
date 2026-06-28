@@ -96,6 +96,32 @@ namespace Tsumari.Bot.Tests.Unit
                     && entry.Message.Contains("Response body: (empty)"));
         }
 
+        [Fact]
+        public async Task ReadStringWithStatusCheckAsync_TruncatesLongFailureBodies()
+        {
+            var longBody = new string('a', 4096) + "TAIL";
+
+            using var response = new HttpResponseMessage(HttpStatusCode.BadGateway)
+            {
+                ReasonPhrase = "Bad Gateway",
+                RequestMessage = new HttpRequestMessage(HttpMethod.Get, "https://example.com/long"),
+                Content = new StringContent(longBody, Encoding.UTF8, "text/plain")
+            };
+
+            var logger = new ListLogger();
+
+            var exception = await Assert.ThrowsAsync<HttpRequestException>(() =>
+                response.ReadStringWithStatusCheckAsync(logger, "fetching a long payload"));
+
+            Assert.Contains(new string('a', 4096) + "...", exception.Message);
+            Assert.DoesNotContain("TAIL", exception.Message);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Error
+                    && entry.Message.Contains(new string('a', 4096) + "...")
+                    && !entry.Message.Contains("TAIL"));
+        }
+
         private sealed class ListLogger : ILogger
         {
             public List<(LogLevel Level, string Message)> Entries { get; } = [];

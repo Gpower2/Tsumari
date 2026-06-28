@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -109,6 +110,80 @@ namespace Tsumari.Bot.Tests.Component
             var transService = new TranslationService(dbMock.Object, providerMock.Object, transLogger, loggerFactory);
 
             Assert.False(transService.IsActive);
+        }
+
+        [Fact]
+        public async Task DetectLanguageAsync_LogsTruncatedPreview()
+        {
+            var dbLogger = NullLogger<DatabaseService>.Instance;
+            var dbPath = $"test_tsumari_trans_{Guid.NewGuid():N}.db";
+            var dbConfigMock = new Mock<IConfiguration>();
+            dbConfigMock.Setup(c => c["Database:FilePath"]).Returns(dbPath);
+            var dbService = new DatabaseService(dbConfigMock.Object, dbLogger);
+            await dbService.InitializeDatabaseAsync();
+
+            var transLogger = new ListLogger<TranslationService>();
+            var loggerFactory = new NullLoggerFactory();
+            var providerMock = new Mock<ITranslationProvider>();
+            providerMock.SetupGet(p => p.UsesCharacterQuota).Returns(false);
+            providerMock.SetupGet(p => p.IsActive).Returns(true);
+            providerMock.Setup(p => p.DetectLanguageAsync(It.IsAny<string>())).ReturnsAsync("EN");
+            var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
+
+            try
+            {
+                var result = await transService.DetectLanguageAsync("12345678901234567890");
+
+                Assert.Equal("EN", result);
+                Assert.Contains(
+                    transLogger.Entries,
+                    entry => entry.Level == LogLevel.Information
+                        && entry.Message.Contains("Language detected: 'EN'")
+                        && entry.Message.Contains("123456789012345")
+                        && !entry.Message.Contains("1234567890123456"));
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(dbPath)) File.Delete(dbPath);
+                    var wal = $"{dbPath}-wal";
+                    if (File.Exists(wal)) File.Delete(wal);
+                }
+                catch {}
+            }
+        }
+
+        private sealed class ListLogger<T> : ILogger<T>
+        {
+            public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+            public IDisposable BeginScope<TState>(TState state)
+                where TState : notnull
+            {
+                return NullScope.Instance;
+            }
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(
+                LogLevel logLevel,
+                EventId eventId,
+                TState state,
+                Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                Entries.Add((logLevel, formatter(state, exception)));
+            }
+
+            private sealed class NullScope : IDisposable
+            {
+                public static readonly NullScope Instance = new();
+
+                public void Dispose()
+                {
+                }
+            }
         }
     }
 }

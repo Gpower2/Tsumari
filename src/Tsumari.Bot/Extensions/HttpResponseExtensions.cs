@@ -96,9 +96,19 @@ namespace Tsumari.Bot.Extensions
                 return "(empty)";
             }
 
-            return responseBody.Length <= MaxLoggedResponseBodyLength
-                ? responseBody
-                : responseBody.Substring(0, MaxLoggedResponseBodyLength) + "...";
+            if (responseBody.Length <= MaxLoggedResponseBodyLength)
+            {
+                return responseBody;
+            }
+
+            return string.Create(
+                MaxLoggedResponseBodyLength + 3,
+                responseBody,
+                static (destination, source) =>
+                {
+                    source.AsSpan(0, MaxLoggedResponseBodyLength).CopyTo(destination);
+                    "...".AsSpan().CopyTo(destination[MaxLoggedResponseBodyLength..]);
+                });
         }
     }
 }
