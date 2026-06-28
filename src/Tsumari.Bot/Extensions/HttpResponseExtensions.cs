@@ -48,8 +48,7 @@ namespace Tsumari.Bot.Extensions
             string operationName,
             string responseBody)
         {
-            logger.LogError(
-                "HTTP request failed while {Operation}. Status: {StatusCode} {ReasonPhrase}. Url: {Url}. Headers: {Headers}. Response body: {ResponseBody}",
+            logger.LogHttpRequestFailed(
                 operationName,
                 (int)response.StatusCode,
                 response.ReasonPhrase,

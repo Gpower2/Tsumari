@@ -31,7 +31,7 @@ namespace Tsumari.Bot.Services
                 logger: loggerFactory.CreateLogger<ResiliencyHelper>()
             );
 
-            _logger.LogInformation("Translation Service configured to use provider implementation: {ProviderType}", _translationProvider.GetType().Name);
+            _logger.LogProviderImplementationConfigured(_translationProvider.GetType().Name);
         }
 
         public bool IsActive => _translationProvider.IsActive;
@@ -70,15 +70,14 @@ namespace Tsumari.Bot.Services
             int charCount = text.Length;
             if (!await CanTranslateAsync(charCount))
             {
-                _logger.LogWarning("Detection request blocked! Monthly translation limit of {Limit} characters exceeded.", MonthlyCharacterLimit);
+                _logger.LogDetectionRequestBlockedByQuota(MonthlyCharacterLimit);
                 throw new InvalidOperationException("Monthly translation quota limit reached.");
             }
 
             string code = await _resiliencyHelper.ExecuteAsync(() => _translationProvider.DetectLanguageAsync(text));
             await IncrementTranslationUsageAsync(charCount);
 
-            _logger.LogInformation("Language detected: '{Lang}' for text prefix '{Prefix}'",
-                code, text.Substring(0, Math.Min(text.Length, 15)));
+            _logger.LogLanguageDetected(code, text.Substring(0, Math.Min(text.Length, 15)));
 
             return code;
         }
@@ -98,7 +97,7 @@ namespace Tsumari.Bot.Services
             int charCount = text.Length;
             if (!await CanTranslateAsync(charCount))
             {
-                _logger.LogWarning("Translation request blocked! Monthly translation limit of {Limit} characters exceeded.", MonthlyCharacterLimit);
+                _logger.LogTranslationRequestBlockedByQuota(MonthlyCharacterLimit);
                 throw new InvalidOperationException("Monthly translation quota limit reached.");
             }
 

@@ -23,7 +23,7 @@ namespace Tsumari.Bot.TranslationProviders
             var apiKey = configuration["DeepL:ApiKey"] ?? configuration["DeepLKey"];
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                _logger.LogCritical("DeepL API Key is missing! Bot will not be able to perform translations with DeepL.");
+                _logger.LogApiKeyMissing();
                 return;
             }
 
@@ -33,19 +33,19 @@ namespace Tsumari.Bot.TranslationProviders
                 if (apiKey.EndsWith(":fx", StringComparison.OrdinalIgnoreCase))
                 {
                     options.ServerUrl = "https://api-free.deepl.com";
-                    _logger.LogInformation("DeepL Key verified with ':fx' suffix. Hardcoded routing to 'https://api-free.deepl.com'.");
+                    _logger.LogFreeApiRoutingSelected();
                 }
                 else
                 {
                     options.ServerUrl = "https://api.deepl.com";
-                    _logger.LogInformation("DeepL Key parsed. Routing to 'https://api.deepl.com'.");
+                    _logger.LogPaidApiRoutingSelected();
                 }
 
                 _translator = new Translator(apiKey, options);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to initialize DeepL Translator client.");
+                _logger.LogTranslatorInitializationFailed(ex);
             }
         }
 

@@ -43,8 +43,7 @@ namespace Tsumari.Bot.Modules
                 bool added = await _dbService.AddMasterChannelAsync(channel.Id);
                 if (added)
                 {
-                    _logger.LogInformation("Channel {Name} ({Id}) registered as a Master channel by {User}.", 
-                        textChannel.Name, channel.Id, Context.User.Username);
+                    _logger.LogMasterChannelRegistered(textChannel.Name, channel.Id, Context.User.Username);
                     await RespondAsync($"✅ Success: Registered <#{channel.Id}> as a Tsumari Master Channel.", ephemeral: false);
                 }
                 else
@@ -54,7 +53,7 @@ namespace Tsumari.Bot.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error registering master channel {Id}.", channel.Id);
+                _logger.LogMasterChannelRegistrationFailed(ex, channel.Id);
                 await RespondAsync("❌ An internal database error occurred while registering the master channel.", ephemeral: true);
             }
         }
@@ -106,8 +105,7 @@ namespace Tsumari.Bot.Modules
                 bool registered = await _dbService.RegisterLocalChannelAsync(localChannel.Id, masterChannel.Id, lang);
                 if (registered)
                 {
-                    _logger.LogInformation("Local channel {Local} registered to Master {Master} with language {Lang} by {User}.", 
-                        localTextChannel.Name, masterTextChannel.Name, lang, Context.User.Username);
+                    _logger.LogLocalizedChannelRegistered(localTextChannel.Name, masterTextChannel.Name, lang, Context.User.Username);
                     await RespondAsync($"✅ Success: Linked localized channel <#{localChannel.Id}> to Master <#{masterChannel.Id}> with target language **{LanguageCodeService.NormalizeLanguageCode(lang)}**.", ephemeral: false);
                 }
                 else
@@ -117,7 +115,7 @@ namespace Tsumari.Bot.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error registering localized channel {LocalId} for master {MasterId}.", localChannel.Id, masterChannel.Id);
+                _logger.LogLocalizedChannelRegistrationFailed(ex, localChannel.Id, masterChannel.Id);
                 await RespondAsync("❌ An internal database error occurred while registering the localized channel.", ephemeral: true);
             }
         }
@@ -138,7 +136,7 @@ namespace Tsumari.Bot.Modules
                 bool deleted = await _dbService.UnregisterChannelAsync(channel.Id);
                 if (deleted)
                 {
-                    _logger.LogInformation("Unregistered channel {Id} by user {User}.", channel.Id, Context.User.Username);
+                    _logger.LogChannelUnregisteredByUser(channel.Id, Context.User.Username);
                     await RespondAsync($"✅ Success: Unregistered <#{channel.Id}> from Tsumari. Sibling or cascading links have been purged.", ephemeral: false);
                 }
                 else
@@ -148,7 +146,7 @@ namespace Tsumari.Bot.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error unregistering channel {Id}.", channel.Id);
+                _logger.LogChannelUnregisterByUserFailed(ex, channel.Id);
                 await RespondAsync("❌ An internal database error occurred while unregistering the channel.", ephemeral: true);
             }
         }

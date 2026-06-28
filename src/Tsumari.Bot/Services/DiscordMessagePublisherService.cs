@@ -43,11 +43,7 @@ namespace Tsumari.Bot.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
-                        ex,
-                        "CDN re-upload fail: Could not download {File} from {Url}",
-                        attachment.Filename,
-                        attachment.Url);
+                    _logger.LogAttachmentDownloadFailed(ex, attachment.Filename, attachment.Url);
                 }
             }
 
@@ -87,11 +83,7 @@ namespace Tsumari.Bot.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
-                        ex,
-                        "Failed to edit buttons into sent message {MsgId} in channel {ChanId}.",
-                        sentMessage.Value.Id,
-                        sentMessage.Key);
+                    _logger.LogJumpButtonEditFailed(ex, sentMessage.Value.Id, sentMessage.Key);
                 }
             }
         }
@@ -129,7 +121,7 @@ namespace Tsumari.Bot.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send files/message to channel {Id}. Fallback to text.", channel.Id);
+                _logger.LogSendWithFilesFailed(ex, channel.Id);
                 try
                 {
                     return await channel.SendMessageAsync(
@@ -139,7 +131,7 @@ namespace Tsumari.Bot.Services
                 }
                 catch (Exception sendEx)
                 {
-                    _logger.LogError(sendEx, "Fallback message transmission failed completely for channel {Id}", channel.Id);
+                    _logger.LogFallbackSendFailed(sendEx, channel.Id);
                     return null;
                 }
             }
@@ -153,7 +145,7 @@ namespace Tsumari.Bot.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to dispose MemoryStream in mirroring routine.");
+                        _logger.LogMemoryStreamDisposeFailed(ex);
                     }
                 }
             }

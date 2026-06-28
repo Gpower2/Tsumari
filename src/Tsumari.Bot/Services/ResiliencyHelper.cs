@@ -62,7 +62,7 @@ namespace Tsumari.Bot.Services
             var currentState = State;
             if (currentState == CircuitState.Open)
             {
-                _logger.LogWarning("Circuit breaker is OPEN. Fast-failing request.");
+                _logger.LogCircuitBreakerOpenFastFail();
                 throw new InvalidOperationException("Circuit breaker is currently open. Request blocked.");
             }
 
@@ -84,15 +84,14 @@ namespace Tsumari.Bot.Services
 
                     if (attempts >= _maxRetryAttempts || State == CircuitState.Open)
                     {
-                        _logger.LogError(ex, "Operation failed after {Attempts} attempts. Circuit state is {State}.", attempts, State);
+                        _logger.LogOperationFailedAfterAttempts(ex, attempts, State);
                         throw;
                     }
 
                     // Exponential backoff with full jitter
                     var delay = CalculateJitteredDelay(attempts);
-                    _logger.LogWarning(ex, "Operation failed. Retrying in {DelayMs}ms (Attempt {Attempt}/{Max}). Error: {Message}", 
-                        delay.TotalMilliseconds, attempts, _maxRetryAttempts, ex.Message);
-                    
+                    _logger.LogOperationRetrying(ex, delay.TotalMilliseconds, attempts, _maxRetryAttempts, ex.Message);
+                     
                     await Task.Delay(delay);
                 }
             }
@@ -113,7 +112,7 @@ namespace Tsumari.Bot.Services
                         {
                             State = CircuitState.HalfOpen;
                             Volatile.Write(ref _lastStateChangeTicks, DateTime.UtcNow.Ticks);
-                            _logger.LogInformation("Circuit breaker transitioned to HALF-OPEN. Testing service availability.");
+                            _logger.LogCircuitBreakerHalfOpen();
                         }
                     }
                 }
@@ -131,7 +130,7 @@ namespace Tsumari.Bot.Services
                     {
                         State = CircuitState.Closed;
                         Volatile.Write(ref _lastStateChangeTicks, DateTime.UtcNow.Ticks);
-                        _logger.LogInformation("Circuit breaker transitioned to CLOSED. Service restored successfully.");
+                        _logger.LogCircuitBreakerClosed();
                     }
                 }
             }
@@ -147,7 +146,7 @@ namespace Tsumari.Bot.Services
                 {
                     State = CircuitState.Open;
                     Volatile.Write(ref _lastStateChangeTicks, DateTime.UtcNow.Ticks);
-                    _logger.LogWarning("Operation failed in HALF-OPEN state. Circuit breaker returned to OPEN.");
+                    _logger.LogCircuitBreakerReturnedToOpen();
                 }
             }
             else if (State == CircuitState.Closed && currentFailures >= _failureThreshold)
@@ -158,8 +157,7 @@ namespace Tsumari.Bot.Services
                     {
                         State = CircuitState.Open;
                         Volatile.Write(ref _lastStateChangeTicks, DateTime.UtcNow.Ticks);
-                        _logger.LogCritical("Sequential failures ({Failures}) exceeded threshold ({Threshold}). Circuit breaker tripped to OPEN.", 
-                            currentFailures, _failureThreshold);
+                        _logger.LogCircuitBreakerTrippedOpen(currentFailures, _failureThreshold);
                     }
                 }
             }

@@ -47,13 +47,11 @@ namespace Tsumari.Bot.TranslationProviders
 
             if (!provider.IsActive)
             {
-                _logger.LogWarning(
-                    "Translation provider {Provider} was selected but is not active. Translation features will remain unavailable until the provider is configured correctly.",
-                    parsedProvider);
+                _logger.LogSelectedProviderInactive(parsedProvider);
             }
             else
             {
-                _logger.LogInformation("Translation provider {Provider} selected from configuration.", parsedProvider);
+                _logger.LogSelectedProvider(parsedProvider);
             }
 
             return provider;
@@ -63,15 +61,11 @@ namespace Tsumari.Bot.TranslationProviders
         {
             if (_ollamaTranslationProvider.IsActive)
             {
-                _logger.LogWarning(
-                    "{Reason} Falling back to Ollama instead of defaulting to paid DeepL.",
-                    reason);
+                _logger.LogFallingBackToOllama(reason);
             }
             else
             {
-                _logger.LogWarning(
-                    "{Reason} Falling back to Ollama instead of defaulting to paid DeepL, but the Ollama provider is not active so translation features will remain unavailable.",
-                    reason);
+                _logger.LogFallingBackToInactiveOllama(reason);
             }
 
             return _ollamaTranslationProvider;

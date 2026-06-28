@@ -53,7 +53,7 @@ namespace Tsumari.Bot.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error inside routing pipeline for message {MsgId}.", message.Id);
+                _logger.LogRoutingPipelineFailed(ex, message.Id);
             }
         }
 
@@ -69,16 +69,11 @@ namespace Tsumari.Bot.Services
                 return;
             }
 
-            _logger.LogInformation(
-                "Processing message {Id} in channel {ChanName} (Master: {Master}, Local: {Local})",
-                message.Id,
-                message.Channel.Name,
-                isMaster,
-                isLocalized);
+            _logger.LogProcessingMessage(message.Id, message.Channel.Name, isMaster, isLocalized);
 
             if (!_translationService.IsActive)
             {
-                _logger.LogWarning("Translation service is currently inactive. Outbound routing aborted.");
+                _logger.LogTranslationServiceInactive();
                 return;
             }
 
@@ -110,7 +105,7 @@ namespace Tsumari.Bot.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to run language detection. Fallback to EN.");
+                    _logger.LogLanguageDetectionFailedFallbackToEnglish(ex);
                     return "EN";
                 }
             }
@@ -169,7 +164,7 @@ namespace Tsumari.Bot.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to translate message {MsgId} to {Lang}. Forwarding raw.", message.Id, localizedChannel.TargetLanguageCode);
+                        _logger.LogMasterTranslationFailedForwardingRaw(ex, message.Id, localizedChannel.TargetLanguageCode);
                         textToSend = MirroredMessageFormatter.FormatMirroredAuthorText(authorName, $"{content} *(Translation Failed)*");
                     }
                 }
@@ -216,7 +211,7 @@ namespace Tsumari.Bot.Services
 
             if (parentMasterId == null || string.IsNullOrWhiteSpace(targetLang))
             {
-                _logger.LogError("Channel {Id} has incomplete configuration in localized table.", channelId);
+                _logger.LogLocalizedChannelConfigurationIncomplete(channelId);
                 return;
             }
 
@@ -323,7 +318,7 @@ namespace Tsumari.Bot.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Match Flow: Failed to translate to sibling {Lang}.", sibling.TargetLanguageCode);
+                        _logger.LogMatchFlowSiblingTranslationFailed(ex, sibling.TargetLanguageCode);
                         siblingText = MirroredMessageFormatter.FormatMirroredAuthorText(authorName, $"{content} *(Translation Failed)*");
                     }
                 }
@@ -391,7 +386,7 @@ namespace Tsumari.Bot.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Mismatch Flow: Failed native translation reply in channel {Id}", message.Channel.Id);
+                    _logger.LogMismatchFlowNativeReplyTranslationFailed(ex, message.Channel.Id);
                 }
             }
 
@@ -436,7 +431,7 @@ namespace Tsumari.Bot.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Mismatch Flow: Failed sibling translation to {Lang}", sibling.TargetLanguageCode);
+                        _logger.LogMismatchFlowSiblingTranslationFailed(ex, sibling.TargetLanguageCode);
                         siblingText = MirroredMessageFormatter.FormatMirroredAuthorText(authorName, $"{content} *(Translation Failed)*");
                     }
                 }

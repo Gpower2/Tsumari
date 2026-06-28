@@ -52,6 +52,21 @@ E:\Development\Tsumari\
 │       ├── Extensions/
 │       │   └── HttpResponseExtensions.cs
 │       ├── GlobalUsings.cs
+│       ├── Logging/
+│       │   ├── DatabaseServiceLog.cs
+│       │   ├── DeepLLanguageServiceLog.cs
+│       │   ├── DeepLTranslationProviderLog.cs
+│       │   ├── DiscordGatewayHostedServiceLog.cs
+│       │   ├── DiscordMessagePublisherServiceLog.cs
+│       │   ├── EditedMessageSyncServiceLog.cs
+│       │   ├── HttpResponseLog.cs
+│       │   ├── InteractionModuleLog.cs
+│       │   ├── LinkedMessageDeletionServiceLog.cs
+│       │   ├── MirroredMessageRoutingServiceLog.cs
+│       │   ├── ReactionMirroringServiceLog.cs
+│       │   ├── ResiliencyHelperLog.cs
+│       │   ├── TranslationProviderResolverLog.cs
+│       │   └── TranslationServiceLog.cs
 │       ├── Program.cs
 │       ├── appsettings.json
 │       ├── Models/

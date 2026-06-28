@@ -50,12 +50,12 @@ namespace Tsumari.Bot
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Starting Tsumari Discord Gateway Hosted Service...");
+            _logger.LogStartingHostedService();
 
             var token = _configuration["Discord:Token"] ?? _configuration["DiscordToken"];
             if (string.IsNullOrWhiteSpace(token))
             {
-                _logger.LogCritical("Discord Token is completely missing from configuration! Shutting down worker.");
+                _logger.LogMissingDiscordToken();
                 throw new InvalidOperationException("Discord Token is required.");
             }
 
@@ -70,11 +70,11 @@ namespace Tsumari.Bot
             }
             catch (TaskCanceledException)
             {
-                _logger.LogInformation("Discord gateway hosted service cancellation requested.");
+                _logger.LogCancellationRequested();
             }
             catch (Exception ex)
             {
-                _logger.LogCritical(ex, "A fatal exception crashed the Gateway Client lifecycle.");
+                _logger.LogGatewayLifecycleCrashed(ex);
                 throw;
             }
             finally
@@ -109,13 +109,13 @@ namespace Tsumari.Bot
                 _ => LogLevel.Information
             };
 
-            _logger.Log(level, log.Exception, "[Discord.Net] {Source}: {Message}", log.Source, log.Message);
+            _logger.LogDiscordNetMessage(level, log.Source, log.Message, log.Exception);
             return Task.CompletedTask;
         }
 
         private async Task OnReadyAsync()
         {
-            _logger.LogInformation("Tsumari is connected to Discord Gateway as: {User}", _client.CurrentUser.ToString());
+            _logger.LogConnectedToGateway(_client.CurrentUser.ToString());
 
             try
             {
@@ -124,11 +124,11 @@ namespace Tsumari.Bot
                 await _interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), _serviceProvider);
                 await _interactionService.RegisterCommandsGloballyAsync();
 
-                _logger.LogInformation("Administrative slash commands registered globally.");
+                _logger.LogAdministrativeCommandsRegistered();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred during worker initialization on Ready event.");
+                _logger.LogReadyInitializationFailed(ex);
             }
         }
 
@@ -139,7 +139,7 @@ namespace Tsumari.Bot
 
             if (!result.IsSuccess)
             {
-                _logger.LogError("Slash command execution failed: {Reason}", result.ErrorReason);
+                _logger.LogSlashCommandExecutionFailed(result.ErrorReason);
 
                 if (interaction.HasResponded)
                 {
@@ -186,7 +186,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error handling edited message {MsgId}.", after.Id);
+                _logger.LogEditedMessageEventHandlingFailed(ex, after.Id);
             }
         }
 
@@ -232,7 +232,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error routing received message {MessageId}.", rawMessage.Id);
+                _logger.LogMessageRoutingFailed(ex, rawMessage.Id);
             }
         }
 
@@ -244,7 +244,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error synchronizing delete for message {MessageId}.", messageId);
+                _logger.LogDeleteSynchronizationFailed(ex, messageId);
             }
         }
 
@@ -256,7 +256,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error synchronizing bulk delete in channel {ChannelId}.", channelId);
+                _logger.LogBulkDeleteSynchronizationFailed(ex, channelId);
             }
         }
 
@@ -268,7 +268,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error synchronizing edited message {MessageId}.", afterMessage.Id);
+                _logger.LogEditSynchronizationFailed(ex, afterMessage.Id);
             }
         }
 
@@ -285,7 +285,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error mirroring added reaction for message {MessageId}.", reaction.MessageId);
+                _logger.LogReactionAddedMirroringFailed(ex, reaction.MessageId);
             }
         }
 
@@ -302,7 +302,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error mirroring removed reaction for message {MessageId}.", reaction.MessageId);
+                _logger.LogReactionRemovedMirroringFailed(ex, reaction.MessageId);
             }
         }
 
@@ -314,7 +314,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error mirroring cleared reactions for message {MessageId}.", messageId);
+                _logger.LogReactionsClearedMirroringFailed(ex, messageId);
             }
         }
 
@@ -326,7 +326,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error mirroring removed-for-emote reactions for message {MessageId}.", messageId);
+                _logger.LogReactionsRemovedForEmoteMirroringFailed(ex, messageId);
             }
         }
 
@@ -384,7 +384,7 @@ namespace Tsumari.Bot
 
         private async Task DisconnectClientAsync()
         {
-            _logger.LogInformation("Disconnecting and disposing Discord client connection...");
+            _logger.LogDisconnectingClient();
 
             try
             {
@@ -395,7 +395,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Discord client logout failed during shutdown.");
+                _logger.LogClientLogoutFailed(ex);
             }
 
             try
@@ -407,7 +407,7 @@ namespace Tsumari.Bot
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Discord client stop failed during shutdown.");
+                    _logger.LogClientStopFailed(ex);
             }
         }
     }

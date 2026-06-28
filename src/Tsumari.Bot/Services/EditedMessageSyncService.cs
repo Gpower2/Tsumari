@@ -49,7 +49,7 @@ namespace Tsumari.Bot.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled error handling edited message {MsgId}.", message.Id);
+                _logger.LogEditedMessageHandlingFailed(ex, message.Id);
             }
         }
 
@@ -84,7 +84,7 @@ namespace Tsumari.Bot.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to detect language for edited message {MsgId}.", message.Id);
+                        _logger.LogEditedMessageLanguageDetectionFailed(ex, message.Id);
                     }
                 }
 
@@ -135,7 +135,7 @@ namespace Tsumari.Bot.Services
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, "Failed to retranslate edited message {MsgId} to {Lang}.", message.Id, translationTargetLang);
+                                _logger.LogEditedMessageRetranslationFailed(ex, message.Id, translationTargetLang);
                                 newText = MirroredMessageFormatter.FormatTranslationFailureText(
                                     message.Channel.Id,
                                     mirroredChannelId,
@@ -149,25 +149,18 @@ namespace Tsumari.Bot.Services
                         var modified = await _discordMessagePublisherService.TryModifyMessageContentAsync(channel, mirroredMessageId, newText);
                         if (!modified)
                         {
-                            _logger.LogWarning(
-                                "Could not fetch mirrored IUserMessage {MirrorId} in channel {ChanId} for edited message.",
-                                mirroredMessageId,
-                                mirroredChannelId);
+                            _logger.LogEditedMirroredMessageNotFetched(mirroredMessageId, mirroredChannelId);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(
-                            ex,
-                            "Error while updating mirrored message {MirrorId} for edited original {MsgId}.",
-                            mirroredMessageId,
-                            message.Id);
+                        _logger.LogEditedMirroredMessageUpdateFailed(ex, mirroredMessageId, message.Id);
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled failure while processing edited message {MsgId}.", message.Id);
+                _logger.LogEditedMessageProcessingFailed(ex, message.Id);
             }
         }
     }

@@ -144,7 +144,7 @@ namespace Tsumari.Bot.TranslationProviders
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to retrieve supported DeepL target language codes. Falling back to legacy mappings.");
+                _logger.LogSupportedTargetLanguagesLoadFailed(ex);
                 return null;
             }
             finally

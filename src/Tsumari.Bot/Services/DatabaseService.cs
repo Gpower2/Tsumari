@@ -55,7 +55,7 @@ namespace Tsumari.Bot.Services
         /// </summary>
         public async Task InitializeDatabaseAsync()
         {
-            _logger.LogInformation("Initializing database schemas...");
+            _logger.LogInitializingDatabaseSchemas();
             
             const string createMasterChannelsSql = @"
                 CREATE TABLE IF NOT EXISTS MasterChannels (
@@ -123,12 +123,12 @@ namespace Tsumari.Bot.Services
                 }
                  
                 await transaction.CommitAsync();
-                _logger.LogInformation("Database tables initialized successfully.");
+                _logger.LogDatabaseTablesInitialized();
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                _logger.LogCritical(ex, "Failed to initialize database tables.");
+                _logger.LogDatabaseTablesInitializationFailed(ex);
                 throw;
             }
         }
@@ -157,7 +157,7 @@ namespace Tsumari.Bot.Services
 
         public async Task<bool> AddMasterChannelAsync(ulong masterChannelId)
         {
-            _logger.LogInformation("Registering master channel: {ChannelId}", masterChannelId);
+            _logger.LogRegisteringMasterChannel(masterChannelId);
             using var connection = await GetConnectionAsync();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "INSERT OR IGNORE INTO MasterChannels (MasterChannelId) VALUES ($id);";
@@ -184,9 +184,8 @@ namespace Tsumari.Bot.Services
 
         public async Task<bool> RegisterLocalChannelAsync(ulong localChannelId, ulong parentMasterChannelId, string targetLanguageCode)
         {
-            _logger.LogInformation("Registering local channel: {LocalId} for master: {MasterId} in language: {Lang}", 
-                localChannelId, parentMasterChannelId, targetLanguageCode);
-                
+            _logger.LogRegisteringLocalChannel(localChannelId, parentMasterChannelId, targetLanguageCode);
+                 
             using var connection = await GetConnectionAsync();
             using var cmd = connection.CreateCommand();
             
@@ -291,7 +290,7 @@ namespace Tsumari.Bot.Services
 
         public async Task<bool> UnregisterChannelAsync(ulong channelId)
         {
-            _logger.LogInformation("Attempting to unregister channel {ChannelId}", channelId);
+            _logger.LogAttemptingToUnregisterChannel(channelId);
             var idStr = channelId.ToString();
             using var connection = await GetConnectionAsync();
             using var transaction = connection.BeginTransaction();
@@ -318,13 +317,13 @@ namespace Tsumari.Bot.Services
                 }
 
                 await transaction.CommitAsync();
-                _logger.LogInformation("Unregistered channel {ChannelId}. Rows affected: {Count}", channelId, rowsDeleted);
+                _logger.LogChannelUnregistered(channelId, rowsDeleted);
                 return rowsDeleted > 0;
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                _logger.LogError(ex, "Failed to unregister channel {ChannelId}", channelId);
+                _logger.LogChannelUnregisterFailed(ex, channelId);
                 throw;
             }
         }
@@ -521,7 +520,7 @@ namespace Tsumari.Bot.Services
             cmd.Parameters.AddWithValue("$chars", characters);
 
             await cmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("Incremented monthly translation usage by {Count} characters.", characters);
+            _logger.LogTranslationUsageIncremented(characters);
         }
     }
 }

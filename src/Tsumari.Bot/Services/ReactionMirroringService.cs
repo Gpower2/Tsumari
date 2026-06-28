@@ -123,20 +123,14 @@ namespace Tsumari.Bot.Services
                     var channel = await _discordMessageService.GetChannelAsync(entry.ChannelId);
                     if (channel == null)
                     {
-                        _logger.LogWarning(
-                            "Reaction mirroring could not resolve channel {ChannelId} for message {MessageId}.",
-                            entry.ChannelId,
-                            entry.MessageId);
+                        _logger.LogReactionChannelNotResolved(entry.ChannelId, entry.MessageId);
                         continue;
                     }
 
                     var message = await channel.GetMessageAsync(entry.MessageId);
                     if (message == null)
                     {
-                        _logger.LogWarning(
-                            "Reaction mirroring could not fetch message {MessageId} in channel {ChannelId}.",
-                            entry.MessageId,
-                            entry.ChannelId);
+                        _logger.LogReactionMessageNotFetched(entry.MessageId, entry.ChannelId);
                         continue;
                     }
 
@@ -144,11 +138,7 @@ namespace Tsumari.Bot.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
-                        ex,
-                        "Reaction mirroring failed while fetching message {MessageId} in channel {ChannelId}.",
-                        entry.MessageId,
-                        entry.ChannelId);
+                    _logger.LogReactionMessageFetchFailed(ex, entry.MessageId, entry.ChannelId);
                 }
             }
 
@@ -201,12 +191,7 @@ namespace Tsumari.Bot.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
-                        ex,
-                        "Reaction mirroring failed while reconciling emoji {Emoji} on message {MessageId} in channel {ChannelId}.",
-                        emote.ToString(),
-                        state.MessageId,
-                        state.ChannelId);
+                    _logger.LogReactionReconcileFailed(ex, emote.ToString() ?? string.Empty, state.MessageId, state.ChannelId);
                 }
             }
         }

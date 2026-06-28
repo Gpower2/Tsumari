@@ -40,21 +40,12 @@ namespace Tsumari.Bot.Services
 
                     if (!deleted)
                     {
-                        _logger.LogWarning(
-                            "Delete sync could not resolve linked message {MirroredMessageId} in channel {ChannelId} while processing original delete {OriginalMessageId}.",
-                            mirroredMessage.MirroredMessageId,
-                            mirroredMessage.ChannelId,
-                            messageId);
+                        _logger.LogLinkedMessageNotResolvedDuringDelete(mirroredMessage.MirroredMessageId, mirroredMessage.ChannelId, messageId);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
-                        ex,
-                        "Delete sync failed while deleting linked message {MirroredMessageId} in channel {ChannelId} for original message {OriginalMessageId}.",
-                        mirroredMessage.MirroredMessageId,
-                        mirroredMessage.ChannelId,
-                        messageId);
+                    _logger.LogLinkedMessageDeleteFailed(ex, mirroredMessage.MirroredMessageId, mirroredMessage.ChannelId, messageId);
                 }
             }
 
