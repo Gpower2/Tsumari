@@ -172,8 +172,8 @@ namespace Tsumari.Bot.Tests
 
             // Assert
             Assert.Equal(2, links.Count);
-            Assert.Contains(links, l => l.MirroredMessageId == mirroredMsgId1 && l.ChannelId == 10001);
-            Assert.Contains(links, l => l.MirroredMessageId == mirroredMsgId2 && l.ChannelId == 10002);
+            Assert.Contains(links, l => l.MirroredMessageId == mirroredMsgId1 && l.ChannelId == 10001 && l.LanguageCode == "EL");
+            Assert.Contains(links, l => l.MirroredMessageId == mirroredMsgId2 && l.ChannelId == 10002 && l.LanguageCode == "IT");
         }
     }
 }

@@ -178,14 +178,19 @@ namespace Tsumari.Bot
             {
                 try
                 {
-                    var beforeMsg = await beforeCache.GetOrDownloadAsync();
+                    // If the old message is not cached, downloading it here returns the already-edited
+                    // state from Discord. In that case we must still process the update instead of
+                    // comparing "after" against another copy of "after" and skipping the edit.
+                    var hadCachedSnapshot = beforeCache.HasValue;
+                    var beforeMsg = hadCachedSnapshot
+                        ? await beforeCache.GetOrDownloadAsync()
+                        : null;
                     var beforeContent = beforeMsg?.Content ?? string.Empty;
                     var afterContent = message.Content ?? string.Empty;
 
-                    // If nothing changed in textual content, skip
-                    if (string.Equals(beforeContent, afterContent, StringComparison.Ordinal)) return;
+                    if (!ShouldProcessEditedMessage(hadCachedSnapshot, beforeContent, afterContent)) return;
 
-                    await ProcessEditedMessageAsync(message, beforeContent);
+                    await ProcessEditedMessageAsync(message);
                 }
                 catch (Exception ex)
                 {
@@ -196,10 +201,16 @@ namespace Tsumari.Bot
             return Task.CompletedTask;
         }
 
-        private async Task ProcessEditedMessageAsync(SocketUserMessage message, string previousContent)
+        private async Task ProcessEditedMessageAsync(SocketUserMessage message)
         {
             try
             {
+                var mirrored = await _dbService.GetMirroredMessagesAsync(message.Id);
+                if (mirrored.Count == 0)
+                {
+                    return;
+                }
+
                 var afterContent = message.Content ?? string.Empty;
                 string detectedLang = "EN";
                 if (!string.IsNullOrWhiteSpace(afterContent))
@@ -220,11 +231,9 @@ namespace Tsumari.Bot
                 {
                     authorName = guildUser.Nickname ?? guildUser.GlobalName ?? guildUser.Username;
                 }
-
                 var sourceChannelLang = await _dbService.GetTargetLanguageCodeAsync(message.Channel.Id);
                 var sourceLang = LanguageCodeService.ResolveSourceLanguageCode(detectedLang, sourceChannelLang);
 
-                var mirrored = await _dbService.GetMirroredMessagesAsync(message.Id);
                 foreach (var link in mirrored)
                 {
                     var mirroredId = link.MirroredMessageId;
@@ -235,24 +244,44 @@ namespace Tsumari.Bot
                         var ch = await _client.GetChannelAsync(chanId) as IMessageChannel;
                         if (ch == null) continue;
 
-                        var targetLang = await _dbService.GetTargetLanguageCodeAsync(chanId); // null for master channel
+                        var configuredTargetLang = await _dbService.GetTargetLanguageCodeAsync(chanId);
+                        var targetLang = ResolveLinkedMessageTargetLanguageCode(link.LanguageCode, configuredTargetLang);
                         string newText;
 
-                        if (targetLang == null || LanguageCodeService.AreSameLanguageCode(sourceLang, targetLang))
+                        if (!ShouldTranslateLinkedMessage(sourceLang, targetLang) || string.IsNullOrWhiteSpace(afterContent))
                         {
-                            newText = $"**{authorName}**:\n{afterContent}";
+                            newText = FormatEditedLinkedMessageText(
+                                message.Channel.Id,
+                                chanId,
+                                authorName,
+                                sourceLang,
+                                targetLang,
+                                afterContent);
                         }
                         else
                         {
+                            var translationTargetLang = targetLang!;
                             try
                             {
-                                var translated = await _translationService.TranslateTextAsync(afterContent, targetLang);
-                                newText = $"**{authorName}** {FormatLanguagePair(sourceLang, targetLang)}:\n{translated}";
+                                var translated = await _translationService.TranslateTextAsync(afterContent, translationTargetLang);
+                                newText = FormatEditedLinkedMessageText(
+                                    message.Channel.Id,
+                                    chanId,
+                                    authorName,
+                                    sourceLang,
+                                    translationTargetLang,
+                                    translated);
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, "Failed to retranslate edited message {MsgId} to {Lang}.", message.Id, targetLang);
-                                newText = $"**{authorName}**:\n{afterContent} *(Translation Failed)*";
+                                _logger.LogError(ex, "Failed to retranslate edited message {MsgId} to {Lang}.", message.Id, translationTargetLang);
+                                newText = FormatTranslationFailureText(
+                                    message.Channel.Id,
+                                    chanId,
+                                    authorName,
+                                    sourceLang,
+                                    translationTargetLang,
+                                    afterContent);
                             }
                         }
 
@@ -487,7 +516,7 @@ namespace Tsumari.Bot
                         try
                         {
                             var nativeTranslation = await _translationService.TranslateTextAsync(content, targetLang);
-                            nativeReply = await message.ReplyAsync($"*{FormatLanguagePair(sourceLang, targetLang)}:* {nativeTranslation}");
+                            nativeReply = await message.ReplyAsync(FormatTranslatedReplyText(sourceLang, targetLang, nativeTranslation));
                         }
                         catch (Exception ex)
                         {
@@ -653,23 +682,93 @@ namespace Tsumari.Bot
             return $"({sourceLang} to {targetLang})";
         }
 
+        public static bool ShouldProcessEditedMessage(bool hadCachedSnapshot, string? beforeContent, string? afterContent)
+        {
+            if (!hadCachedSnapshot)
+            {
+                return true;
+            }
+
+            return !string.Equals(beforeContent ?? string.Empty, afterContent ?? string.Empty, StringComparison.Ordinal);
+        }
+
+        public static string FormatTranslatedReplyText(string sourceLang, string targetLang, string translatedText)
+        {
+            var prefix = $"*{FormatLanguagePair(sourceLang, targetLang)}:*";
+            return string.IsNullOrWhiteSpace(translatedText)
+                ? prefix
+                : $"{prefix} {translatedText}";
+        }
+
+        public static string FormatMirroredAuthorText(string authorName, string content)
+        {
+            return string.IsNullOrWhiteSpace(content)
+                ? $"**{authorName}**:"
+                : $"**{authorName}**:\n{content}";
+        }
+
+        public static string? ResolveLinkedMessageTargetLanguageCode(string? storedLanguageCode, string? configuredTargetLanguageCode)
+        {
+            if (!string.IsNullOrWhiteSpace(configuredTargetLanguageCode))
+            {
+                return LanguageCodeService.NormalizeLanguageCode(configuredTargetLanguageCode);
+            }
+
+            var stored = LanguageCodeService.NormalizeLanguageCode(storedLanguageCode);
+            return string.Equals(stored, "MASTER", StringComparison.Ordinal) ? null : stored;
+        }
+
+        public static bool ShouldTranslateLinkedMessage(string sourceLang, string? targetLang)
+        {
+            return !string.IsNullOrWhiteSpace(targetLang)
+                && !LanguageCodeService.AreSameLanguageCode(sourceLang, targetLang);
+        }
+
+        public static string FormatEditedLinkedMessageText(
+            ulong sourceChannelId,
+            ulong linkedChannelId,
+            string authorName,
+            string sourceLang,
+            string? targetLang,
+            string content)
+        {
+            if (!ShouldTranslateLinkedMessage(sourceLang, targetLang))
+            {
+                return FormatMirroredAuthorText(authorName, content);
+            }
+
+            return sourceChannelId == linkedChannelId
+                ? FormatTranslatedReplyText(sourceLang, targetLang!, content)
+                : string.IsNullOrWhiteSpace(content)
+                    ? FormatMirroredAuthorText(authorName, string.Empty)
+                    : $"**{authorName}** {FormatLanguagePair(sourceLang, targetLang!)}:\n{content}";
+        }
+
+        public static string FormatTranslationFailureText(
+            ulong sourceChannelId,
+            ulong linkedChannelId,
+            string authorName,
+            string sourceLang,
+            string targetLang,
+            string sourceContent)
+        {
+            return sourceChannelId == linkedChannelId
+                ? FormatTranslatedReplyText(sourceLang, targetLang, $"{sourceContent} *(Translation Failed)*")
+                : FormatMirroredAuthorText(authorName, $"{sourceContent} *(Translation Failed)*");
+        }
+
         public static async Task<bool> TryModifyMessageContentAsync(IMessageChannel channel, ulong messageId, string newText)
         {
             if (channel == null) return false;
-            try
+
+            var fetched = await channel.GetMessageAsync(messageId);
+            if (fetched is IUserMessage userMsg)
             {
-                var fetched = await channel.GetMessageAsync(messageId);
-                if (fetched is IUserMessage userMsg)
-                {
-                    await userMsg.ModifyAsync(p => p.Content = newText);
-                    return true;
-                }
-                return false;
+                await userMsg.ModifyAsync(p => p.Content = newText);
+                return true;
             }
-            catch (Exception)
-            {
-                return false;
-            }
+
+            return false;
         }
     }
 }

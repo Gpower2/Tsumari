@@ -314,12 +314,12 @@ namespace Tsumari.Bot.Services
             await cmd.ExecuteNonQueryAsync();
         }
 
-        public async Task<List<(ulong MirroredMessageId, ulong ChannelId)>> GetMirroredMessagesAsync(ulong originalMessageId)
+        public async Task<List<(ulong MirroredMessageId, ulong ChannelId, string LanguageCode)>> GetMirroredMessagesAsync(ulong originalMessageId)
         {
-            var results = new List<(ulong, ulong)>();
+            var results = new List<(ulong, ulong, string)>();
             using var connection = await GetConnectionAsync();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT MirroredMessageId, ChannelId FROM MessageLinks WHERE OriginalMessageId = $orig;";
+            cmd.CommandText = "SELECT MirroredMessageId, ChannelId, LanguageCode FROM MessageLinks WHERE OriginalMessageId = $orig;";
             cmd.Parameters.AddWithValue("$orig", originalMessageId.ToString());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -328,7 +328,7 @@ namespace Tsumari.Bot.Services
                 if (ulong.TryParse(reader.GetString(0), out ulong mirId) && 
                     ulong.TryParse(reader.GetString(1), out ulong chanId))
                 {
-                    results.Add((mirId, chanId));
+                    results.Add((mirId, chanId, LanguageCodeService.NormalizeLanguageCode(reader.GetString(2))));
                 }
             }
             return results;
