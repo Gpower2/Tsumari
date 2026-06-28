@@ -5,6 +5,7 @@ using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 using Tsumari.Bot.Services;
 
 namespace Tsumari.Bot
@@ -17,9 +18,15 @@ namespace Tsumari.Bot
 
             // Configure Console Logging
             builder.Logging.ClearProviders();
-            builder.Logging.AddConsole();
+            builder.Logging.AddSimpleConsole(options =>
+            {
+                options.SingleLine = true;
+                options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz ";
+                options.UseUtcTimestamp = true;
+                options.IncludeScopes = true;
+                options.ColorBehavior = LoggerColorBehavior.Enabled;
+            });
             builder.Logging.AddDebug();
-            builder.Logging.SetMinimumLevel(LogLevel.Information);
 
             // Discord Client Setup
             var socketConfig = new DiscordSocketConfig
