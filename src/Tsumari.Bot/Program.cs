@@ -24,7 +24,7 @@ namespace Tsumari.Bot
             // Discord Client Setup
             var socketConfig = new DiscordSocketConfig
             {
-                GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.MessageContent,
+                GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.GuildMessageReactions | GatewayIntents.MessageContent,
                 AlwaysDownloadUsers = false,
                 MessageCacheSize = 50,
                 LogLevel = LogSeverity.Info
@@ -52,6 +52,7 @@ namespace Tsumari.Bot
             builder.Services.AddHttpClient(HttpClientNames.OllamaTranslation);
             builder.Services.AddHttpClient(HttpClientNames.OpenAITranslation);
 
+            builder.Services.AddSingleton<IDiscordMessageService, DiscordMessageService>();
             builder.Services.AddSingleton<DatabaseService>();
             builder.Services.AddSingleton<DeepLLanguageService>();
             builder.Services.AddSingleton<DeepLTranslationProvider>();
@@ -61,6 +62,7 @@ namespace Tsumari.Bot
             builder.Services.AddSingleton<ITranslationProvider>(provider =>
                 provider.GetRequiredService<TranslationProviderResolver>().Resolve());
             builder.Services.AddSingleton<TranslationService>();
+            builder.Services.AddSingleton<ReactionMirroringService>();
 
             // Main Background Bot Service
             builder.Services.AddHostedService<Worker>();

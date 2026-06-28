@@ -1,4 +1,4 @@
-# Routing Flows and Edit Synchronization
+# Routing Flows, Edit Synchronization, and Reaction Mirroring
 
 Tsumari has two live routing paths for new messages and one follow-up path for edited messages.
 
@@ -8,6 +8,7 @@ Tsumari has two live routing paths for new messages and one follow-up path for e
 
 - `MessageReceived` for new user-authored messages
 - `MessageUpdated` for edited user-authored messages
+- `ReactionAdded`, `ReactionRemoved`, `ReactionsCleared`, and `ReactionsRemovedForEmote` for linked reaction reconciliation
 - `InteractionCreated` for `/tsumari` admin commands
 
 Only user messages are processed. Bot messages are ignored.
@@ -107,7 +108,7 @@ When a user edits a message, `OnMessageUpdatedAsync` runs.
 ### Current Behavior
 
 1. Ignore bot edits and non-user edits.
-2. Compare cached previous text with the current text.
+2. Compare cached previous text with the current text when a cached pre-edit snapshot exists.
 3. If the text is unchanged, do nothing.
 4. Look up all mirrored/generated messages for the original message ID through `MessageLinks`.
 5. For each mirrored message:
@@ -122,14 +123,40 @@ When a user edits a message, `OnMessageUpdatedAsync` runs.
 - Existing jump buttons remain on the mirrored messages.
 - Existing reply linkage remains on reply messages created by `ReplyAsync`.
 - Attachments are not re-downloaded or replaced.
+- Edits only apply to already-linked messages; the edit path never creates new messages.
 
 ### Current Limitations
 
 - The handler only reacts to **text content changes**.
 - Attachment-only edits are ignored.
-- The comparison relies on the Discord.Net message cache. The current client cache is `50` messages, so older edits may not have the pre-edit text available.
-- The localized reply created during mismatch flow is initially sent as `*(SRC to LOCAL):* ...`, but if the source message is edited later, that reply's content is rewritten into the standard mirrored format:
-  - `**Author** (SRC to LOCAL):`
+- The current client cache is `50` messages. When a cached pre-edit snapshot is unavailable, Tsumari still re-synchronizes linked messages; it just cannot skip the update based on a before/after text comparison.
+
+## Reaction Mirroring
+
+When a standard reaction changes on any message that belongs to a linked message family, Tsumari reconciles that emoji across the family in place.
+
+### Current Behavior
+
+1. Resolve the linked-message family from either the original message ID or a mirrored message ID.
+2. If the message is not linked, do nothing.
+3. Inspect live reaction state across the original message plus every linked bot-generated copy.
+4. If at least one non-bot user still has the emoji anywhere in the family:
+   - ensure that every family message shows that emoji
+   - add the bot's reaction only to messages that do not already have that emoji
+5. If no non-bot user still has the emoji anywhere in the family:
+   - remove the bot's mirrored reaction from any family message where it remains
+
+### Reaction Mirroring Rules
+
+- Reaction mirroring only updates **existing linked messages**. It never creates new messages.
+- The original human reaction remains attributed to the human user on the message they actually reacted to.
+- Mirrored reactions added elsewhere are attributed to the bot account.
+- The reconciliation logic uses the live family state, so reactions can be triggered from either the original message or any mirrored copy.
+
+### Current Limitations
+
+- Only **standard reactions** are mirrored. Burst reactions are ignored.
+- If an older mirrored message was created before source-channel IDs were stored in `MessageLinks`, family resolution from that mirrored message may be unavailable until the original message is seen again.
 
 ## Attachment Handling During New Message Routing
 

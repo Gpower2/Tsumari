@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
@@ -72,6 +73,7 @@ namespace Tsumari.Bot.Services
             const string createMessageLinksSql = @"
                 CREATE TABLE IF NOT EXISTS MessageLinks (
                     OriginalMessageId TEXT NOT NULL,
+                    OriginalChannelId TEXT NULL,
                     MirroredMessageId TEXT NOT NULL,
                     ChannelId TEXT NOT NULL,
                     LanguageCode TEXT NOT NULL,
@@ -104,7 +106,22 @@ namespace Tsumari.Bot.Services
                     cmd.CommandText = createUsageTrackerSql;
                     await cmd.ExecuteNonQueryAsync();
                 }
-                
+
+                if (!await ColumnExistsAsync(connection, transaction, "MessageLinks", "OriginalChannelId"))
+                {
+                    using var alterMessageLinksCmd = connection.CreateCommand();
+                    alterMessageLinksCmd.Transaction = transaction;
+                    alterMessageLinksCmd.CommandText = "ALTER TABLE MessageLinks ADD COLUMN OriginalChannelId TEXT;";
+                    await alterMessageLinksCmd.ExecuteNonQueryAsync();
+                }
+
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_MessageLinks_MirroredMessageId ON MessageLinks (MirroredMessageId);";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                 
                 await transaction.CommitAsync();
                 _logger.LogInformation("Database tables initialized successfully.");
             }
@@ -114,6 +131,24 @@ namespace Tsumari.Bot.Services
                 _logger.LogCritical(ex, "Failed to initialize database tables.");
                 throw;
             }
+        }
+
+        private static async Task<bool> ColumnExistsAsync(SqliteConnection connection, SqliteTransaction transaction, string tableName, string columnName)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = $"PRAGMA table_info({tableName});";
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // ==========================================
@@ -298,15 +333,16 @@ namespace Tsumari.Bot.Services
         // MESSAGE LINKS LOGGING
         // ==========================================
 
-        public async Task LinkMessagesAsync(ulong originalMessageId, ulong mirroredMessageId, ulong channelId, string languageCode)
+        public async Task LinkMessagesAsync(ulong originalMessageId, ulong originalChannelId, ulong mirroredMessageId, ulong channelId, string languageCode)
         {
             using var connection = await GetConnectionAsync();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO MessageLinks (OriginalMessageId, MirroredMessageId, ChannelId, LanguageCode) 
-                VALUES ($orig, $mirror, $chan, $lang);";
-            
+                INSERT INTO MessageLinks (OriginalMessageId, OriginalChannelId, MirroredMessageId, ChannelId, LanguageCode) 
+                VALUES ($orig, $origChan, $mirror, $chan, $lang);";
+             
             cmd.Parameters.AddWithValue("$orig", originalMessageId.ToString());
+            cmd.Parameters.AddWithValue("$origChan", originalChannelId.ToString());
             cmd.Parameters.AddWithValue("$mirror", mirroredMessageId.ToString());
             cmd.Parameters.AddWithValue("$chan", channelId.ToString());
             cmd.Parameters.AddWithValue("$lang", LanguageCodeService.NormalizeStoredLanguageCode(languageCode));
@@ -314,12 +350,27 @@ namespace Tsumari.Bot.Services
             await cmd.ExecuteNonQueryAsync();
         }
 
-        public async Task<List<(ulong MirroredMessageId, ulong ChannelId, string LanguageCode)>> GetMirroredMessagesAsync(ulong originalMessageId)
+        public async Task EnsureOriginalChannelIdAsync(ulong originalMessageId, ulong originalChannelId)
         {
-            var results = new List<(ulong, ulong, string)>();
             using var connection = await GetConnectionAsync();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT MirroredMessageId, ChannelId, LanguageCode FROM MessageLinks WHERE OriginalMessageId = $orig;";
+            cmd.CommandText = @"
+                UPDATE MessageLinks
+                SET OriginalChannelId = $origChan
+                WHERE OriginalMessageId = $orig
+                  AND (OriginalChannelId IS NULL OR OriginalChannelId = '');";
+            cmd.Parameters.AddWithValue("$orig", originalMessageId.ToString());
+            cmd.Parameters.AddWithValue("$origChan", originalChannelId.ToString());
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task<List<MirroredMessageLink>> GetMirroredMessagesAsync(ulong originalMessageId)
+        {
+            var results = new List<MirroredMessageLink>();
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT MirroredMessageId, ChannelId, LanguageCode, OriginalChannelId FROM MessageLinks WHERE OriginalMessageId = $orig;";
             cmd.Parameters.AddWithValue("$orig", originalMessageId.ToString());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -328,10 +379,87 @@ namespace Tsumari.Bot.Services
                 if (ulong.TryParse(reader.GetString(0), out ulong mirId) && 
                     ulong.TryParse(reader.GetString(1), out ulong chanId))
                 {
-                    results.Add((mirId, chanId, LanguageCodeService.NormalizeLanguageCode(reader.GetString(2))));
+                    ulong? originalChannelId = null;
+                    if (!reader.IsDBNull(3) && ulong.TryParse(reader.GetString(3), out ulong originalChanId))
+                    {
+                        originalChannelId = originalChanId;
+                    }
+
+                    results.Add(new MirroredMessageLink
+                    {
+                        MirroredMessageId = mirId,
+                        ChannelId = chanId,
+                        LanguageCode = LanguageCodeService.NormalizeLanguageCode(reader.GetString(2)),
+                        OriginalChannelId = originalChannelId
+                    });
                 }
             }
             return results;
+        }
+
+        public async Task<LinkedMessageFamily?> GetLinkedMessageFamilyAsync(ulong messageId, ulong? knownChannelId = null)
+        {
+            ulong originalMessageId;
+            bool messageIsOriginal;
+
+            using (var connection = await GetConnectionAsync())
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT 1 FROM MessageLinks WHERE OriginalMessageId = $id LIMIT 1;";
+                cmd.Parameters.AddWithValue("$id", messageId.ToString());
+                messageIsOriginal = await cmd.ExecuteScalarAsync() != null;
+            }
+
+            if (messageIsOriginal)
+            {
+                originalMessageId = messageId;
+
+                if (knownChannelId.HasValue)
+                {
+                    await EnsureOriginalChannelIdAsync(originalMessageId, knownChannelId.Value);
+                }
+            }
+            else
+            {
+                using var connection = await GetConnectionAsync();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT OriginalMessageId FROM MessageLinks WHERE MirroredMessageId = $id LIMIT 1;";
+                cmd.Parameters.AddWithValue("$id", messageId.ToString());
+
+                var result = await cmd.ExecuteScalarAsync() as string;
+                if (result == null || !ulong.TryParse(result, out originalMessageId))
+                {
+                    return null;
+                }
+            }
+
+            var mirroredMessages = await GetMirroredMessagesAsync(originalMessageId);
+            if (mirroredMessages.Count == 0)
+            {
+                return null;
+            }
+
+            var originalChannelId = mirroredMessages
+                .Where(link => link.OriginalChannelId.HasValue)
+                .Select(link => link.OriginalChannelId!.Value)
+                .FirstOrDefault();
+
+            if (originalChannelId == 0 && messageIsOriginal && knownChannelId.HasValue)
+            {
+                originalChannelId = knownChannelId.Value;
+            }
+
+            if (originalChannelId == 0)
+            {
+                return null;
+            }
+
+            return new LinkedMessageFamily
+            {
+                OriginalMessageId = originalMessageId,
+                OriginalChannelId = originalChannelId,
+                MirroredMessages = mirroredMessages
+            };
         }
 
         // ==========================================

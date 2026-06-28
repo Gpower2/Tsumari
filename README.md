@@ -11,7 +11,8 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Separate locale targets:** locale tags such as `pt` and `pt-br` are preserved as distinct translation targets and are not collapsed together during fan-out.
 - **Clear translated headers:** translated messages use the format `**Author** (XX to YY):`.
 - **Jump-link buttons:** generated bot messages are edited after send so they can include `Original` plus language-code buttons for other generated copies.
-- **Edited-message synchronization:** when a user edits a recently cached text message, mirrored bot messages are updated in place.
+- **Edited-message synchronization:** when a user edits a text message, mirrored bot messages are updated in place.
+- **Reaction mirroring:** standard reactions added to one linked message are reconciled across the rest of the linked message family.
 - **Attachment mirroring:** attachments are downloaded once and re-uploaded as native Discord files during initial fan-out.
 - **SQLite persistence:** channel mappings, mirrored message IDs, and usage tracking are stored in SQLite.
 - **DeepL quota protection:** the monthly `500,000` character guard is enforced only when `Translation.Provider` is `DeepL`.
@@ -20,7 +21,9 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 ## Current Behavior Notes
 
 - **Edit sync is text-only.** The `MessageUpdated` flow compares message content and only rewrites mirrored message text; attachment-only edits are not re-mirrored.
-- **Edit sync depends on the socket cache.** The Discord client is configured with `MessageCacheSize = 50`, so edit detection is most reliable for recently cached messages.
+- **Edit sync uses cache when available.** The Discord client keeps `MessageCacheSize = 50` messages cached so unchanged edits can be skipped cheaply, but cache misses are still re-synchronized instead of being ignored.
+- **Reaction mirroring is link-driven and in-place.** Only existing linked messages participate; reaction handling never creates new messages or reorders the conversation.
+- **Reaction mirroring currently tracks standard reactions only.** Burst reactions are ignored because the bot can only mirror normal reactions reliably.
 - **Language buttons only exist for bot-generated copies.** The source user-authored message is always reached through the `Original` button.
 - **Mismatch replies are tracked too.** When a localized channel receives the wrong language, the bot's in-channel translated reply is stored in `MessageLinks` and participates in cross-link buttons.
 - **Stored locale tags are normalized.** Inputs such as `pt_BR` are normalized to `pt-br` for storage and display, while target-channel routing keeps locale variants separate.
@@ -45,14 +48,18 @@ E:\Development\Tsumari\
 │       ├── Modules/
 │       │   └── InteractionModule.cs
 │       └── Services/
+│           ├── DiscordMessageService.cs
 │           ├── DatabaseService.cs
 │           ├── DeepLTranslationProvider.cs
 │           ├── DeepLLanguageService.cs
 │           ├── HttpClientNames.cs
+│           ├── IDiscordMessageService.cs
 │           ├── ITranslationProvider.cs
 │           ├── LanguageCodeService.cs
+│           ├── LinkedMessageFamily.cs
 │           ├── OllamaTranslationProvider.cs
 │           ├── OpenAITranslationProvider.cs
+│           ├── ReactionMirroringService.cs
 │           ├── ResiliencyHelper.cs
 │           ├── TranslationProvider.cs
 │           ├── TranslationProviderResolver.cs
@@ -65,6 +72,7 @@ E:\Development\Tsumari\
         ├── LanguageCodeServiceTests.cs
         ├── OllamaTranslationProviderTests.cs
         ├── OpenAITranslationProviderTests.cs
+        ├── ReactionMirroringServiceTests.cs
         ├── ResiliencyHelperTests.cs
         ├── TranslationServiceTests.cs
         ├── TranslationProviderResolverTests.cs

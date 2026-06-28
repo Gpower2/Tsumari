@@ -20,6 +20,7 @@ namespace Tsumari.Bot
         private readonly InteractionService _interactionService;
         private readonly DatabaseService _dbService;
         private readonly TranslationService _translationService;
+        private readonly ReactionMirroringService _reactionMirroringService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
@@ -30,6 +31,7 @@ namespace Tsumari.Bot
             InteractionService interactionService,
             DatabaseService dbService,
             TranslationService translationService,
+            ReactionMirroringService reactionMirroringService,
             IHttpClientFactory httpClientFactory,
             IServiceProvider serviceProvider,
             IConfiguration configuration,
@@ -39,6 +41,7 @@ namespace Tsumari.Bot
             _interactionService = interactionService;
             _dbService = dbService;
             _translationService = translationService;
+            _reactionMirroringService = reactionMirroringService;
             _httpClientFactory = httpClientFactory;
             _serviceProvider = serviceProvider;
             _configuration = configuration;
@@ -53,6 +56,10 @@ namespace Tsumari.Bot
             _client.Ready += OnReadyAsync;
             _client.MessageReceived += OnMessageReceivedAsync;
             _client.MessageUpdated += OnMessageUpdatedAsync;
+            _client.ReactionAdded += OnReactionAddedAsync;
+            _client.ReactionRemoved += OnReactionRemovedAsync;
+            _client.ReactionsCleared += OnReactionsClearedAsync;
+            _client.ReactionsRemovedForEmote += OnReactionsRemovedForEmoteAsync;
             _client.InteractionCreated += OnInteractionCreatedAsync;
 
             _interactionService.Log += OnLogAsync;
@@ -201,10 +208,89 @@ namespace Tsumari.Bot
             return Task.CompletedTask;
         }
 
+        private Task OnReactionAddedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _reactionMirroringService.MirrorReactionAddedAsync(
+                        reaction.MessageId,
+                        reaction.Channel.Id,
+                        reaction.Emote,
+                        reaction.ReactionType,
+                        reaction.UserId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unhandled error mirroring added reaction for message {MessageId}.", reaction.MessageId);
+                }
+            });
+
+            return Task.CompletedTask;
+        }
+
+        private Task OnReactionRemovedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _reactionMirroringService.MirrorReactionRemovedAsync(
+                        reaction.MessageId,
+                        reaction.Channel.Id,
+                        reaction.Emote,
+                        reaction.ReactionType,
+                        reaction.UserId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unhandled error mirroring removed reaction for message {MessageId}.", reaction.MessageId);
+                }
+            });
+
+            return Task.CompletedTask;
+        }
+
+        private Task OnReactionsClearedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _reactionMirroringService.MirrorReactionsClearedAsync(messageCache.Id, channelCache.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unhandled error mirroring cleared reactions for message {MessageId}.", messageCache.Id);
+                }
+            });
+
+            return Task.CompletedTask;
+        }
+
+        private Task OnReactionsRemovedForEmoteAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, IEmote emote)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _reactionMirroringService.MirrorReactionsRemovedForEmoteAsync(messageCache.Id, channelCache.Id, emote);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unhandled error mirroring removed-for-emote reactions for message {MessageId}.", messageCache.Id);
+                }
+            });
+
+            return Task.CompletedTask;
+        }
+
         private async Task ProcessEditedMessageAsync(SocketUserMessage message)
         {
             try
             {
+                await _dbService.EnsureOriginalChannelIdAsync(message.Id, message.Channel.Id);
                 var mirrored = await _dbService.GetMirroredMessagesAsync(message.Id);
                 if (mirrored.Count == 0)
                 {
@@ -421,7 +507,7 @@ namespace Tsumari.Bot
                     if (sentMsg != null)
                     {
                         sentMessages.Add(child.ChannelId, sentMsg);
-                        await _dbService.LinkMessagesAsync(message.Id, sentMsg.Id, childChannel.Id, child.TargetLanguageCode);
+                        await _dbService.LinkMessagesAsync(message.Id, channelId, sentMsg.Id, childChannel.Id, child.TargetLanguageCode);
                         targetsList.Add((child.ChannelId, LanguageCodeService.NormalizeLanguageCode(child.TargetLanguageCode), child.TargetLanguageCode));
                     }
                 }
@@ -465,7 +551,7 @@ namespace Tsumari.Bot
                     if (parentSent != null)
                     {
                         sentMessages.Add(parentMasterId.Value, parentSent);
-                        await _dbService.LinkMessagesAsync(message.Id, parentSent.Id, parentChannel.Id, "master");
+                        await _dbService.LinkMessagesAsync(message.Id, channelId, parentSent.Id, parentChannel.Id, "master");
                     }
 
                     // 2. Fetch sibling channels, translate, and send
@@ -498,7 +584,7 @@ namespace Tsumari.Bot
                         if (siblingSent != null)
                         {
                             sentMessages.Add(sibling.ChannelId, siblingSent);
-                            await _dbService.LinkMessagesAsync(message.Id, siblingSent.Id, siblingChannel.Id, sibling.TargetLanguageCode);
+                            await _dbService.LinkMessagesAsync(message.Id, channelId, siblingSent.Id, siblingChannel.Id, sibling.TargetLanguageCode);
                             targetsList.Add((sibling.ChannelId, LanguageCodeService.NormalizeLanguageCode(sibling.TargetLanguageCode), sibling.TargetLanguageCode));
                         }
                     }
@@ -526,7 +612,7 @@ namespace Tsumari.Bot
                         if (nativeReply != null)
                         {
                             sentMessages.Add(channelId, nativeReply);
-                            await _dbService.LinkMessagesAsync(message.Id, nativeReply.Id, channelId, targetLang);
+                            await _dbService.LinkMessagesAsync(message.Id, channelId, nativeReply.Id, channelId, targetLang);
                         }
                     }
 
@@ -536,7 +622,7 @@ namespace Tsumari.Bot
                     if (parentSent != null)
                     {
                         sentMessages.Add(parentMasterId.Value, parentSent);
-                        await _dbService.LinkMessagesAsync(message.Id, parentSent.Id, parentChannel.Id, "master");
+                        await _dbService.LinkMessagesAsync(message.Id, channelId, parentSent.Id, parentChannel.Id, "master");
                     }
 
                     // 3. Post original raw to sibling home channel and translate to other siblings
@@ -575,7 +661,7 @@ namespace Tsumari.Bot
                         if (siblingSent != null)
                         {
                             sentMessages.Add(sibling.ChannelId, siblingSent);
-                            await _dbService.LinkMessagesAsync(message.Id, siblingSent.Id, siblingChannel.Id, sibling.TargetLanguageCode);
+                            await _dbService.LinkMessagesAsync(message.Id, channelId, siblingSent.Id, siblingChannel.Id, sibling.TargetLanguageCode);
                             targetsList.Add((sibling.ChannelId, LanguageCodeService.NormalizeLanguageCode(sibling.TargetLanguageCode), sibling.TargetLanguageCode));
                         }
                     }

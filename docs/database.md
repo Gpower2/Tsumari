@@ -18,11 +18,15 @@ CREATE TABLE IF NOT EXISTS LocalizedChannels (
 
 CREATE TABLE IF NOT EXISTS MessageLinks (
     OriginalMessageId TEXT NOT NULL,
+    OriginalChannelId TEXT NULL,
     MirroredMessageId TEXT NOT NULL,
     ChannelId TEXT NOT NULL,
     LanguageCode TEXT NOT NULL,
     PRIMARY KEY (OriginalMessageId, ChannelId)
 );
+
+CREATE INDEX IF NOT EXISTS IX_MessageLinks_MirroredMessageId
+    ON MessageLinks (MirroredMessageId);
 
 CREATE TABLE IF NOT EXISTS UsageTracker (
     YearMonth TEXT PRIMARY KEY,
@@ -48,13 +52,14 @@ Notes:
 
 ### `MessageLinks`
 
-Stores one generated/mirrored bot message per `(OriginalMessageId, ChannelId)`.
+Stores one generated/mirrored bot message per `(OriginalMessageId, ChannelId)`, plus the source channel ID for that original message.
 
 Current uses in code:
 
 - generating jump-link buttons after a message fan-out completes
 - looking up mirrored bot messages when a source message is edited later
 - tracking the mismatch-flow translated reply created in the source localized channel
+- resolving a full linked-message family from either an original message ID or a mirrored message ID during reaction mirroring
 
 This table is **not** currently used for delete synchronization.
 
@@ -87,7 +92,9 @@ Discord Snowflake IDs are 64-bit values. Storing them as `TEXT` avoids cross-lay
 ### Message Linking
 
 - `LinkMessagesAsync()` stores generated bot messages during routing
+- `EnsureOriginalChannelIdAsync()` backfills the source channel for pre-existing link rows when the original message is observed again
 - `GetMirroredMessagesAsync()` returns all generated bot messages tied to an original user message
+- `GetLinkedMessageFamilyAsync()` resolves the original message plus its linked bot-generated copies for reaction mirroring
 
 ## Concurrency and Safety Settings
 
