@@ -16,6 +16,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Delete synchronization:** when a source message is deleted, existing linked bot messages are deleted too.
 - **Reaction mirroring:** standard reactions added to one linked message are reconciled across the rest of the linked message family.
 - **Attachment mirroring:** attachments are downloaded once and re-uploaded as native Discord files during initial fan-out.
+- **Gateway-safe dispatching:** Discord gateway callbacks enqueue work immediately, then a dispatcher routes events into per-linked-group FIFO workers so local-LLM latency does not block the gateway task.
 - **SQLite persistence:** channel mappings, mirrored message IDs, and usage tracking are stored in SQLite.
 - **DeepL quota protection:** the monthly `500,000` character guard is enforced only when `Translation.Provider` is `DeepL`.
 - **Built-in resiliency:** translation/detection calls are wrapped in a custom retry + circuit-breaker helper.
@@ -28,6 +29,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Reaction mirroring is link-driven and in-place.** Only existing linked messages participate; reaction handling never creates new messages or reorders the conversation.
 - **Reaction mirroring currently tracks standard reactions only.** Burst reactions are ignored because the bot can only mirror normal reactions reliably.
 - **Delete sync is link-driven and in-place.** Deleting an original source message removes its existing linked bot messages; deleting a mirrored bot message only removes its stale link row.
+- **Gateway work is ordered per linked group.** Events for the same linked channel cluster are processed sequentially, while unrelated clusters can continue in parallel.
 - **Language buttons only exist for bot-generated copies.** The source user-authored message is always reached through the `Original` button.
 - **Mismatch replies are tracked too.** When a localized channel receives the wrong language, the bot's in-channel translated reply is stored in `MessageLinks` and participates in cross-link buttons.
 - **Stored locale tags are normalized.** Inputs such as `pt_BR` are normalized to `pt-br` for storage and display, while target-channel routing keeps locale variants separate.
@@ -56,9 +58,11 @@ E:\Development\Tsumari\
 │       │   ├── DatabaseServiceLog.cs
 │       │   ├── DeepLLanguageServiceLog.cs
 │       │   ├── DeepLTranslationProviderLog.cs
+│       │   ├── DiscordGatewayEventDispatcherServiceLog.cs
 │       │   ├── DiscordGatewayHostedServiceLog.cs
 │       │   ├── DiscordMessagePublisherServiceLog.cs
 │       │   ├── EditedMessageSyncServiceLog.cs
+│       │   ├── GatewayEventGroupResolverLog.cs
 │       │   ├── HttpResponseLog.cs
 │       │   ├── InteractionModuleLog.cs
 │       │   ├── LinkedMessageDeletionServiceLog.cs
@@ -71,6 +75,7 @@ E:\Development\Tsumari\
 │       ├── appsettings.json
 │       ├── Models/
 │       │   ├── DiscordReactionEvent.cs
+│       │   ├── GatewayIngressEvent.cs
 │       │   ├── JumpLinkTarget.cs
 │       │   ├── LinkedMessageFamily.cs
 │       │   ├── MediaAsset.cs
@@ -89,11 +94,17 @@ E:\Development\Tsumari\
 │       │   └── TranslationProviderResolver.cs
 │       └── Services/
 │           ├── Abstractions/
-│           │   └── IDiscordMessageService.cs
+│           │   ├── IDiscordGatewayEventDispatcher.cs
+│           │   ├── IDiscordGatewayEventProcessor.cs
+│           │   ├── IDiscordMessageService.cs
+│           │   └── IGatewayEventGroupResolver.cs
 │           ├── DiscordMessagePublisherService.cs
 │           ├── DiscordMessageService.cs
+│           ├── DiscordGatewayEventDispatcherService.cs
+│           ├── DiscordGatewayEventProcessorService.cs
 │           ├── DatabaseService.cs
 │           ├── EditedMessageSyncService.cs
+│           ├── GatewayEventGroupResolver.cs
 │           ├── LanguageCodeService.cs
 │           ├── LinkedMessageDeletionService.cs
 │           ├── MirroredMessageFormatter.cs
@@ -108,6 +119,7 @@ E:\Development\Tsumari\
         │   ├── DatabaseServiceTests.cs
         │   ├── DiscordGatewayHostedServiceComponentTests.cs
         │   ├── DiscordGatewayHostedServiceDeleteTests.cs
+        │   ├── GatewayEventGroupResolverTests.cs
         │   ├── LinkedMessageDeletionServiceTests.cs
         │   ├── ReactionMirroringServiceTests.cs
         │   ├── ReplyMirroringServiceTests.cs
@@ -116,6 +128,7 @@ E:\Development\Tsumari\
         └── Unit/
             ├── DeepLTranslationProviderTests.cs
             ├── DeepLLanguageServiceTests.cs
+            ├── DiscordGatewayEventDispatcherServiceTests.cs
             ├── DiscordGatewayHostedServiceLifecycleTests.cs
             ├── DiscordMessagePublisherServiceTests.cs
             ├── EditedMessageSyncServiceTests.cs

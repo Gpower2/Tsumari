@@ -79,8 +79,15 @@ namespace Tsumari.Bot
             builder.Services.AddSingleton<LinkedMessageDeletionService>();
             builder.Services.AddSingleton<ReplyMirroringService>();
             builder.Services.AddSingleton<ReactionMirroringService>();
+            builder.Services.AddSingleton<IGatewayEventGroupResolver, GatewayEventGroupResolver>();
+            builder.Services.AddSingleton<IDiscordGatewayEventProcessor, DiscordGatewayEventProcessorService>();
+            builder.Services.AddSingleton<DiscordGatewayEventDispatcherService>();
+            builder.Services.AddSingleton<IDiscordGatewayEventDispatcher>(provider =>
+                provider.GetRequiredService<DiscordGatewayEventDispatcherService>());
 
-            // Main Background Bot Service
+            // Background services
+            builder.Services.AddHostedService(provider =>
+                provider.GetRequiredService<DiscordGatewayEventDispatcherService>());
             builder.Services.AddHostedService<DiscordGatewayHostedService>();
 
             var host = builder.Build();

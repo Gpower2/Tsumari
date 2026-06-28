@@ -12,6 +12,7 @@ namespace Tsumari.Bot.Tests.Component
     {
         private readonly string _testDbPath;
         private readonly DatabaseService _dbService;
+        private readonly List<DiscordGatewayEventDispatcherService> _dispatchers = [];
 
         public DiscordGatewayHostedServiceDeleteTests()
         {
@@ -27,6 +28,12 @@ namespace Tsumari.Bot.Tests.Component
         {
             try
             {
+                foreach (var dispatcher in _dispatchers)
+                {
+                    dispatcher.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+                    dispatcher.Dispose();
+                }
+
                 if (File.Exists(_testDbPath))
                 {
                     File.Delete(_testDbPath);
@@ -128,6 +135,21 @@ namespace Tsumari.Bot.Tests.Component
                 discordMessageService,
                 _dbService,
                 NullLogger<LinkedMessageDeletionService>.Instance);
+            var processor = new DiscordGatewayEventProcessorService(
+                null!,
+                null!,
+                deletionService,
+                null!,
+                NullLogger<DiscordGatewayEventProcessorService>.Instance);
+            var resolver = new GatewayEventGroupResolver(
+                _dbService,
+                NullLogger<GatewayEventGroupResolver>.Instance);
+            var dispatcher = new DiscordGatewayEventDispatcherService(
+                resolver,
+                processor,
+                NullLogger<DiscordGatewayEventDispatcherService>.Instance);
+            dispatcher.StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+            _dispatchers.Add(dispatcher);
 
             var configMock = new Mock<IConfiguration>();
 
@@ -135,10 +157,8 @@ namespace Tsumari.Bot.Tests.Component
                 null!,
                 null!,
                 _dbService,
-                null!,
-                null!,
-                deletionService,
-                null!,
+                dispatcher,
+                processor,
                 null!,
                 configMock.Object,
                 NullLogger<DiscordGatewayHostedService>.Instance);

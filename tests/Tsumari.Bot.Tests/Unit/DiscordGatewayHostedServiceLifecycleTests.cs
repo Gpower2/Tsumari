@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tsumari.Bot;
+using Tsumari.Bot.Services;
 using Xunit;
 
 namespace Tsumari.Bot.Tests.Unit
@@ -21,14 +22,13 @@ namespace Tsumari.Bot.Tests.Unit
             });
             var interactionService = new InteractionService(client, new InteractionServiceConfig());
             var configMock = new Mock<IConfiguration>();
+            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
             var hostedService = new DiscordGatewayHostedService(
                 client,
                 interactionService,
                 null!,
                 null!,
-                null!,
-                null!,
-                null!,
+                processorMock.Object,
                 null!,
                 configMock.Object,
                 NullLogger<DiscordGatewayHostedService>.Instance);
@@ -55,14 +55,13 @@ namespace Tsumari.Bot.Tests.Unit
             });
             var interactionService = new InteractionService(client, new InteractionServiceConfig());
             var configMock = new Mock<IConfiguration>();
+            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
             var hostedService = new DiscordGatewayHostedService(
                 client,
                 interactionService,
                 null!,
                 null!,
-                null!,
-                null!,
-                null!,
+                processorMock.Object,
                 null!,
                 configMock.Object,
                 NullLogger<DiscordGatewayHostedService>.Instance);
@@ -81,6 +80,70 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task OnMessageDeletedAsync_ReturnsBeforeQueuedProcessingCompletes()
+        {
+            var client = new DiscordSocketClient(new DiscordSocketConfig
+            {
+                GatewayIntents = GatewayIntents.None
+            });
+            var interactionService = new InteractionService(client, new InteractionServiceConfig());
+            var configMock = new Mock<IConfiguration>();
+            var processorStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var allowProcessingToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var resolverMock = new Mock<IGatewayEventGroupResolver>();
+            resolverMock
+                .Setup(resolver => resolver.ResolveDispatchesAsync(It.IsAny<GatewayIngressEvent>()))
+                .ReturnsAsync((GatewayIngressEvent gatewayEvent) => [new GatewayDispatchItem(10UL, gatewayEvent)]);
+            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
+            processorMock
+                .Setup(processor => processor.ProcessAsync(It.IsAny<GatewayIngressEvent>()))
+                .Returns<GatewayIngressEvent>(async _ =>
+                {
+                    processorStarted.TrySetResult();
+                    await allowProcessingToFinish.Task;
+                });
+
+            var dispatcher = new DiscordGatewayEventDispatcherService(
+                resolverMock.Object,
+                processorMock.Object,
+                NullLogger<DiscordGatewayEventDispatcherService>.Instance);
+            await dispatcher.StartAsync(CancellationToken.None);
+
+            var hostedService = new DiscordGatewayHostedService(
+                client,
+                interactionService,
+                null!,
+                dispatcher,
+                processorMock.Object,
+                null!,
+                configMock.Object,
+                NullLogger<DiscordGatewayHostedService>.Instance);
+            var messageCache = new Cacheable<IMessage, ulong>(null!, 12345UL, false, () => Task.FromResult<IMessage>(null!));
+            var channelCache = new Cacheable<IMessageChannel, ulong>(null!, 10UL, false, () => Task.FromResult<IMessageChannel>(null!));
+
+            try
+            {
+                var invokeTask = InvokeHostedServiceAsync(
+                    hostedService,
+                    "OnMessageDeletedAsync",
+                    messageCache,
+                    channelCache);
+
+                await invokeTask.WaitAsync(TimeSpan.FromSeconds(2));
+                await processorStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            finally
+            {
+                allowProcessingToFinish.TrySetResult();
+                await dispatcher.StopAsync(CancellationToken.None);
+                dispatcher.Dispose();
+                hostedService.Dispose();
+                client.Dispose();
+            }
+        }
+
+        [Fact]
         public void RegisterAndUnregisterEventHandlers_AreIdempotent_AndRestoreSubscriberCounts()
         {
             var client = new DiscordSocketClient(new DiscordSocketConfig
@@ -89,14 +152,13 @@ namespace Tsumari.Bot.Tests.Unit
             });
             var interactionService = new InteractionService(client, new InteractionServiceConfig());
             var configMock = new Mock<IConfiguration>();
+            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
             var hostedService = new DiscordGatewayHostedService(
                 client,
                 interactionService,
                 null!,
                 null!,
-                null!,
-                null!,
-                null!,
+                processorMock.Object,
                 null!,
                 configMock.Object,
                 NullLogger<DiscordGatewayHostedService>.Instance);
@@ -206,6 +268,15 @@ namespace Tsumari.Bot.Tests.Unit
             var method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
                 ?? throw new InvalidOperationException($"Could not find private method '{methodName}' on {instance.GetType().FullName}.");
             method.Invoke(instance, null);
+        }
+
+        private static async Task InvokeHostedServiceAsync(object instance, string methodName, params object[] arguments)
+        {
+            var method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException($"Could not find private method '{methodName}' on {instance.GetType().FullName}.");
+            var task = (Task?)method.Invoke(instance, arguments)
+                ?? throw new InvalidOperationException($"Method '{methodName}' on {instance.GetType().FullName} did not return a task.");
+            await task;
         }
     }
 }

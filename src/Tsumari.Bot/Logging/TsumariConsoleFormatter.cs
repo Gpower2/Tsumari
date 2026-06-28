@@ -88,13 +88,13 @@ namespace Tsumari.Bot.Logging
         {
             return logLevel switch
             {
-                LogLevel.Trace => "trc:",
-                LogLevel.Debug => "dbg:",
-                LogLevel.Information => "inf:",
-                LogLevel.Warning => "wrn:",
-                LogLevel.Error => "err:",
+                LogLevel.Trace => "trce:",
+                LogLevel.Debug => "dbug:",
+                LogLevel.Information => "info:",
+                LogLevel.Warning => "warn:",
+                LogLevel.Error => "fail:",
                 LogLevel.Critical => "crt:",
-                _ => "---:"
+                _ => "none:"
             };
         }
 

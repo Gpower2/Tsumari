@@ -224,6 +224,25 @@ namespace Tsumari.Bot.Services
             return result != null && ulong.TryParse(result, out ulong id) ? id : null;
         }
 
+        public async Task<ulong?> GetLinkedGroupKeyForChannelAsync(ulong channelId)
+        {
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT MasterChannelId
+                FROM MasterChannels
+                WHERE MasterChannelId = $id
+                UNION ALL
+                SELECT ParentMasterChannelId
+                FROM LocalizedChannels
+                WHERE ChannelId = $id
+                LIMIT 1;";
+            cmd.Parameters.AddWithValue("$id", channelId.ToString());
+
+            var result = await cmd.ExecuteScalarAsync() as string;
+            return result != null && ulong.TryParse(result, out ulong groupKey) ? groupKey : null;
+        }
+
         public async Task<string?> GetTargetLanguageCodeAsync(ulong localizedChannelId)
         {
             using var connection = await GetConnectionAsync();
@@ -479,6 +498,18 @@ namespace Tsumari.Bot.Services
                 OriginalChannelId = originalChannelId,
                 MirroredMessages = mirroredMessages
             };
+        }
+
+        public async Task<ulong?> GetLinkedGroupKeyForMessageAsync(ulong messageId, ulong? knownChannelId = null)
+        {
+            var family = await GetLinkedMessageFamilyAsync(messageId, knownChannelId);
+            if (family == null)
+            {
+                return null;
+            }
+
+            var groupKey = await GetLinkedGroupKeyForChannelAsync(family.OriginalChannelId);
+            return groupKey ?? family.OriginalChannelId;
         }
 
         // ==========================================

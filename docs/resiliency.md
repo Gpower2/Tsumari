@@ -88,3 +88,17 @@ Quota enforcement is separate from resiliency:
 - when `Translation.Provider = Ollama` or `OpenAI`, `CanTranslateAsync(...)` always returns `true`
 
 So the circuit breaker protects backend availability, while `UsageTracker` protects DeepL billing.
+
+## Gateway Isolation for Slow Local LLMs
+
+Translation resiliency is only one part of runtime stability. Tsumari also isolates Discord gateway callbacks from slow local/self-hosted LLM calls by enqueueing gateway events into a dispatcher:
+
+- gateway callbacks enqueue and return immediately
+- a single router forwards events into FIFO queues keyed by linked channel group
+- one worker processes each active linked group sequentially
+
+That means:
+
+- a slow translation in one linked channel cluster does not block unrelated clusters
+- ordering inside a linked channel cluster is still preserved
+- Discord.Net no longer needs to wait on the full translation pipeline inside `MessageReceived`

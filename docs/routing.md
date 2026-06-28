@@ -12,7 +12,41 @@ Tsumari has two live routing paths for new messages plus follow-up paths for rep
 - `ReactionAdded`, `ReactionRemoved`, `ReactionsCleared`, and `ReactionsRemovedForEmote` for linked reaction reconciliation
 - `InteractionCreated` for `/tsumari` admin commands
 
-Only user messages are processed. Bot messages are ignored.
+For message, edit, delete, and reaction events, the gateway callbacks now do **minimal work only**:
+
+1. package the raw Discord event into an ingress work item
+2. enqueue it into a global ingress `Channel<T>`
+3. return immediately to Discord.Net
+
+Only user messages are processed by the routing/edit paths. Bot messages are ignored there.
+
+## Gateway Dispatch Architecture
+
+To prevent slow translation backends from blocking Discord's gateway task, Tsumari uses a two-level dispatcher:
+
+```text
+Discord gateway callbacks
+    -> global ingress channel (multi-writer, single-reader)
+    -> single router loop
+    -> per-linked-group FIFO channels
+    -> one worker task per active linked-group queue
+```
+
+### Linked-Group Key
+
+The router uses the **linked channel group** as the ordering key:
+
+- for a master-channel source event, the key is that master channel ID
+- for a localized-channel source event, the key is the parent master channel ID
+- for delete/reaction events on already-linked messages, the key is resolved from `MessageLinks`
+
+### Ordering Guarantees
+
+- events for the **same linked channel cluster** are processed sequentially
+- unrelated linked channel clusters can process in parallel
+- bulk deletes are split into per-message delete work items so each linked family still routes through the correct FIFO queue
+
+This means a slow local-LLM translation in one linked channel cluster does **not** block other independent channel clusters, while ordering stays stable inside that cluster.
 
 ## New Message Intake
 

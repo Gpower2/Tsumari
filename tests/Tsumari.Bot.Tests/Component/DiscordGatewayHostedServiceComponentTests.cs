@@ -352,17 +352,22 @@ namespace Tsumari.Bot.Tests.Component
                 discordMessageService,
                 _dbService,
                 NullLogger<ReactionMirroringService>.Instance);
+            var eventProcessor = new DiscordGatewayEventProcessorService(
+                mirroredMessageRoutingService,
+                editedMessageSyncService,
+                linkedMessageDeletionService,
+                reactionMirroringService,
+                NullLogger<DiscordGatewayEventProcessorService>.Instance);
 
             var configMock = new Mock<IConfiguration>();
+            var dispatcherMock = new Mock<IDiscordGatewayEventDispatcher>();
 
             return new DiscordGatewayHostedService(
                 null!,
                 null!,
                 _dbService,
-                mirroredMessageRoutingService,
-                editedMessageSyncService,
-                linkedMessageDeletionService,
-                reactionMirroringService,
+                dispatcherMock.Object,
+                eventProcessor,
                 null!,
                 configMock.Object,
                 NullLogger<DiscordGatewayHostedService>.Instance);

@@ -15,10 +15,8 @@ namespace Tsumari.Bot
         private readonly DiscordSocketClient _client;
         private readonly InteractionService _interactionService;
         private readonly DatabaseService _dbService;
-        private readonly MirroredMessageRoutingService _mirroredMessageRoutingService;
-        private readonly EditedMessageSyncService _editedMessageSyncService;
-        private readonly LinkedMessageDeletionService _linkedMessageDeletionService;
-        private readonly ReactionMirroringService _reactionMirroringService;
+        private readonly IDiscordGatewayEventDispatcher _eventDispatcher;
+        private readonly IDiscordGatewayEventProcessor _eventProcessor;
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
         private readonly ILogger<DiscordGatewayHostedService> _logger;
@@ -28,10 +26,8 @@ namespace Tsumari.Bot
             DiscordSocketClient client,
             InteractionService interactionService,
             DatabaseService dbService,
-            MirroredMessageRoutingService mirroredMessageRoutingService,
-            EditedMessageSyncService editedMessageSyncService,
-            LinkedMessageDeletionService linkedMessageDeletionService,
-            ReactionMirroringService reactionMirroringService,
+            IDiscordGatewayEventDispatcher eventDispatcher,
+            IDiscordGatewayEventProcessor eventProcessor,
             IServiceProvider serviceProvider,
             IConfiguration configuration,
             ILogger<DiscordGatewayHostedService> logger)
@@ -39,10 +35,8 @@ namespace Tsumari.Bot
             _client = client;
             _interactionService = interactionService;
             _dbService = dbService;
-            _mirroredMessageRoutingService = mirroredMessageRoutingService;
-            _editedMessageSyncService = editedMessageSyncService;
-            _linkedMessageDeletionService = linkedMessageDeletionService;
-            _reactionMirroringService = reactionMirroringService;
+            _eventDispatcher = eventDispatcher;
+            _eventProcessor = eventProcessor;
             _serviceProvider = serviceProvider;
             _configuration = configuration;
             _logger = logger;
@@ -154,15 +148,17 @@ namespace Tsumari.Bot
 
         private Task OnMessageReceivedAsync(SocketMessage rawMessage)
         {
-            return HandleMessageReceivedAsync(rawMessage);
+            _eventDispatcher.TryEnqueue(new MessageReceivedGatewayEvent(rawMessage));
+            return Task.CompletedTask;
         }
 
         private Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
         {
-            return HandleMessageDeletedAsync(messageCache.Id);
+            _eventDispatcher.TryEnqueue(new MessageDeletedGatewayEvent(messageCache.Id, channelCache.Id));
+            return Task.CompletedTask;
         }
 
-        private async Task OnMessagesBulkDeletedAsync(IReadOnlyCollection<Cacheable<IMessage, ulong>> messageCaches, Cacheable<IMessageChannel, ulong> channelCache)
+        private Task OnMessagesBulkDeletedAsync(IReadOnlyCollection<Cacheable<IMessage, ulong>> messageCaches, Cacheable<IMessageChannel, ulong> channelCache)
         {
             var messageIds = new List<ulong>(messageCaches.Count);
             foreach (var messageCache in messageCaches)
@@ -170,65 +166,59 @@ namespace Tsumari.Bot
                 messageIds.Add(messageCache.Id);
             }
 
-            await HandleMessagesBulkDeletedAsync(messageIds, channelCache.Id);
+            _eventDispatcher.TryEnqueue(new MessagesBulkDeletedGatewayEvent(messageIds, channelCache.Id));
+            return Task.CompletedTask;
         }
 
-        private async Task OnMessageUpdatedAsync(Cacheable<IMessage, ulong> beforeCache, SocketMessage after, ISocketMessageChannel channel)
+        private Task OnMessageUpdatedAsync(Cacheable<IMessage, ulong> beforeCache, SocketMessage after, ISocketMessageChannel channel)
         {
-            try
-            {
-                var hadCachedSnapshot = beforeCache.HasValue;
-                var beforeMessage = hadCachedSnapshot
-                    ? await beforeCache.GetOrDownloadAsync()
-                    : null;
-                var beforeContent = beforeMessage?.Content ?? string.Empty;
-                await HandleMessageUpdatedAsync(hadCachedSnapshot, beforeContent, after);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogEditedMessageEventHandlingFailed(ex, after.Id);
-            }
+            _eventDispatcher.TryEnqueue(new MessageUpdatedGatewayEvent(beforeCache, after));
+            return Task.CompletedTask;
         }
 
         private Task OnReactionAddedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
         {
-            return HandleReactionAddedAsync(new DiscordReactionEvent
+            _eventDispatcher.TryEnqueue(new ReactionAddedGatewayEvent(new DiscordReactionEvent
             {
                 MessageId = reaction.MessageId,
                 ChannelId = reaction.Channel.Id,
                 Emote = reaction.Emote,
                 ReactionType = reaction.ReactionType,
                 UserId = reaction.UserId
-            });
+            }));
+            return Task.CompletedTask;
         }
 
         private Task OnReactionRemovedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
         {
-            return HandleReactionRemovedAsync(new DiscordReactionEvent
+            _eventDispatcher.TryEnqueue(new ReactionRemovedGatewayEvent(new DiscordReactionEvent
             {
                 MessageId = reaction.MessageId,
                 ChannelId = reaction.Channel.Id,
                 Emote = reaction.Emote,
                 ReactionType = reaction.ReactionType,
                 UserId = reaction.UserId
-            });
+            }));
+            return Task.CompletedTask;
         }
 
         private Task OnReactionsClearedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
         {
-            return HandleReactionsClearedAsync(messageCache.Id, channelCache.Id);
+            _eventDispatcher.TryEnqueue(new ReactionsClearedGatewayEvent(messageCache.Id, channelCache.Id));
+            return Task.CompletedTask;
         }
 
         private Task OnReactionsRemovedForEmoteAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, IEmote emote)
         {
-            return HandleReactionsRemovedForEmoteAsync(messageCache.Id, channelCache.Id, emote);
+            _eventDispatcher.TryEnqueue(new ReactionsRemovedForEmoteGatewayEvent(messageCache.Id, channelCache.Id, emote));
+            return Task.CompletedTask;
         }
 
         public async Task HandleMessageReceivedAsync(IMessage rawMessage)
         {
             try
             {
-                await _mirroredMessageRoutingService.HandleMessageReceivedAsync(rawMessage);
+                await _eventProcessor.ProcessMessageReceivedAsync(rawMessage);
             }
             catch (Exception ex)
             {
@@ -240,7 +230,7 @@ namespace Tsumari.Bot
         {
             try
             {
-                await _linkedMessageDeletionService.HandleMessageDeletedAsync(messageId);
+                await _eventProcessor.ProcessMessageDeletedAsync(messageId);
             }
             catch (Exception ex)
             {
@@ -252,7 +242,7 @@ namespace Tsumari.Bot
         {
             try
             {
-                await _linkedMessageDeletionService.HandleMessagesDeletedAsync(messageIds);
+                await _eventProcessor.ProcessMessagesBulkDeletedAsync(messageIds, channelId);
             }
             catch (Exception ex)
             {
@@ -264,7 +254,7 @@ namespace Tsumari.Bot
         {
             try
             {
-                await _editedMessageSyncService.HandleMessageUpdatedAsync(hadCachedSnapshot, beforeContent, afterMessage);
+                await _eventProcessor.ProcessMessageUpdatedAsync(hadCachedSnapshot, beforeContent, afterMessage);
             }
             catch (Exception ex)
             {
@@ -276,12 +266,7 @@ namespace Tsumari.Bot
         {
             try
             {
-                await _reactionMirroringService.MirrorReactionAddedAsync(
-                    reaction.MessageId,
-                    reaction.ChannelId,
-                    reaction.Emote,
-                    reaction.ReactionType,
-                    reaction.UserId);
+                await _eventProcessor.ProcessReactionAddedAsync(reaction);
             }
             catch (Exception ex)
             {
@@ -293,12 +278,7 @@ namespace Tsumari.Bot
         {
             try
             {
-                await _reactionMirroringService.MirrorReactionRemovedAsync(
-                    reaction.MessageId,
-                    reaction.ChannelId,
-                    reaction.Emote,
-                    reaction.ReactionType,
-                    reaction.UserId);
+                await _eventProcessor.ProcessReactionRemovedAsync(reaction);
             }
             catch (Exception ex)
             {
@@ -310,7 +290,7 @@ namespace Tsumari.Bot
         {
             try
             {
-                await _reactionMirroringService.MirrorReactionsClearedAsync(messageId, channelId);
+                await _eventProcessor.ProcessReactionsClearedAsync(messageId, channelId);
             }
             catch (Exception ex)
             {
@@ -322,7 +302,7 @@ namespace Tsumari.Bot
         {
             try
             {
-                await _reactionMirroringService.MirrorReactionsRemovedForEmoteAsync(messageId, channelId, emote);
+                await _eventProcessor.ProcessReactionsRemovedForEmoteAsync(messageId, channelId, emote);
             }
             catch (Exception ex)
             {
