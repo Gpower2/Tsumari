@@ -54,6 +54,7 @@ namespace Tsumari.Bot
 
             builder.Services.AddSingleton<IDiscordMessageService, DiscordMessageService>();
             builder.Services.AddSingleton<DatabaseService>();
+            builder.Services.AddSingleton<DiscordMessagePublisherService>();
             builder.Services.AddSingleton<DeepLLanguageService>();
             builder.Services.AddSingleton<DeepLTranslationProvider>();
             builder.Services.AddSingleton<OllamaTranslationProvider>();
@@ -62,12 +63,14 @@ namespace Tsumari.Bot
             builder.Services.AddSingleton<ITranslationProvider>(provider =>
                 provider.GetRequiredService<TranslationProviderResolver>().Resolve());
             builder.Services.AddSingleton<TranslationService>();
+            builder.Services.AddSingleton<MirroredMessageRoutingService>();
+            builder.Services.AddSingleton<EditedMessageSyncService>();
             builder.Services.AddSingleton<LinkedMessageDeletionService>();
             builder.Services.AddSingleton<ReplyMirroringService>();
             builder.Services.AddSingleton<ReactionMirroringService>();
 
             // Main Background Bot Service
-            builder.Services.AddHostedService<Worker>();
+            builder.Services.AddHostedService<DiscordGatewayHostedService>();
 
             var host = builder.Build();
             host.Run();

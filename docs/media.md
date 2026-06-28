@@ -4,14 +4,15 @@ Discord CDN attachment URLs expire. Tsumari avoids stale CDN links by downloadin
 
 ## Initial Send Path
 
-During `ProcessMessageRoutingPipelineAsync`:
+During `MirroredMessageRoutingService` fan-out:
 
-1. Each inbound attachment URL is downloaded once with `HttpClient.GetByteArrayAsync(...)`.
-2. The downloaded bytes are stored as:
+1. `DiscordMessagePublisherService.DownloadMediaAssetsAsync(...)` downloads each inbound attachment URL once.
+2. The download uses `HttpClient.GetAsync(..., HttpCompletionOption.ResponseHeadersRead)` plus `ReadBytesWithStatusCheckAsync(...)` so HTTP failures are surfaced with the full logged response details.
+3. The downloaded bytes are stored as:
    - filename
    - `byte[]`
-3. Every outbound destination gets a fresh `MemoryStream` created from the shared `byte[]`.
-4. `SendFilesAsync(...)` sends those streams as native Discord attachments.
+4. Every outbound destination gets a fresh `MemoryStream` created from the shared `byte[]`.
+5. `SendFilesAsync(...)` sends those streams as native Discord attachments.
 
 ## Why Separate Streams Are Created
 
@@ -19,7 +20,7 @@ Discord.Net consumes stream instances during upload. Reusing the same stream acr
 
 ## Disposal Behavior
 
-`SendMessageWithFilesAsync(...)` keeps a list of temporary streams and disposes all of them in a `finally` block after the send attempt finishes.
+`DiscordMessagePublisherService.SendMessageWithFilesAsync(...)` keeps a list of temporary streams and disposes all of them in a `finally` block after the send attempt finishes.
 
 That keeps the message-routing path memory-conscious while still allowing multi-destination fan-out.
 

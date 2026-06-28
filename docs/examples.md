@@ -153,11 +153,9 @@ Starting from Scenario 3, the user edits the original message to:
 
 ### Updated Reply in `#general-greek`
 
-After edit sync, the reply remains a Discord reply message, but its **content** is rewritten into the standard mirrored format:
+After edit sync, the reply remains a Discord reply message and keeps the compact same-channel translated-reply format:
 
-> ↳ 🤖 **Tsumari** (Bot):
-> **gpowe** (EN to EL):
-> Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα και να τις κοινοποιήσουμε στο νήμα της έκδοσης;
+> ↳ 🤖 **Tsumari** (Bot): *(EN to EL):* Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα και να τις κοινοποιήσουμε στο νήμα της έκδοσης;
 >
 > `[Buttons: Original | EL | EN | IT]`
 

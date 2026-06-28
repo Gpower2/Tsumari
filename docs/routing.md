@@ -4,7 +4,7 @@ Tsumari has two live routing paths for new messages plus follow-up paths for rep
 
 ## Event Entry Points
 
-`Worker` subscribes to:
+`DiscordGatewayHostedService` subscribes to:
 
 - `MessageReceived` for new user-authored messages
 - `MessageDeleted` and `MessagesBulkDeleted` for linked message cleanup
@@ -142,13 +142,14 @@ When a user edits a message, `OnMessageUpdatedAsync` runs.
    - If the destination channel's target language exactly matches the resolved source locale, rewrite it as raw:
      - `**Author**:`
    - Otherwise translate it and rewrite it as:
-     - `**Author** (SRC to TARGET):`
+     - `*(SRC to TARGET):* translated text` for the same-channel translated reply created by localized mismatch flow
+     - `**Author** (SRC to TARGET):` for cross-channel translated mirrors
 6. Update the mirrored message content in place with `ModifyAsync`.
 
 ### What Stays the Same During Edit Sync
 
 - Existing jump buttons remain on the mirrored messages.
-- Existing reply linkage remains on reply messages created by `ReplyAsync`.
+- Existing reply linkage remains on reply messages that were originally sent with a Discord `MessageReference`.
 - Attachments are not re-downloaded or replaced.
 - Edits only apply to already-linked messages; the edit path never creates new messages.
 

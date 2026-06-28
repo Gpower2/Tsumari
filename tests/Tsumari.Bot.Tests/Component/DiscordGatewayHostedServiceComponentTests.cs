@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
 using Discord;
@@ -14,14 +15,14 @@ using Xunit;
 
 namespace Tsumari.Bot.Tests.Component
 {
-    public class WorkerComponentTests : IDisposable
+    public class DiscordGatewayHostedServiceComponentTests : IDisposable
     {
         private readonly string _testDbPath;
         private readonly DatabaseService _dbService;
 
-        public WorkerComponentTests()
+        public DiscordGatewayHostedServiceComponentTests()
         {
-            _testDbPath = $"test_tsumari_worker_component_{Guid.NewGuid():N}.db";
+            _testDbPath = $"test_tsumari_gateway_component_{Guid.NewGuid():N}.db";
 
             var configMock = new Mock<IConfiguration>();
             configMock.Setup(c => c["Database:FilePath"]).Returns(_testDbPath);
@@ -82,11 +83,11 @@ namespace Tsumari.Bot.Tests.Component
             discordMessageService.RegisterChannel(germanChannel);
             discordMessageService.RegisterChannel(italianChannel);
 
-            var worker = CreateWorker(discordMessageService, translationProvider.Object);
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
             var author = CreateGuildUser("alice", nickname: "Alice");
             var message = CreateIncomingMessage(100UL, masterChannel.Channel, author, "Hello world");
 
-            await worker.HandleMessageReceivedAsync(message.Object);
+            await hostedService.HandleMessageReceivedAsync(message.Object);
 
             Assert.Single(germanChannel.SentMessages);
             Assert.Equal("**Alice** (EN to DE):\nHallo Welt", germanChannel.SentMessages[0].Content);
@@ -102,6 +103,49 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Equal(2, links.Count);
             Assert.Contains(links, link => link.ChannelId == 20UL && link.LanguageCode == "DE");
             Assert.Contains(links, link => link.ChannelId == 30UL && link.LanguageCode == "IT");
+        }
+
+        [Fact]
+        public async Task HandleMessageReceivedAsync_RoutesAttachmentOnlyMasterMessage_WithHeaderOnlyContent()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+
+            var translationProvider = CreateTranslationProvider();
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+
+            var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+                new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent([1, 2, 3])
+                }));
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object, httpClient);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var attachmentMock = new Mock<IAttachment>();
+            attachmentMock.SetupGet(attachment => attachment.Filename).Returns("file.txt");
+            attachmentMock.SetupGet(attachment => attachment.Url).Returns("https://cdn.example/file.txt");
+            var message = CreateIncomingMessage(
+                100UL,
+                masterChannel.Channel,
+                author,
+                string.Empty,
+                attachments: [attachmentMock.Object]);
+
+            await hostedService.HandleMessageReceivedAsync(message.Object);
+
+            Assert.Single(germanChannel.SentMessages);
+            Assert.Equal("**Alice**:", germanChannel.SentMessages[0].Content);
+            Assert.Equal(1, germanChannel.SentMessages[0].AttachedFileCount);
+            Assert.Equal(1, germanChannel.SentMessages[0].ModifyCallCount);
+
+            var links = await _dbService.GetMirroredMessagesAsync(100UL);
+            Assert.Single(links);
+            Assert.Contains(links, link => link.ChannelId == 20UL && link.LanguageCode == "DE");
         }
 
         [Fact]
@@ -138,12 +182,12 @@ namespace Tsumari.Bot.Tests.Component
             discordMessageService.RegisterChannel(italianChannel);
             discordMessageService.RegisterChannel(englishChannel);
 
-            var worker = CreateWorker(discordMessageService, translationProvider.Object);
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
             var author = CreateGuildUser("alice", nickname: "Alice");
             var replyReference = new MessageReference(520UL, 20UL, null, false, default);
             var message = CreateIncomingMessage(600UL, germanChannel.Channel, author, "Hello from Germany", replyReference);
 
-            await worker.HandleMessageReceivedAsync(message.Object);
+            await hostedService.HandleMessageReceivedAsync(message.Object);
 
             Assert.Single(germanChannel.SentMessages);
             Assert.Equal("*(EN to DE):* Hallo aus Deutschland", germanChannel.SentMessages[0].Content);
@@ -198,11 +242,11 @@ namespace Tsumari.Bot.Tests.Component
             discordMessageService.RegisterChannel(masterChannel);
             discordMessageService.RegisterChannel(germanChannel);
 
-            var worker = CreateWorker(discordMessageService, translationProvider.Object);
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
             var author = CreateGuildUser("alice", nickname: "Alice");
             var editedMessage = CreateIncomingMessage(700UL, masterChannel.Channel, author, "Updated text");
 
-            await worker.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
+            await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
 
             Assert.Equal("**Alice** (EN to DE):\nAktualisierter Text", mirroredMessage.Content);
             Assert.Equal(1, mirroredMessage.ModifyCallCount);
@@ -214,7 +258,7 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
-        public async Task HandleMessageDeletedAsync_DeletesLinkedMirrors_ThroughWorkerSurface()
+        public async Task HandleMessageDeletedAsync_DeletesLinkedMirrors_ThroughHostedServiceSurface()
         {
             await _dbService.InitializeDatabaseAsync();
             await _dbService.LinkMessagesAsync(800UL, 10UL, 820UL, 20UL, "de");
@@ -225,9 +269,9 @@ namespace Tsumari.Bot.Tests.Component
             germanChannel.RegisterExistingMessage(820UL, "**Alice**:\nHallo");
             discordMessageService.RegisterChannel(germanChannel);
 
-            var worker = CreateWorker(discordMessageService, translationProvider.Object);
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
 
-            await worker.HandleMessageDeletedAsync(800UL);
+            await hostedService.HandleMessageDeletedAsync(800UL);
 
             Assert.Single(discordMessageService.DeletedMessages);
             Assert.Equal((20UL, 820UL), discordMessageService.DeletedMessages[0]);
@@ -235,7 +279,7 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
-        public async Task HandleReactionAddedAsync_MirrorsStandardReactions_ThroughWorkerSurface()
+        public async Task HandleReactionAddedAsync_MirrorsStandardReactions_ThroughHostedServiceSurface()
         {
             await _dbService.InitializeDatabaseAsync();
             await _dbService.LinkMessagesAsync(900UL, 10UL, 920UL, 20UL, "de");
@@ -251,9 +295,9 @@ namespace Tsumari.Bot.Tests.Component
             discordMessageService.RegisterChannel(originalChannel);
             discordMessageService.RegisterChannel(mirrorChannel);
 
-            var worker = CreateWorker(discordMessageService, translationProvider.Object);
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
 
-            await worker.HandleReactionAddedAsync(new DiscordReactionEvent
+            await hostedService.HandleReactionAddedAsync(new DiscordReactionEvent
             {
                 MessageId = 900UL,
                 ChannelId = 10UL,
@@ -268,7 +312,10 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Empty(discordMessageService.RemovedReactions);
         }
 
-        private Worker CreateWorker(ComponentDiscordMessageService discordMessageService, ITranslationProvider translationProvider)
+        private DiscordGatewayHostedService CreateHostedService(
+            ComponentDiscordMessageService discordMessageService,
+            ITranslationProvider translationProvider,
+            HttpClient? discordCdnHttpClient = null)
         {
             var translationService = new TranslationService(
                 _dbService,
@@ -276,32 +323,49 @@ namespace Tsumari.Bot.Tests.Component
                 NullLogger<TranslationService>.Instance,
                 new NullLoggerFactory());
 
+            var httpClientFactoryMock = new Mock<IHttpClientFactory>(MockBehavior.Strict);
+            httpClientFactoryMock
+                .Setup(factory => factory.CreateClient(HttpClientNames.DiscordCdn))
+                .Returns(discordCdnHttpClient ?? new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.OK))));
+            var discordMessagePublisherService = new DiscordMessagePublisherService(
+                httpClientFactoryMock.Object,
+                NullLogger<DiscordMessagePublisherService>.Instance);
+            var replyMirroringService = new ReplyMirroringService(_dbService);
+            var mirroredMessageRoutingService = new MirroredMessageRoutingService(
+                _dbService,
+                translationService,
+                replyMirroringService,
+                discordMessageService,
+                discordMessagePublisherService,
+                NullLogger<MirroredMessageRoutingService>.Instance);
+            var editedMessageSyncService = new EditedMessageSyncService(
+                _dbService,
+                translationService,
+                discordMessageService,
+                discordMessagePublisherService,
+                NullLogger<EditedMessageSyncService>.Instance);
             var linkedMessageDeletionService = new LinkedMessageDeletionService(
                 discordMessageService,
                 _dbService,
                 NullLogger<LinkedMessageDeletionService>.Instance);
-
             var reactionMirroringService = new ReactionMirroringService(
                 discordMessageService,
                 _dbService,
                 NullLogger<ReactionMirroringService>.Instance);
 
             var configMock = new Mock<IConfiguration>();
-            var httpClientFactoryMock = new Mock<IHttpClientFactory>(MockBehavior.Strict);
 
-            return new Worker(
+            return new DiscordGatewayHostedService(
                 null!,
                 null!,
                 _dbService,
-                translationService,
+                mirroredMessageRoutingService,
+                editedMessageSyncService,
                 linkedMessageDeletionService,
-                new ReplyMirroringService(_dbService),
                 reactionMirroringService,
-                discordMessageService,
-                httpClientFactoryMock.Object,
                 null!,
                 configMock.Object,
-                NullLogger<Worker>.Instance);
+                NullLogger<DiscordGatewayHostedService>.Instance);
         }
 
         private static Mock<ITranslationProvider> CreateTranslationProvider(
@@ -350,7 +414,8 @@ namespace Tsumari.Bot.Tests.Component
             IMessageChannel channel,
             IUser author,
             string content,
-            MessageReference? messageReference = null)
+            MessageReference? messageReference = null,
+            IReadOnlyCollection<IAttachment>? attachments = null)
         {
             var messageMock = new Mock<IUserMessage>();
             messageMock.As<ISnowflakeEntity>().SetupGet(message => message.Id).Returns(messageId);
@@ -359,7 +424,7 @@ namespace Tsumari.Bot.Tests.Component
             messageMock.SetupGet(message => message.Content).Returns(content);
             messageMock.SetupGet(message => message.Source).Returns(MessageSource.User);
             messageMock.SetupGet(message => message.Reference).Returns(messageReference!);
-            messageMock.SetupGet(message => message.Attachments).Returns(Array.Empty<IAttachment>());
+            messageMock.SetupGet(message => message.Attachments).Returns(attachments ?? Array.Empty<IAttachment>());
             messageMock.SetupGet(message => message.Reactions).Returns(new Dictionary<IEmote, ReactionMetadata>());
             return messageMock;
         }
@@ -552,6 +617,41 @@ namespace Tsumari.Bot.Tests.Component
                         SentMessages.Add(trackedMessage);
                         return trackedMessage.Message;
                     });
+                channelMock
+                    .Setup(channel => channel.SendFilesAsync(
+                        It.IsAny<IEnumerable<FileAttachment>>(),
+                        It.IsAny<string>(),
+                        It.IsAny<bool>(),
+                        It.IsAny<Embed?>(),
+                        It.IsAny<RequestOptions?>(),
+                        It.IsAny<AllowedMentions?>(),
+                        It.IsAny<MessageReference?>(),
+                        It.IsAny<MessageComponent?>(),
+                        It.IsAny<ISticker[]?>(),
+                        It.IsAny<Embed[]?>(),
+                        It.IsAny<MessageFlags>(),
+                        It.IsAny<PollProperties?>()))
+                    .ReturnsAsync((
+                        IEnumerable<FileAttachment> files,
+                        string text,
+                        bool _,
+                        Embed? __,
+                        RequestOptions? ___,
+                        AllowedMentions? ____,
+                        MessageReference? messageReference,
+                        MessageComponent? components,
+                        ISticker[]? _____,
+                        Embed[]? ______,
+                        MessageFlags _______,
+                        PollProperties? ________) =>
+                    {
+                        var trackedMessage = RegisterExistingMessage(++_nextMessageId, text);
+                        trackedMessage.ReplyReference = messageReference;
+                        trackedMessage.Components = components;
+                        trackedMessage.AttachedFileCount = files.Count();
+                        SentMessages.Add(trackedMessage);
+                        return trackedMessage.Message;
+                    });
 
                 Channel = channelMock.Object;
             }
@@ -623,6 +723,8 @@ namespace Tsumari.Bot.Tests.Component
 
             public MessageComponent? Components { get; set; }
 
+            public int AttachedFileCount { get; set; }
+
             public int ModifyCallCount { get; private set; }
 
             public Dictionary<IEmote, ReactionMetadata> Reactions { get; }
@@ -630,6 +732,21 @@ namespace Tsumari.Bot.Tests.Component
             public void SetReaction(IEmote emote, int normalCount, bool isMe)
             {
                 Reactions[emote] = CreateReactionMetadata(normalCount, isMe);
+            }
+        }
+
+        private sealed class StubHttpMessageHandler : HttpMessageHandler
+        {
+            private readonly Func<HttpRequestMessage, HttpResponseMessage> _responseFactory;
+
+            public StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+            {
+                _responseFactory = responseFactory;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(_responseFactory(request));
             }
         }
 

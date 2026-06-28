@@ -1,29 +1,24 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using System.Threading.Tasks;
 using Discord;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Tsumari.Bot;
 using Tsumari.Bot.Services;
 using Xunit;
 
 namespace Tsumari.Bot.Tests.Component
 {
-    public class WorkerDeleteTests : IDisposable
+    public class DiscordGatewayHostedServiceDeleteTests : IDisposable
     {
         private readonly string _testDbPath;
         private readonly DatabaseService _dbService;
 
-        public WorkerDeleteTests()
+        public DiscordGatewayHostedServiceDeleteTests()
         {
-            _testDbPath = $"test_tsumari_worker_delete_{Guid.NewGuid():N}.db";
+            _testDbPath = $"test_tsumari_gateway_delete_{Guid.NewGuid():N}.db";
 
             var configMock = new Mock<IConfiguration>();
-            configMock.Setup(c => c["Database:FilePath"]).Returns(_testDbPath);
+            configMock.Setup(configuration => configuration["Database:FilePath"]).Returns(_testDbPath);
 
             _dbService = new DatabaseService(configMock.Object, NullLogger<DatabaseService>.Instance);
         }
@@ -67,12 +62,13 @@ namespace Tsumari.Bot.Tests.Component
                 .ReturnsAsync(true)
                 .Callback(() => deleteObserved.TrySetResult());
 
-            var worker = CreateWorker(discordMessageService.Object);
+            var hostedService = CreateHostedService(discordMessageService.Object);
             var messageCache = new Cacheable<IMessage, ulong>(null!, 55555UL, false, () => Task.FromResult<IMessage>(null!));
             var channelCache = new Cacheable<IMessageChannel, ulong>(null!, 11111UL, false, () => Task.FromResult<IMessageChannel>(null!));
 
-            await InvokeWorkerAsync(worker, "OnMessageDeletedAsync", messageCache, channelCache);
+            await InvokeHostedServiceAsync(hostedService, "OnMessageDeletedAsync", messageCache, channelCache);
             await deleteObserved.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            await WaitUntilAsync(async () => (await _dbService.GetMirroredMessagesAsync(55555UL)).Count == 0);
 
             Assert.Empty(await _dbService.GetMirroredMessagesAsync(55555UL));
         }
@@ -92,7 +88,7 @@ namespace Tsumari.Bot.Tests.Component
                 .ReturnsAsync(true)
                 .Callback(() =>
                 {
-                    if (System.Threading.Interlocked.Increment(ref deleteCount) == 2)
+                    if (Interlocked.Increment(ref deleteCount) == 2)
                     {
                         allDeletesObserved.TrySetResult();
                     }
@@ -102,13 +98,13 @@ namespace Tsumari.Bot.Tests.Component
                 .ReturnsAsync(true)
                 .Callback(() =>
                 {
-                    if (System.Threading.Interlocked.Increment(ref deleteCount) == 2)
+                    if (Interlocked.Increment(ref deleteCount) == 2)
                     {
                         allDeletesObserved.TrySetResult();
                     }
                 });
 
-            var worker = CreateWorker(discordMessageService.Object);
+            var hostedService = CreateHostedService(discordMessageService.Object);
             var messageCaches = new List<Cacheable<IMessage, ulong>>
             {
                 new(null!, 55555UL, false, () => Task.FromResult<IMessage>(null!)),
@@ -116,14 +112,17 @@ namespace Tsumari.Bot.Tests.Component
             };
             var channelCache = new Cacheable<IMessageChannel, ulong>(null!, 11111UL, false, () => Task.FromResult<IMessageChannel>(null!));
 
-            await InvokeWorkerAsync(worker, "OnMessagesBulkDeletedAsync", messageCaches, channelCache);
+            await InvokeHostedServiceAsync(hostedService, "OnMessagesBulkDeletedAsync", messageCaches, channelCache);
             await allDeletesObserved.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            await WaitUntilAsync(async () =>
+                (await _dbService.GetMirroredMessagesAsync(55555UL)).Count == 0
+                && (await _dbService.GetMirroredMessagesAsync(77777UL)).Count == 0);
 
             Assert.Empty(await _dbService.GetMirroredMessagesAsync(55555UL));
             Assert.Empty(await _dbService.GetMirroredMessagesAsync(77777UL));
         }
 
-        private Worker CreateWorker(IDiscordMessageService discordMessageService)
+        private DiscordGatewayHostedService CreateHostedService(IDiscordMessageService discordMessageService)
         {
             var deletionService = new LinkedMessageDeletionService(
                 discordMessageService,
@@ -132,30 +131,43 @@ namespace Tsumari.Bot.Tests.Component
 
             var configMock = new Mock<IConfiguration>();
 
-            return new Worker(
+            return new DiscordGatewayHostedService(
                 null!,
                 null!,
                 _dbService,
                 null!,
-                deletionService,
-                new ReplyMirroringService(_dbService),
                 null!,
-                discordMessageService,
+                deletionService,
                 null!,
                 null!,
                 configMock.Object,
-                NullLogger<Worker>.Instance);
+                NullLogger<DiscordGatewayHostedService>.Instance);
         }
 
-        private static async Task InvokeWorkerAsync(Worker worker, string methodName, params object[] arguments)
+        private static async Task InvokeHostedServiceAsync(DiscordGatewayHostedService hostedService, string methodName, params object[] arguments)
         {
-            var method = typeof(Worker).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
-                ?? throw new InvalidOperationException($"Could not find Worker method '{methodName}'.");
+            var method = typeof(DiscordGatewayHostedService).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException($"Could not find DiscordGatewayHostedService method '{methodName}'.");
 
-            var task = (Task?)method.Invoke(worker, arguments)
-                ?? throw new InvalidOperationException($"Worker method '{methodName}' did not return a task.");
+            var task = (Task?)method.Invoke(hostedService, arguments)
+                ?? throw new InvalidOperationException($"DiscordGatewayHostedService method '{methodName}' did not return a task.");
 
             await task;
+        }
+
+        private static async Task WaitUntilAsync(Func<Task<bool>> condition, int maxAttempts = 40, int delayMs = 25)
+        {
+            for (var attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                if (await condition())
+                {
+                    return;
+                }
+
+                await Task.Delay(delayMs);
+            }
+
+            throw new TimeoutException("Condition was not satisfied before timeout.");
         }
     }
 }

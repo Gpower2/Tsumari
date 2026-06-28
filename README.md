@@ -9,7 +9,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Pluggable translation backends:** `DeepL`, `Ollama`, and `OpenAI` (OpenAI-compatible chat-completions endpoint).
 - **Automatic language detection:** every text message is detected before routing decisions are made.
 - **Separate locale targets:** locale tags such as `pt` and `pt-br` are preserved as distinct translation targets and are not collapsed together during fan-out.
-- **Clear translated headers:** translated messages use the format `**Author** (XX to YY):`.
+- **Clear translated headers:** cross-channel translated mirrors use `**Author** (XX to YY):`, while same-channel localized mismatch replies use `*(XX to YY):*`.
 - **Jump-link buttons:** generated bot messages are edited after send so they can include `Original` plus language-code buttons for other generated copies.
 - **Reply mirroring:** when a user replies to a tracked message, mirrored bot messages reply to the corresponding linked message in each destination channel.
 - **Edited-message synchronization:** when a user edits a text message, mirrored bot messages are updated in place.
@@ -48,15 +48,17 @@ E:\Development\Tsumari\
 │   └── Tsumari.Bot/
 │       ├── Constants/
 │       │   └── HttpClientNames.cs
+│       ├── DiscordGatewayHostedService.cs
 │       ├── Extensions/
 │       │   └── HttpResponseExtensions.cs
 │       ├── GlobalUsings.cs
 │       ├── Program.cs
-│       ├── Worker.cs
 │       ├── appsettings.json
 │       ├── Models/
 │       │   ├── DiscordReactionEvent.cs
+│       │   ├── JumpLinkTarget.cs
 │       │   ├── LinkedMessageFamily.cs
+│       │   ├── MediaAsset.cs
 │       │   ├── ReplyMirroringContext.cs
 │       │   └── TranslationProvider.cs
 │       ├── Modules/
@@ -73,10 +75,14 @@ E:\Development\Tsumari\
 │       └── Services/
 │           ├── Abstractions/
 │           │   └── IDiscordMessageService.cs
+│           ├── DiscordMessagePublisherService.cs
 │           ├── DiscordMessageService.cs
 │           ├── DatabaseService.cs
+│           ├── EditedMessageSyncService.cs
 │           ├── LanguageCodeService.cs
 │           ├── LinkedMessageDeletionService.cs
+│           ├── MirroredMessageFormatter.cs
+│           ├── MirroredMessageRoutingService.cs
 │           ├── ReplyMirroringService.cs
 │           ├── ReactionMirroringService.cs
 │           ├── ResiliencyHelper.cs
@@ -85,24 +91,26 @@ E:\Development\Tsumari\
     └── Tsumari.Bot.Tests/
         ├── Component/
         │   ├── DatabaseServiceTests.cs
+        │   ├── DiscordGatewayHostedServiceComponentTests.cs
+        │   ├── DiscordGatewayHostedServiceDeleteTests.cs
         │   ├── LinkedMessageDeletionServiceTests.cs
         │   ├── ReactionMirroringServiceTests.cs
         │   ├── ReplyMirroringServiceTests.cs
-        │   ├── TranslationServiceTests.cs
-        │   ├── WorkerComponentTests.cs
-        │   └── WorkerDeleteTests.cs
+        │   └── TranslationServiceTests.cs
         ├── GlobalUsings.cs
         └── Unit/
             ├── DeepLTranslationProviderTests.cs
             ├── DeepLLanguageServiceTests.cs
+            ├── DiscordGatewayHostedServiceLifecycleTests.cs
+            ├── DiscordMessagePublisherServiceTests.cs
+            ├── EditedMessageSyncServiceTests.cs
             ├── HttpResponseExtensionsTests.cs
             ├── LanguageCodeServiceTests.cs
+            ├── MirroredMessageFormatterTests.cs
             ├── OllamaTranslationProviderTests.cs
             ├── OpenAITranslationProviderTests.cs
             ├── ResiliencyHelperTests.cs
-            ├── TranslationProviderResolverTests.cs
-            ├── WorkerEditTests.cs
-            └── WorkerReplyTests.cs
+            └── TranslationProviderResolverTests.cs
 ```
 
 ## Configuration (`src/Tsumari.Bot/appsettings.json`)
@@ -159,8 +167,8 @@ All configuration commands live under the `/tsumari` group and require **Adminis
 Run the full local verification suite:
 
 ```powershell
-dotnet build
-dotnet test
+dotnet build src\Tsumari.Bot\Tsumari.Bot.csproj
+dotnet test tests\Tsumari.Bot.Tests\Tsumari.Bot.Tests.csproj --nologo
 ```
 
 Publish a self-contained Linux build:
