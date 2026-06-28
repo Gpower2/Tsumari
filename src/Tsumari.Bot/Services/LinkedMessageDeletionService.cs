@@ -26,6 +26,7 @@ namespace Tsumari.Bot.Services
             var mirroredMessages = await _dbService.GetMirroredMessagesAsync(messageId);
             if (mirroredMessages.Count == 0)
             {
+                _logger.LogDeleteMessageSkippedWithoutMirrors(messageId);
                 await _dbService.DeleteMessageLinkByMirroredMessageIdAsync(messageId);
                 return;
             }

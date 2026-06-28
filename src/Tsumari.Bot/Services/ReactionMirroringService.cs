@@ -30,6 +30,7 @@ namespace Tsumari.Bot.Services
         {
             if (ShouldIgnoreReactionEvent(reactingUserId, _discordMessageService.CurrentUserId, reactionType))
             {
+                _logger.LogReactionEventIgnored(triggerMessageId, triggerChannelId, reactingUserId, emote.ToString() ?? string.Empty, reactionType);
                 return;
             }
 
@@ -40,6 +41,7 @@ namespace Tsumari.Bot.Services
         {
             if (ShouldIgnoreReactionEvent(reactingUserId, _discordMessageService.CurrentUserId, reactionType))
             {
+                _logger.LogReactionEventIgnored(triggerMessageId, triggerChannelId, reactingUserId, emote.ToString() ?? string.Empty, reactionType);
                 return;
             }
 
@@ -78,6 +80,7 @@ namespace Tsumari.Bot.Services
             var family = await _dbService.GetLinkedMessageFamilyAsync(triggerMessageId, triggerChannelId);
             if (family == null)
             {
+                _logger.LogReactionFamilyNotFound(triggerMessageId, triggerChannelId);
                 return;
             }
 
@@ -88,6 +91,7 @@ namespace Tsumari.Bot.Services
                 var familyMessages = await FetchFamilyMessagesAsync(family);
                 if (familyMessages.Count == 0)
                 {
+                    _logger.LogReactionFamilyMessagesNotFetched(family.OriginalMessageId, family.OriginalChannelId);
                     return;
                 }
 

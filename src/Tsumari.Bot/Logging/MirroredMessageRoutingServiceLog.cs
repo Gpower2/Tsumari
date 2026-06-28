@@ -1,3 +1,4 @@
+using Discord;
 using Microsoft.Extensions.Logging;
 
 namespace Tsumari.Bot.Logging
@@ -66,5 +67,54 @@ namespace Tsumari.Bot.Logging
             Message = "Mismatch flow failed sibling translation to {TargetLanguageCode}."
         )]
         public static partial void LogMismatchFlowSiblingTranslationFailed(this ILogger logger, Exception exception, string targetLanguageCode);
+
+        [LoggerMessage(
+            EventId = 1109,
+            Level = LogLevel.Debug,
+            Message = "Skipping received message {MessageId} because gateway payload type {MessageType} does not implement IUserMessage."
+        )]
+        public static partial void LogSkippingNonUserGatewayMessage(this ILogger logger, ulong messageId, string messageType);
+
+        [LoggerMessage(
+            EventId = 1110,
+            Level = LogLevel.Debug,
+            Message = "Skipping received message {MessageId} because source {MessageSource} is not a user-authored Discord message."
+        )]
+        public static partial void LogSkippingNonUserMessageSource(this ILogger logger, ulong messageId, MessageSource messageSource);
+
+        [LoggerMessage(
+            EventId = 1111,
+            Level = LogLevel.Debug,
+            Message = "Skipping received message {MessageId} in channel {ChannelId} because it has no text content or attachments."
+        )]
+        public static partial void LogSkippingContentlessMessage(this ILogger logger, ulong messageId, ulong channelId);
+
+        [LoggerMessage(
+            EventId = 1112,
+            Level = LogLevel.Debug,
+            Message = "Skipping received message {MessageId} in channel {ChannelId} because the channel is not registered as master or localized."
+        )]
+        public static partial void LogSkippingUnlinkedChannel(this ILogger logger, ulong messageId, ulong channelId);
+
+        [LoggerMessage(
+            EventId = 1113,
+            Level = LogLevel.Debug,
+            Message = "Master routing for message {MessageId} in channel {ChannelId} has no localized targets to publish."
+        )]
+        public static partial void LogMasterMessageHasNoLocalizedTargets(this ILogger logger, ulong messageId, ulong channelId);
+
+        [LoggerMessage(
+            EventId = 1114,
+            Level = LogLevel.Debug,
+            Message = "Skipping mirrored publish for message {MessageId} from channel {SourceChannelId} because destination channel {TargetChannelId} could not be resolved."
+        )]
+        public static partial void LogMirroredTargetChannelNotResolved(this ILogger logger, ulong messageId, ulong sourceChannelId, ulong targetChannelId);
+
+        [LoggerMessage(
+            EventId = 1115,
+            Level = LogLevel.Debug,
+            Message = "Skipping localized routing for message {MessageId} in channel {ChannelId} because parent master channel {ParentChannelId} could not be resolved."
+        )]
+        public static partial void LogLocalizedParentChannelNotResolved(this ILogger logger, ulong messageId, ulong channelId, ulong parentChannelId);
     }
 }

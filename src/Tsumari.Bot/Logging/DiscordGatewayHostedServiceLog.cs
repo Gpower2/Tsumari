@@ -1,3 +1,4 @@
+using Discord;
 using Microsoft.Extensions.Logging;
 
 namespace Tsumari.Bot.Logging
@@ -149,5 +150,75 @@ namespace Tsumari.Bot.Logging
             Message = "Discord client stop failed during shutdown."
         )]
         public static partial void LogClientStopFailed(this ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            EventId = 2321,
+            Level = LogLevel.Trace,
+            Message = "Received Discord Ready event."
+        )]
+        public static partial void LogReadyEventReceived(this ILogger logger);
+
+        [LoggerMessage(
+            EventId = 2322,
+            Level = LogLevel.Trace,
+            Message = "Received Discord interaction event of type {InteractionType} in channel {ChannelId} from user {UserId}."
+        )]
+        public static partial void LogInteractionCreatedEventReceived(this ILogger logger, string interactionType, ulong? channelId, ulong userId);
+
+        [LoggerMessage(
+            EventId = 2323,
+            Level = LogLevel.Trace,
+            Message = "Received Discord message event for message {MessageId} in channel {ChannelId} with source {MessageSource}. Enqueued: {Enqueued}."
+        )]
+        public static partial void LogMessageReceivedEventReceived(this ILogger logger, ulong messageId, ulong channelId, MessageSource messageSource, bool enqueued);
+
+        [LoggerMessage(
+            EventId = 2324,
+            Level = LogLevel.Trace,
+            Message = "Received Discord message delete event for message {MessageId} in channel {ChannelId}. Enqueued: {Enqueued}."
+        )]
+        public static partial void LogMessageDeletedEventReceived(this ILogger logger, ulong messageId, ulong channelId, bool enqueued);
+
+        [LoggerMessage(
+            EventId = 2325,
+            Level = LogLevel.Trace,
+            Message = "Received Discord bulk delete event for {MessageCount} messages in channel {ChannelId}. Enqueued: {Enqueued}."
+        )]
+        public static partial void LogMessagesBulkDeletedEventReceived(this ILogger logger, int messageCount, ulong channelId, bool enqueued);
+
+        [LoggerMessage(
+            EventId = 2326,
+            Level = LogLevel.Trace,
+            Message = "Received Discord message update event for message {MessageId} in channel {ChannelId}. Cached before snapshot: {HadCachedSnapshot}. Enqueued: {Enqueued}."
+        )]
+        public static partial void LogMessageUpdatedEventReceived(this ILogger logger, ulong messageId, ulong channelId, bool hadCachedSnapshot, bool enqueued);
+
+        [LoggerMessage(
+            EventId = 2327,
+            Level = LogLevel.Trace,
+            Message = "Received Discord reaction added event for message {MessageId} in channel {ChannelId} from user {UserId} with emoji {Emoji} and type {ReactionType}. Enqueued: {Enqueued}."
+        )]
+        public static partial void LogReactionAddedEventReceived(this ILogger logger, ulong messageId, ulong channelId, ulong userId, string emoji, ReactionType reactionType, bool enqueued);
+
+        [LoggerMessage(
+            EventId = 2328,
+            Level = LogLevel.Trace,
+            Message = "Received Discord reaction removed event for message {MessageId} in channel {ChannelId} from user {UserId} with emoji {Emoji} and type {ReactionType}. Enqueued: {Enqueued}."
+        )]
+        public static partial void LogReactionRemovedEventReceived(this ILogger logger, ulong messageId, ulong channelId, ulong userId, string emoji, ReactionType reactionType, bool enqueued);
+
+        [LoggerMessage(
+            EventId = 2329,
+            Level = LogLevel.Trace,
+            Message = "Received Discord reactions cleared event for message {MessageId} in channel {ChannelId}. Enqueued: {Enqueued}."
+        )]
+        public static partial void LogReactionsClearedEventReceived(this ILogger logger, ulong messageId, ulong channelId, bool enqueued);
+
+        [LoggerMessage(
+            EventId = 2330,
+            Level = LogLevel.Trace,
+            Message = "Received Discord reactions removed-for-emote event for message {MessageId} in channel {ChannelId} with emoji {Emoji}. Enqueued: {Enqueued}."
+        )]
+        public static partial void LogReactionsRemovedForEmoteEventReceived(this ILogger logger, ulong messageId, ulong channelId, string emoji, bool enqueued);
     }
 }

@@ -29,11 +29,13 @@ namespace Tsumari.Bot.Services
         {
             if (afterMessage is not IUserMessage message)
             {
+                _logger.LogSkippingNonUserEditedMessage(afterMessage.Id, afterMessage.GetType().Name);
                 return;
             }
 
             if (message.Author.IsBot || message.Source != MessageSource.User)
             {
+                _logger.LogSkippingBotOrNonUserEdit(message.Id, message.Source);
                 return;
             }
 
@@ -42,6 +44,7 @@ namespace Tsumari.Bot.Services
                 var afterContent = message.Content ?? string.Empty;
                 if (!ShouldProcessEditedMessage(hadCachedSnapshot, beforeContent ?? string.Empty, afterContent))
                 {
+                    _logger.LogSkippingUnchangedEditedMessage(message.Id);
                     return;
                 }
 
@@ -71,6 +74,7 @@ namespace Tsumari.Bot.Services
                 var mirroredMessages = await _dbService.GetMirroredMessagesAsync(message.Id);
                 if (mirroredMessages.Count == 0)
                 {
+                    _logger.LogSkippingEditedMessageWithoutMirrors(message.Id);
                     return;
                 }
 
@@ -102,6 +106,7 @@ namespace Tsumari.Bot.Services
                         var channel = await _discordMessageService.GetChannelAsync(mirroredChannelId);
                         if (channel == null)
                         {
+                            _logger.LogEditedMirroredChannelNotResolved(message.Id, mirroredChannelId, mirroredMessageId);
                             continue;
                         }
 

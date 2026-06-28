@@ -109,6 +109,7 @@ namespace Tsumari.Bot
 
         private async Task OnReadyAsync()
         {
+            _logger.LogReadyEventReceived();
             _logger.LogConnectedToGateway(_client.CurrentUser.ToString());
 
             try
@@ -128,6 +129,7 @@ namespace Tsumari.Bot
 
         private async Task OnInteractionCreatedAsync(SocketInteraction interaction)
         {
+            _logger.LogInteractionCreatedEventReceived(interaction.Type.ToString(), interaction.ChannelId, interaction.User.Id);
             var context = new SocketInteractionContext(_client, interaction);
             var result = await _interactionService.ExecuteCommandAsync(context, _serviceProvider);
 
@@ -148,13 +150,15 @@ namespace Tsumari.Bot
 
         private Task OnMessageReceivedAsync(SocketMessage rawMessage)
         {
-            _eventDispatcher.TryEnqueue(new MessageReceivedGatewayEvent(rawMessage));
+            var enqueued = _eventDispatcher.TryEnqueue(new MessageReceivedGatewayEvent(rawMessage));
+            _logger.LogMessageReceivedEventReceived(rawMessage.Id, rawMessage.Channel.Id, rawMessage.Source, enqueued);
             return Task.CompletedTask;
         }
 
         private Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
         {
-            _eventDispatcher.TryEnqueue(new MessageDeletedGatewayEvent(messageCache.Id, channelCache.Id));
+            var enqueued = _eventDispatcher.TryEnqueue(new MessageDeletedGatewayEvent(messageCache.Id, channelCache.Id));
+            _logger.LogMessageDeletedEventReceived(messageCache.Id, channelCache.Id, enqueued);
             return Task.CompletedTask;
         }
 
@@ -166,51 +170,69 @@ namespace Tsumari.Bot
                 messageIds.Add(messageCache.Id);
             }
 
-            _eventDispatcher.TryEnqueue(new MessagesBulkDeletedGatewayEvent(messageIds, channelCache.Id));
+            var enqueued = _eventDispatcher.TryEnqueue(new MessagesBulkDeletedGatewayEvent(messageIds, channelCache.Id));
+            _logger.LogMessagesBulkDeletedEventReceived(messageIds.Count, channelCache.Id, enqueued);
             return Task.CompletedTask;
         }
 
         private Task OnMessageUpdatedAsync(Cacheable<IMessage, ulong> beforeCache, SocketMessage after, ISocketMessageChannel channel)
         {
-            _eventDispatcher.TryEnqueue(new MessageUpdatedGatewayEvent(beforeCache, after));
+            var enqueued = _eventDispatcher.TryEnqueue(new MessageUpdatedGatewayEvent(beforeCache, after));
+            _logger.LogMessageUpdatedEventReceived(after.Id, channel.Id, beforeCache.HasValue, enqueued);
             return Task.CompletedTask;
         }
 
         private Task OnReactionAddedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
         {
-            _eventDispatcher.TryEnqueue(new ReactionAddedGatewayEvent(new DiscordReactionEvent
+            var enqueued = _eventDispatcher.TryEnqueue(new ReactionAddedGatewayEvent(new DiscordReactionEvent
             {
                 MessageId = reaction.MessageId,
-                ChannelId = reaction.Channel.Id,
+                ChannelId = channelCache.Id,
                 Emote = reaction.Emote,
                 ReactionType = reaction.ReactionType,
                 UserId = reaction.UserId
             }));
+            _logger.LogReactionAddedEventReceived(
+                reaction.MessageId,
+                channelCache.Id,
+                reaction.UserId,
+                reaction.Emote.ToString() ?? string.Empty,
+                reaction.ReactionType,
+                enqueued);
             return Task.CompletedTask;
         }
 
         private Task OnReactionRemovedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
         {
-            _eventDispatcher.TryEnqueue(new ReactionRemovedGatewayEvent(new DiscordReactionEvent
+            var enqueued = _eventDispatcher.TryEnqueue(new ReactionRemovedGatewayEvent(new DiscordReactionEvent
             {
                 MessageId = reaction.MessageId,
-                ChannelId = reaction.Channel.Id,
+                ChannelId = channelCache.Id,
                 Emote = reaction.Emote,
                 ReactionType = reaction.ReactionType,
                 UserId = reaction.UserId
             }));
+            _logger.LogReactionRemovedEventReceived(
+                reaction.MessageId,
+                channelCache.Id,
+                reaction.UserId,
+                reaction.Emote.ToString() ?? string.Empty,
+                reaction.ReactionType,
+                enqueued);
             return Task.CompletedTask;
         }
 
         private Task OnReactionsClearedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
         {
-            _eventDispatcher.TryEnqueue(new ReactionsClearedGatewayEvent(messageCache.Id, channelCache.Id));
+            var enqueued = _eventDispatcher.TryEnqueue(new ReactionsClearedGatewayEvent(messageCache.Id, channelCache.Id));
+            _logger.LogReactionsClearedEventReceived(messageCache.Id, channelCache.Id, enqueued);
             return Task.CompletedTask;
         }
 
         private Task OnReactionsRemovedForEmoteAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, IEmote emote)
         {
-            _eventDispatcher.TryEnqueue(new ReactionsRemovedForEmoteGatewayEvent(messageCache.Id, channelCache.Id, emote));
+            var enqueued = _eventDispatcher.TryEnqueue(new ReactionsRemovedForEmoteGatewayEvent(messageCache.Id, channelCache.Id, emote));
+            _logger.LogReactionsRemovedForEmoteEventReceived(messageCache.Id, channelCache.Id, emote.ToString() ?? string.Empty, enqueued);
             return Task.CompletedTask;
         }
 

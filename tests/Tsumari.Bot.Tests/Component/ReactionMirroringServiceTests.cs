@@ -7,9 +7,11 @@ using System.Threading.Tasks;
 using Discord;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tsumari.Bot.Services;
+using Tsumari.Bot.Tests;
 using Xunit;
 
 namespace Tsumari.Bot.Tests.Component
@@ -113,13 +115,20 @@ namespace Tsumari.Bot.Tests.Component
         {
             await _dbService.InitializeDatabaseAsync();
             var discordMessageService = new TestDiscordMessageService();
-            var service = CreateService(discordMessageService);
+            var logger = new ListLogger<ReactionMirroringService>();
+            var service = CreateService(discordMessageService, logger);
 
             await service.MirrorReactionAddedAsync(12345UL, 54321UL, new Emoji("👍"), ReactionType.Normal, 999UL);
 
             Assert.Equal(0, discordMessageService.GetChannelAsyncCalls);
             Assert.Empty(discordMessageService.AddedReactions);
             Assert.Empty(discordMessageService.RemovedReactions);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Debug
+                    && entry.EventId.Id == 1305
+                    && entry.Message.Contains("12345")
+                    && entry.Message.Contains("54321"));
         }
 
         [Fact]
@@ -127,13 +136,21 @@ namespace Tsumari.Bot.Tests.Component
         {
             await _dbService.InitializeDatabaseAsync();
             var discordMessageService = new TestDiscordMessageService { CurrentUserId = 42UL };
-            var service = CreateService(discordMessageService);
+            var logger = new ListLogger<ReactionMirroringService>();
+            var service = CreateService(discordMessageService, logger);
 
             await service.MirrorReactionAddedAsync(12345UL, 54321UL, new Emoji("👍"), ReactionType.Normal, 42UL);
 
             Assert.Equal(0, discordMessageService.GetChannelAsyncCalls);
             Assert.Empty(discordMessageService.AddedReactions);
             Assert.Empty(discordMessageService.RemovedReactions);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Debug
+                    && entry.EventId.Id == 1304
+                    && entry.Message.Contains("12345")
+                    && entry.Message.Contains("👍")
+                    && entry.Message.Contains("Normal"));
         }
 
         [Fact]
@@ -338,21 +355,30 @@ namespace Tsumari.Bot.Tests.Component
             await _dbService.InitializeDatabaseAsync();
 
             var discordMessageService = new TestDiscordMessageService();
-            var service = CreateService(discordMessageService);
+            var logger = new ListLogger<ReactionMirroringService>();
+            var service = CreateService(discordMessageService, logger);
 
             await service.MirrorReactionsRemovedForEmoteAsync(2600UL, 26UL, new Emoji("👍"));
 
             Assert.Equal(0, discordMessageService.GetChannelAsyncCalls);
             Assert.Empty(discordMessageService.AddedReactions);
             Assert.Empty(discordMessageService.RemovedReactions);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Debug
+                    && entry.EventId.Id == 1305
+                    && entry.Message.Contains("2600")
+                    && entry.Message.Contains("26"));
         }
 
-        private ReactionMirroringService CreateService(TestDiscordMessageService discordMessageService)
+        private ReactionMirroringService CreateService(
+            TestDiscordMessageService discordMessageService,
+            ILogger<ReactionMirroringService>? logger = null)
         {
             return new ReactionMirroringService(
                 discordMessageService,
                 _dbService,
-                NullLogger<ReactionMirroringService>.Instance);
+                logger ?? NullLogger<ReactionMirroringService>.Instance);
         }
 
         private async Task SeedLinkedFamilyAsync(

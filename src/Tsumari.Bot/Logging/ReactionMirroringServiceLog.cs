@@ -1,3 +1,4 @@
+using Discord;
 using Microsoft.Extensions.Logging;
 
 namespace Tsumari.Bot.Logging
@@ -31,5 +32,26 @@ namespace Tsumari.Bot.Logging
             Message = "Reaction mirroring failed while reconciling emoji {Emoji} on message {MessageId} in channel {ChannelId}."
         )]
         public static partial void LogReactionReconcileFailed(this ILogger logger, Exception exception, string emoji, ulong messageId, ulong channelId);
+
+        [LoggerMessage(
+            EventId = 1304,
+            Level = LogLevel.Debug,
+            Message = "Skipping reaction event for message {MessageId} in channel {ChannelId} from user {UserId} because emoji {Emoji} with reaction type {ReactionType} is ignored."
+        )]
+        public static partial void LogReactionEventIgnored(this ILogger logger, ulong messageId, ulong channelId, ulong userId, string emoji, ReactionType reactionType);
+
+        [LoggerMessage(
+            EventId = 1305,
+            Level = LogLevel.Debug,
+            Message = "Skipping reaction reconciliation for message {MessageId} in channel {ChannelId} because no linked message family was found."
+        )]
+        public static partial void LogReactionFamilyNotFound(this ILogger logger, ulong messageId, ulong channelId);
+
+        [LoggerMessage(
+            EventId = 1306,
+            Level = LogLevel.Debug,
+            Message = "Skipping reaction reconciliation for original message {MessageId} in channel {ChannelId} because no linked messages could be fetched from Discord."
+        )]
+        public static partial void LogReactionFamilyMessagesNotFetched(this ILogger logger, ulong messageId, ulong channelId);
     }
 }

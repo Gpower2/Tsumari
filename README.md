@@ -125,16 +125,19 @@ E:\Development\Tsumari\
         │   ├── ReplyMirroringServiceTests.cs
         │   └── TranslationServiceTests.cs
         ├── GlobalUsings.cs
+        ├── ListLogger.cs
         └── Unit/
             ├── DeepLTranslationProviderTests.cs
             ├── DeepLLanguageServiceTests.cs
             ├── DiscordGatewayEventDispatcherServiceTests.cs
             ├── DiscordGatewayHostedServiceLifecycleTests.cs
+            ├── DiscordGatewayHostedServiceLogTests.cs
             ├── DiscordMessagePublisherServiceTests.cs
             ├── EditedMessageSyncServiceTests.cs
             ├── HttpResponseExtensionsTests.cs
             ├── LanguageCodeServiceTests.cs
             ├── MirroredMessageFormatterTests.cs
+            ├── MirroredMessageRoutingServiceTests.cs
             ├── OllamaTranslationProviderTests.cs
             ├── OpenAITranslationProviderTests.cs
             ├── ResiliencyHelperTests.cs
@@ -165,6 +168,12 @@ E:\Development\Tsumari\
   },
   "Database": {
     "FilePath": "tsumari.db"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
   }
 }
 ```
@@ -178,6 +187,28 @@ E:\Development\Tsumari\
 - If `Translation.Provider` is missing or invalid, startup falls back to **Ollama** instead of defaulting to paid DeepL, and that fallback is logged explicitly.
 - DeepL target language handling is provider-specific: `DeepLLanguageService` queries DeepL's `GET /v3/languages?resource=translate_text` metadata and only falls back to legacy aliases when the provider metadata cannot be used.
 - Translation providers are separated behind `ITranslationProvider`, and all `IHttpClientFactory` usage now goes through named clients.
+
+### Gateway Diagnostics Logging
+
+Gateway receipt logs are emitted at **Trace** level, and intentional service no-op / skip decisions are emitted at **Debug** level. The checked-in config stays at `Information`, so raise category levels only when you need to troubleshoot event flow:
+
+```json
+"Logging": {
+  "LogLevel": {
+    "Default": "Information",
+    "Tsumari.Bot": "Debug",
+    "Tsumari.Bot.DiscordGatewayHostedService": "Trace"
+  }
+}
+```
+
+Useful categories when narrowing production diagnostics:
+
+- `Tsumari.Bot.DiscordGatewayHostedService` - trace-level receipt logs for Discord events
+- `Tsumari.Bot.Services.MirroredMessageRoutingService` - message routing skip decisions
+- `Tsumari.Bot.Services.EditedMessageSyncService` - edit-sync skip decisions
+- `Tsumari.Bot.Services.LinkedMessageDeletionService` - delete-sync skip decisions
+- `Tsumari.Bot.Services.ReactionMirroringService` - reaction-mirroring skip decisions
 - The `UsageTracker` quota guard is only enforced for DeepL; local/self-hosted LLM providers do not use the monthly character limit.
 
 ## Administrative Slash Commands

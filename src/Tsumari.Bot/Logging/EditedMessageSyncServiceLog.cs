@@ -1,3 +1,4 @@
+using Discord;
 using Microsoft.Extensions.Logging;
 
 namespace Tsumari.Bot.Logging
@@ -45,5 +46,40 @@ namespace Tsumari.Bot.Logging
             Message = "Unhandled failure while processing edited message {MessageId}."
         )]
         public static partial void LogEditedMessageProcessingFailed(this ILogger logger, Exception exception, ulong messageId);
+
+        [LoggerMessage(
+            EventId = 1206,
+            Level = LogLevel.Debug,
+            Message = "Skipping edited message {MessageId} because gateway payload type {MessageType} does not implement IUserMessage."
+        )]
+        public static partial void LogSkippingNonUserEditedMessage(this ILogger logger, ulong messageId, string messageType);
+
+        [LoggerMessage(
+            EventId = 1207,
+            Level = LogLevel.Debug,
+            Message = "Skipping edited message {MessageId} because it was authored by a bot or source {MessageSource} is not user-authored."
+        )]
+        public static partial void LogSkippingBotOrNonUserEdit(this ILogger logger, ulong messageId, MessageSource messageSource);
+
+        [LoggerMessage(
+            EventId = 1208,
+            Level = LogLevel.Debug,
+            Message = "Skipping edited message {MessageId} because the cached before/after content is unchanged."
+        )]
+        public static partial void LogSkippingUnchangedEditedMessage(this ILogger logger, ulong messageId);
+
+        [LoggerMessage(
+            EventId = 1209,
+            Level = LogLevel.Debug,
+            Message = "Skipping edited message {MessageId} because no mirrored messages are tracked for it."
+        )]
+        public static partial void LogSkippingEditedMessageWithoutMirrors(this ILogger logger, ulong messageId);
+
+        [LoggerMessage(
+            EventId = 1210,
+            Level = LogLevel.Debug,
+            Message = "Skipping mirrored edit publish for original message {OriginalMessageId} because destination channel {ChannelId} for mirrored message {MirroredMessageId} could not be resolved."
+        )]
+        public static partial void LogEditedMirroredChannelNotResolved(this ILogger logger, ulong originalMessageId, ulong channelId, ulong mirroredMessageId);
     }
 }

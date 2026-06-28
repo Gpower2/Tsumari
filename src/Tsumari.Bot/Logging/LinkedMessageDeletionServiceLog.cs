@@ -17,5 +17,12 @@ namespace Tsumari.Bot.Logging
             Message = "Delete sync failed while deleting linked message {MirroredMessageId} in channel {ChannelId} for original message {OriginalMessageId}."
         )]
         public static partial void LogLinkedMessageDeleteFailed(this ILogger logger, Exception exception, ulong mirroredMessageId, ulong channelId, ulong originalMessageId);
+
+        [LoggerMessage(
+            EventId = 1602,
+            Level = LogLevel.Debug,
+            Message = "Delete event for message {MessageId} has no original-family mirrors; any mirrored-link row will be removed and fan-out is skipped."
+        )]
+        public static partial void LogDeleteMessageSkippedWithoutMirrors(this ILogger logger, ulong messageId);
     }
 }

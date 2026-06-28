@@ -33,17 +33,20 @@ namespace Tsumari.Bot.Services
         {
             if (rawMessage is not IUserMessage message)
             {
+                _logger.LogSkippingNonUserGatewayMessage(rawMessage.Id, rawMessage.GetType().Name);
                 return;
             }
 
             if (message.Source != MessageSource.User)
             {
+                _logger.LogSkippingNonUserMessageSource(message.Id, message.Source);
                 return;
             }
 
             var hasAttachments = message.Attachments != null && message.Attachments.Count > 0;
             if (string.IsNullOrWhiteSpace(message.Content) && !hasAttachments)
             {
+                _logger.LogSkippingContentlessMessage(message.Id, message.Channel.Id);
                 return;
             }
 
@@ -66,6 +69,7 @@ namespace Tsumari.Bot.Services
 
             if (!isMaster && !isLocalized)
             {
+                _logger.LogSkippingUnlinkedChannel(message.Id, channelId);
                 return;
             }
 
@@ -132,6 +136,10 @@ namespace Tsumari.Bot.Services
         {
             var channelId = message.Channel.Id;
             var localizedChannels = await _dbService.GetLocalizedChannelsForMasterAsync(channelId);
+            if (localizedChannels.Count == 0)
+            {
+                _logger.LogMasterMessageHasNoLocalizedTargets(message.Id, channelId);
+            }
 
             var sentMessages = new Dictionary<ulong, IUserMessage>();
             var targets = new List<JumpLinkTarget>
@@ -148,6 +156,7 @@ namespace Tsumari.Bot.Services
                 var channel = await _discordMessageService.GetChannelAsync(localizedChannel.ChannelId);
                 if (channel == null)
                 {
+                    _logger.LogMirroredTargetChannelNotResolved(message.Id, channelId, localizedChannel.ChannelId);
                     continue;
                 }
 
@@ -218,6 +227,7 @@ namespace Tsumari.Bot.Services
             var parentChannel = await _discordMessageService.GetChannelAsync(parentMasterId.Value);
             if (parentChannel == null)
             {
+                _logger.LogLocalizedParentChannelNotResolved(message.Id, channelId, parentMasterId.Value);
                 return;
             }
 
@@ -303,6 +313,7 @@ namespace Tsumari.Bot.Services
                 var siblingChannel = await _discordMessageService.GetChannelAsync(sibling.ChannelId);
                 if (siblingChannel == null)
                 {
+                    _logger.LogMirroredTargetChannelNotResolved(message.Id, message.Channel.Id, sibling.ChannelId);
                     continue;
                 }
 
@@ -411,6 +422,7 @@ namespace Tsumari.Bot.Services
                 var siblingChannel = await _discordMessageService.GetChannelAsync(sibling.ChannelId);
                 if (siblingChannel == null)
                 {
+                    _logger.LogMirroredTargetChannelNotResolved(message.Id, message.Channel.Id, sibling.ChannelId);
                     continue;
                 }
 

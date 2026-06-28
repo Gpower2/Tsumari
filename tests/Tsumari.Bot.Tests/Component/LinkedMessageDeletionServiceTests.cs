@@ -4,8 +4,10 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tsumari.Bot.Tests;
 using Tsumari.Bot.Services;
 using Xunit;
 
@@ -57,11 +59,17 @@ namespace Tsumari.Bot.Tests.Component
         {
             await _dbService.InitializeDatabaseAsync();
             var discordMessageService = new Mock<IDiscordMessageService>(MockBehavior.Strict);
-            var service = CreateService(discordMessageService);
+            var logger = new ListLogger<LinkedMessageDeletionService>();
+            var service = CreateService(discordMessageService, logger);
 
             await service.HandleMessageDeletedAsync(12345UL);
 
             discordMessageService.VerifyNoOtherCalls();
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Debug
+                    && entry.EventId.Id == 1602
+                    && entry.Message.Contains("12345"));
         }
 
         [Fact]
@@ -225,12 +233,14 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Empty(await _dbService.GetMirroredMessagesAsync(55555UL));
         }
 
-        private LinkedMessageDeletionService CreateService(Mock<IDiscordMessageService> discordMessageService)
+        private LinkedMessageDeletionService CreateService(
+            Mock<IDiscordMessageService> discordMessageService,
+            ILogger<LinkedMessageDeletionService>? logger = null)
         {
             return new LinkedMessageDeletionService(
                 discordMessageService.Object,
                 _dbService,
-                NullLogger<LinkedMessageDeletionService>.Instance);
+                logger ?? NullLogger<LinkedMessageDeletionService>.Instance);
         }
 
         private async Task CreateLegacyMessageLinksDatabaseAsync(ulong originalMessageId, ulong mirroredMessageId, ulong channelId, string languageCode)
