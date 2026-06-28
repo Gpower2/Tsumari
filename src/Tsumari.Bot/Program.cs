@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
@@ -14,6 +15,10 @@ namespace Tsumari.Bot
     {
         public static void Main(string[] args)
         {
+            // Prefer UTF-8 console I/O so Unicode log output has the best chance of rendering.
+            Console.InputEncoding = Encoding.UTF8;
+            Console.OutputEncoding = Encoding.UTF8;
+
             var builder = Host.CreateApplicationBuilder(args);
 
             // Configure Console Logging

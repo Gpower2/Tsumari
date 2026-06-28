@@ -125,6 +125,13 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Empty(discordMessageService.RemovedReactions);
             Assert.Contains(
                 logger.Entries,
+                entry => entry.Level == LogLevel.Information
+                    && entry.EventId.Id == 1307
+                    && entry.Message.Contains("12345")
+                    && entry.Message.Contains("54321")
+                    && entry.Message.Contains("👍"));
+            Assert.Contains(
+                logger.Entries,
                 entry => entry.Level == LogLevel.Debug
                     && entry.EventId.Id == 1305
                     && entry.Message.Contains("12345")
@@ -223,6 +230,74 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Single(discordMessageService.AddedReactions);
             Assert.Same(mirrorState.Message, discordMessageService.AddedReactions[0].Message);
             Assert.Equal("custom:123456789012345678", discordMessageService.AddedReactions[0].EmoteKey);
+        }
+
+        [Fact]
+        public async Task MirrorReactionAddedAsync_UsesTriggerEvent_WhenMasterCopyMetadataIsStale()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await SeedLinkedFamilyAsync(
+                originalMessageId: 1150UL,
+                originalChannelId: 15UL,
+                (2150UL, 25UL, "en"),
+                (3150UL, 35UL, "master"),
+                (4150UL, 45UL, "it"));
+
+            var thumbsUp = new Emoji("👍");
+            var originalState = CreateMessageState();
+            var nativeReplyState = CreateMessageState();
+            var masterState = CreateMessageState();
+            var siblingState = CreateMessageState();
+
+            var discordMessageService = new TestDiscordMessageService();
+            discordMessageService.RegisterMessage(15UL, 1150UL, originalState);
+            discordMessageService.RegisterMessage(25UL, 2150UL, nativeReplyState);
+            discordMessageService.RegisterMessage(35UL, 3150UL, masterState);
+            discordMessageService.RegisterMessage(45UL, 4150UL, siblingState);
+
+            var service = CreateService(discordMessageService);
+
+            await service.MirrorReactionAddedAsync(3150UL, 35UL, thumbsUp, ReactionType.Normal, 777UL);
+
+            Assert.Equal(3, discordMessageService.AddedReactions.Count);
+            Assert.DoesNotContain(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, masterState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, originalState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, nativeReplyState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, siblingState.Message));
+        }
+
+        [Fact]
+        public async Task MirrorReactionAddedAsync_UsesTriggerEvent_WhenOriginalLocalizedMetadataIsStale()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await SeedLinkedFamilyAsync(
+                originalMessageId: 1160UL,
+                originalChannelId: 16UL,
+                (2160UL, 16UL, "en"),
+                (3160UL, 36UL, "master"),
+                (4160UL, 46UL, "de"));
+
+            var thumbsUp = new Emoji("👍");
+            var originalState = CreateMessageState();
+            var nativeReplyState = CreateMessageState();
+            var masterState = CreateMessageState();
+            var siblingState = CreateMessageState();
+
+            var discordMessageService = new TestDiscordMessageService();
+            discordMessageService.RegisterMessage(16UL, 1160UL, originalState);
+            discordMessageService.RegisterMessage(16UL, 2160UL, nativeReplyState);
+            discordMessageService.RegisterMessage(36UL, 3160UL, masterState);
+            discordMessageService.RegisterMessage(46UL, 4160UL, siblingState);
+
+            var service = CreateService(discordMessageService);
+
+            await service.MirrorReactionAddedAsync(1160UL, 16UL, thumbsUp, ReactionType.Normal, 888UL);
+
+            Assert.Equal(3, discordMessageService.AddedReactions.Count);
+            Assert.DoesNotContain(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, originalState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, nativeReplyState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, masterState.Message));
+            Assert.Contains(discordMessageService.AddedReactions, item => ReferenceEquals(item.Message, siblingState.Message));
         }
 
         [Fact]

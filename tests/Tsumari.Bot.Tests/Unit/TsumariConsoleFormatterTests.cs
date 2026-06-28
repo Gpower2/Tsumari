@@ -28,7 +28,7 @@ namespace Tsumari.Bot.Tests.Unit
 
             var output = writer.ToString();
             Assert.StartsWith("[", output);
-            Assert.Contains("info: [Discord.Net] Gateway: Connecting", output);
+            Assert.Contains("inf: [Discord.Net] Gateway: Connecting", output);
             Assert.DoesNotContain("Tsumari.Bot.DiscordGatewayHostedService", output);
             Assert.DoesNotContain("[2304]", output);
         }
@@ -50,7 +50,7 @@ namespace Tsumari.Bot.Tests.Unit
             formatter.Write(in entry, null, writer);
 
             var output = writer.ToString();
-            Assert.Contains("fail: line1 line2", output);
+            Assert.Contains("err: line1 line2", output);
             Assert.Contains("System.InvalidOperationException: boom", output);
             Assert.DoesNotContain("Category", output);
             Assert.DoesNotContain("[17]", output);
@@ -72,7 +72,7 @@ namespace Tsumari.Bot.Tests.Unit
             formatter.Write(in entry, null, writer);
 
             var output = writer.ToString();
-            Assert.Contains("\u001b[33mwarn:\u001b[0m watch out", output);
+            Assert.Contains("\u001b[33mwrn:\u001b[0m watch out", output);
             Assert.DoesNotContain("Category", output);
             Assert.DoesNotContain("[99]", output);
         }
