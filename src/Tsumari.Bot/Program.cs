@@ -25,7 +25,7 @@ namespace Tsumari.Bot
             builder.Logging.AddConsoleFormatter<TsumariConsoleFormatter, TsumariConsoleFormatterOptions>(options =>
             {
                 options.SingleLine = true;
-                options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz";
+                options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff";
                 options.UseUtcTimestamp = true;
                 options.IncludeScopes = false;
                 options.ColorBehavior = LoggerColorBehavior.Enabled;
