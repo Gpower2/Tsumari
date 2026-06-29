@@ -26,27 +26,17 @@ namespace Tsumari.Bot.Services
             {
                 DataSource = dbPath,
                 Mode = SqliteOpenMode.ReadWriteCreate,
-                Cache = SqliteCacheMode.Shared
+                Cache = SqliteCacheMode.Shared,
+                ForeignKeys = true
             };
             
             _connectionString = builder.ConnectionString;
         }
 
-        /// <summary>
-        /// Creates a connection and ensures foreign keys and WAL mode are enabled.
-        /// </summary>
         private async Task<SqliteConnection> GetConnectionAsync()
         {
             var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync();
-
-            // Enable WAL mode for high concurrency & performance
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;";
-                await cmd.ExecuteNonQueryAsync();
-            }
-
             return connection;
         }
 
@@ -87,6 +77,7 @@ namespace Tsumari.Bot.Services
                 );";
 
             using var connection = await GetConnectionAsync();
+            await EnsureWriteAheadLoggingAsync(connection);
             using var transaction = connection.BeginTransaction();
             try
             {
@@ -131,6 +122,13 @@ namespace Tsumari.Bot.Services
                 _logger.LogDatabaseTablesInitializationFailed(ex);
                 throw;
             }
+        }
+
+        private static async Task EnsureWriteAheadLoggingAsync(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "PRAGMA journal_mode = WAL;";
+            await cmd.ExecuteScalarAsync();
         }
 
         private static async Task<bool> ColumnExistsAsync(SqliteConnection connection, SqliteTransaction transaction, string tableName, string columnName)
@@ -224,23 +222,42 @@ namespace Tsumari.Bot.Services
             return result != null && ulong.TryParse(result, out ulong id) ? id : null;
         }
 
-        public async Task<ulong?> GetLinkedGroupKeyForChannelAsync(ulong channelId)
+        public async Task<ChannelRoutingContext> GetChannelRoutingContextAsync(ulong channelId)
         {
             using var connection = await GetConnectionAsync();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-                SELECT MasterChannelId
-                FROM MasterChannels
-                WHERE MasterChannelId = $id
-                UNION ALL
-                SELECT ParentMasterChannelId
-                FROM LocalizedChannels
-                WHERE ChannelId = $id
-                LIMIT 1;";
+                SELECT
+                    EXISTS(SELECT 1 FROM MasterChannels WHERE MasterChannelId = $id) AS IsMaster,
+                    (SELECT ParentMasterChannelId FROM LocalizedChannels WHERE ChannelId = $id LIMIT 1) AS ParentMasterChannelId,
+                    (SELECT TargetLanguageCode FROM LocalizedChannels WHERE ChannelId = $id LIMIT 1) AS TargetLanguageCode;";
             cmd.Parameters.AddWithValue("$id", channelId.ToString());
 
-            var result = await cmd.ExecuteScalarAsync() as string;
-            return result != null && ulong.TryParse(result, out ulong groupKey) ? groupKey : null;
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+            {
+                return new ChannelRoutingContext { ChannelId = channelId };
+            }
+
+            ulong? parentMasterChannelId = null;
+            if (!reader.IsDBNull(1) && ulong.TryParse(reader.GetString(1), out var parsedParentMasterChannelId))
+            {
+                parentMasterChannelId = parsedParentMasterChannelId;
+            }
+
+            return new ChannelRoutingContext
+            {
+                ChannelId = channelId,
+                IsMaster = reader.GetInt64(0) != 0,
+                ParentMasterChannelId = parentMasterChannelId,
+                TargetLanguageCode = reader.IsDBNull(2) ? null : reader.GetString(2)
+            };
+        }
+
+        public async Task<ulong?> GetLinkedGroupKeyForChannelAsync(ulong channelId)
+        {
+            var routingContext = await GetChannelRoutingContextAsync(channelId);
+            return routingContext.LinkedGroupKey;
         }
 
         public async Task<string?> GetTargetLanguageCodeAsync(ulong localizedChannelId)

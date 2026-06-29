@@ -38,6 +38,11 @@ namespace Tsumari.Bot.TranslationProviders
                 return ResolveOllamaFallback($"Translation:Provider value '{providerString}' is invalid.");
             }
 
+            if (!Enum.IsDefined(parsedProvider))
+            {
+                return ResolveOllamaFallback($"Translation:Provider value '{providerString}' does not map to a supported provider.");
+            }
+
             ITranslationProvider provider = parsedProvider switch
             {
                 TranslationProvider.Ollama => _ollamaTranslationProvider,

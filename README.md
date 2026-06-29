@@ -23,12 +23,10 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 
 ## Current Behavior Notes
 
+- The canonical end-to-end routing, edit-sync, reply, reaction, and delete behavior lives in `docs/routing.md`. The notes below are the short operational summary.
 - **Edit sync is text-only.** The `MessageUpdated` flow compares message content and only rewrites mirrored message text; attachment-only edits are not re-mirrored.
 - **Edit sync uses cache when available.** The Discord client keeps `MessageCacheSize = 50` messages cached so unchanged edits can be skipped cheaply, but cache misses are still re-synchronized instead of being ignored.
-- **Reply mirroring is best-effort per destination.** If a corresponding parent copy cannot be resolved in a target channel, the mirrored message is still sent there as a normal non-reply message.
-- **Reaction mirroring is link-driven and in-place.** Only existing linked messages participate; reaction handling never creates new messages or reorders the conversation.
 - **Reaction mirroring currently tracks standard reactions only.** Burst reactions are ignored because the bot can only mirror normal reactions reliably.
-- **Delete sync is link-driven and in-place.** Deleting an original source message removes its existing linked bot messages; deleting a mirrored bot message only removes its stale link row.
 - **Gateway work is ordered per linked group.** Events for the same linked channel cluster are processed sequentially, while unrelated clusters can continue in parallel.
 - **Language buttons only exist for bot-generated copies.** The source user-authored message is always reached through the `Original` button.
 - **Mismatch replies are tracked too.** When a localized channel receives the wrong language, the bot's in-channel translated reply is stored in `MessageLinks` and participates in cross-link buttons.
@@ -74,6 +72,7 @@ E:\Development\Tsumari\
 │       ├── Program.cs
 │       ├── appsettings.json
 │       ├── Models/
+│       │   ├── ChannelRoutingContext.cs
 │       │   ├── DiscordReactionEvent.cs
 │       │   ├── GatewayIngressEvent.cs
 │       │   ├── JumpLinkTarget.cs
@@ -83,6 +82,8 @@ E:\Development\Tsumari\
 │       │   └── TranslationProvider.cs
 │       ├── Modules/
 │       │   └── InteractionModule.cs
+│       ├── Properties/
+│       │   └── AssemblyInfo.cs
 │       ├── TranslationProviders/
 │       │   ├── Abstractions/
 │       │   │   ├── ITranslationProvider.cs
@@ -127,6 +128,7 @@ E:\Development\Tsumari\
         │   └── TranslationServiceTests.cs
         ├── GlobalUsings.cs
         ├── ListLogger.cs
+        ├── TemporarySqliteDatabase.cs
         └── Unit/
             ├── DeepLTranslationProviderTests.cs
             ├── DeepLLanguageServiceTests.cs

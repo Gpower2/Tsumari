@@ -116,7 +116,7 @@ namespace Tsumari.Bot.Services
 
                         if (!MirroredMessageFormatter.ShouldTranslateLinkedMessage(sourceLang, targetLang) || string.IsNullOrWhiteSpace(afterContent))
                         {
-                            newText = MirroredMessageFormatter.FormatEditedLinkedMessageText(
+                            newText = MirroredMessageFormatter.FormatLinkedMessageText(
                                 message.Channel.Id,
                                 mirroredChannelId,
                                 authorName,
@@ -130,7 +130,7 @@ namespace Tsumari.Bot.Services
                             try
                             {
                                 var translatedText = await _translationService.TranslateTextAsync(afterContent, translationTargetLang);
-                                newText = MirroredMessageFormatter.FormatEditedLinkedMessageText(
+                                newText = MirroredMessageFormatter.FormatLinkedMessageText(
                                     message.Channel.Id,
                                     mirroredChannelId,
                                     authorName,

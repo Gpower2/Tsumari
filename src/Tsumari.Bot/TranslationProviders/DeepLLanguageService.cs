@@ -26,6 +26,7 @@ namespace Tsumari.Bot.TranslationProviders
         private readonly string? _apiKey;
         private readonly string _serverUrl;
         private readonly SemaphoreSlim _supportedLanguagesLock = new(1, 1);
+        private readonly bool _skipSupportedLanguageLookup;
 
         private HashSet<string>? _supportedTargetLanguageCodes;
 
@@ -38,6 +39,7 @@ namespace Tsumari.Bot.TranslationProviders
             _logger = logger;
 
             _apiKey = configuration["DeepL:ApiKey"] ?? configuration["DeepLKey"];
+            _skipSupportedLanguageLookup = string.IsNullOrWhiteSpace(_apiKey);
             _serverUrl = !string.IsNullOrWhiteSpace(_apiKey) && _apiKey.EndsWith(":fx", StringComparison.OrdinalIgnoreCase)
                 ? "https://api-free.deepl.com"
                 : "https://api.deepl.com";
@@ -86,6 +88,11 @@ namespace Tsumari.Bot.TranslationProviders
 
         private async Task<HashSet<string>?> TryGetSupportedTargetLanguageCodesAsync()
         {
+            if (_skipSupportedLanguageLookup)
+            {
+                return null;
+            }
+
             if (_supportedTargetLanguageCodes != null)
             {
                 return _supportedTargetLanguageCodes;
@@ -97,11 +104,6 @@ namespace Tsumari.Bot.TranslationProviders
                 if (_supportedTargetLanguageCodes != null)
                 {
                     return _supportedTargetLanguageCodes;
-                }
-
-                if (string.IsNullOrWhiteSpace(_apiKey))
-                {
-                    return null;
                 }
 
                 // DeepL's v3 language metadata is the source of truth for targetability. We cache the

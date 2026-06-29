@@ -2,46 +2,25 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
-using Tsumari.Bot.Services;
 using Xunit;
 
 namespace Tsumari.Bot.Tests.Component
 {
     public class DatabaseServiceTests : IDisposable
     {
-        private readonly string _testDbPath;
+        private readonly TemporarySqliteDatabase _database;
         private readonly DatabaseService _dbService;
 
         public DatabaseServiceTests()
         {
-            _testDbPath = $"test_tsumari_{Guid.NewGuid():N}.db";
-            
-            var configMock = new Mock<IConfiguration>();
-            configMock.Setup(c => c["Database:FilePath"]).Returns(_testDbPath);
-
-            _dbService = new DatabaseService(configMock.Object, NullLogger<DatabaseService>.Instance);
+            _database = new TemporarySqliteDatabase("database-service");
+            _dbService = _database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
         }
 
         public void Dispose()
         {
-            // Clean up test database file and journal/wal files if they exist
-            try
-            {
-                if (File.Exists(_testDbPath)) File.Delete(_testDbPath);
-                
-                var walFile = $"{_testDbPath}-wal";
-                if (File.Exists(walFile)) File.Delete(walFile);
-
-                var shmFile = $"{_testDbPath}-shm";
-                if (File.Exists(shmFile)) File.Delete(shmFile);
-            }
-            catch
-            {
-                // Silently ignore cleanup errors
-            }
+            _database.Dispose();
         }
 
         [Fact]
@@ -51,7 +30,7 @@ namespace Tsumari.Bot.Tests.Component
             await _dbService.InitializeDatabaseAsync();
             
             // Check that the file was actually created
-            Assert.True(File.Exists(_testDbPath));
+            Assert.True(File.Exists(_database.DatabasePath));
         }
 
         [Fact]
@@ -61,7 +40,7 @@ namespace Tsumari.Bot.Tests.Component
 
             await _dbService.InitializeDatabaseAsync();
 
-            await using var connection = new SqliteConnection($"Data Source={_testDbPath}");
+            await using var connection = new SqliteConnection($"Data Source={_database.DatabasePath}");
             await connection.OpenAsync();
 
             await using var tableInfoCmd = connection.CreateCommand();
@@ -101,6 +80,37 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Equal(54321UL, links[0].ChannelId);
             Assert.Equal("EL", links[0].LanguageCode);
             Assert.Null(links[0].OriginalChannelId);
+        }
+
+        [Fact]
+        public async Task GetChannelRoutingContextAsync_ReturnsMasterContext_ForRegisteredMasterChannel()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+
+            var context = await _dbService.GetChannelRoutingContextAsync(10UL);
+
+            Assert.True(context.IsMaster);
+            Assert.False(context.IsLocalized);
+            Assert.Equal(10UL, context.LinkedGroupKey);
+            Assert.Null(context.ParentMasterChannelId);
+            Assert.Null(context.TargetLanguageCode);
+        }
+
+        [Fact]
+        public async Task GetChannelRoutingContextAsync_ReturnsLocalizedContext_ForRegisteredLocalizedChannel()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+
+            var context = await _dbService.GetChannelRoutingContextAsync(20UL);
+
+            Assert.False(context.IsMaster);
+            Assert.True(context.IsLocalized);
+            Assert.Equal(10UL, context.LinkedGroupKey);
+            Assert.Equal(10UL, context.ParentMasterChannelId);
+            Assert.Equal("de", context.TargetLanguageCode);
         }
 
         [Fact]
@@ -359,7 +369,7 @@ namespace Tsumari.Bot.Tests.Component
 
         private async Task CreateLegacyMessageLinksDatabaseAsync(ulong originalMessageId, ulong mirroredMessageId, ulong channelId, string languageCode)
         {
-            await using var connection = new SqliteConnection($"Data Source={_testDbPath}");
+            await using var connection = new SqliteConnection($"Data Source={_database.DatabasePath}");
             await connection.OpenAsync();
 
             await using var cmd = connection.CreateCommand();

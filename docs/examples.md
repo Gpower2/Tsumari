@@ -167,4 +167,4 @@ After edit sync, the reply remains a Discord reply message and keeps the compact
 > `[Buttons: Original | EL | EN | IT]`
 
 > [!NOTE]
-> Edit sync currently updates **text content only**. It does not re-mirror attachment edits.
+> The canonical edit-sync rules and current limitations live in [`routing.md`](routing.md#edited-message-synchronization).

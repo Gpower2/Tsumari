@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Discord;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 using Tsumari.Bot.Services;
 using Tsumari.Bot.Tests;
 using Xunit;
@@ -18,43 +15,18 @@ namespace Tsumari.Bot.Tests.Component
 {
     public class ReactionMirroringServiceTests : IDisposable
     {
-        private readonly string _testDbPath;
+        private readonly TemporarySqliteDatabase _database;
         private readonly DatabaseService _dbService;
 
         public ReactionMirroringServiceTests()
         {
-            _testDbPath = $"test_tsumari_reactions_{Guid.NewGuid():N}.db";
-
-            var configMock = new Mock<IConfiguration>();
-            configMock.Setup(c => c["Database:FilePath"]).Returns(_testDbPath);
-
-            _dbService = new DatabaseService(configMock.Object, NullLogger<DatabaseService>.Instance);
+            _database = new TemporarySqliteDatabase("reactions");
+            _dbService = _database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
         }
 
         public void Dispose()
         {
-            try
-            {
-                if (File.Exists(_testDbPath))
-                {
-                    File.Delete(_testDbPath);
-                }
-
-                var walFile = $"{_testDbPath}-wal";
-                if (File.Exists(walFile))
-                {
-                    File.Delete(walFile);
-                }
-
-                var shmFile = $"{_testDbPath}-shm";
-                if (File.Exists(shmFile))
-                {
-                    File.Delete(shmFile);
-                }
-            }
-            catch
-            {
-            }
+            _database.Dispose();
         }
 
         [Fact]
@@ -508,7 +480,7 @@ namespace Tsumari.Bot.Tests.Component
 
         private async Task CreateLegacyMessageLinksDatabaseAsync(ulong originalMessageId, ulong mirroredMessageId, ulong channelId, string languageCode)
         {
-            await using var connection = new SqliteConnection($"Data Source={_testDbPath}");
+            await using var connection = new SqliteConnection($"Data Source={_database.DatabasePath}");
             await connection.OpenAsync();
 
             await using var cmd = connection.CreateCommand();

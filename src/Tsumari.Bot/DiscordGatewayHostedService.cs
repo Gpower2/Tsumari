@@ -22,6 +22,7 @@ namespace Tsumari.Bot
         private readonly ILogger<DiscordGatewayHostedService> _logger;
         private readonly SemaphoreSlim _readyInitializationLock = new(1, 1);
         private bool _eventHandlersRegistered;
+        private bool _databaseInitialized;
         private bool _interactionModulesLoaded;
         private bool _globalCommandsRegistered;
 
@@ -117,8 +118,8 @@ namespace Tsumari.Bot
 
             try
             {
-                await _dbService.InitializeDatabaseAsync();
-                await EnsureInteractionCommandsInitializedAsync(
+                await EnsureReadyInitializationAsync(
+                    async () => await _dbService.InitializeDatabaseAsync(),
                     async () => await _interactionService.AddModulesAsync(typeof(Program).Assembly, _serviceProvider),
                     async () =>
                     {
@@ -132,11 +133,20 @@ namespace Tsumari.Bot
             }
         }
 
-        private async Task EnsureInteractionCommandsInitializedAsync(Func<Task> addModulesAsync, Func<Task> registerCommandsAsync)
+        internal async Task EnsureReadyInitializationAsync(
+            Func<Task> initializeDatabaseAsync,
+            Func<Task> addModulesAsync,
+            Func<Task> registerCommandsAsync)
         {
             await _readyInitializationLock.WaitAsync();
             try
             {
+                if (!_databaseInitialized)
+                {
+                    await initializeDatabaseAsync();
+                    _databaseInitialized = true;
+                }
+
                 if (!_interactionModulesLoaded)
                 {
                     await addModulesAsync();
@@ -178,21 +188,21 @@ namespace Tsumari.Bot
             }
         }
 
-        private Task OnMessageReceivedAsync(SocketMessage rawMessage)
+        internal Task OnMessageReceivedAsync(SocketMessage rawMessage)
         {
             var enqueued = _eventDispatcher.TryEnqueue(new MessageReceivedGatewayEvent(rawMessage));
             _logger.LogMessageReceivedEventReceived(rawMessage.Id, rawMessage.Channel.Id, rawMessage.Source, enqueued);
             return Task.CompletedTask;
         }
 
-        private Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
+        internal Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
         {
             var enqueued = _eventDispatcher.TryEnqueue(new MessageDeletedGatewayEvent(messageCache.Id, channelCache.Id));
             _logger.LogMessageDeletedEventReceived(messageCache.Id, channelCache.Id, enqueued);
             return Task.CompletedTask;
         }
 
-        private Task OnMessagesBulkDeletedAsync(IReadOnlyCollection<Cacheable<IMessage, ulong>> messageCaches, Cacheable<IMessageChannel, ulong> channelCache)
+        internal Task OnMessagesBulkDeletedAsync(IReadOnlyCollection<Cacheable<IMessage, ulong>> messageCaches, Cacheable<IMessageChannel, ulong> channelCache)
         {
             var messageIds = new List<ulong>(messageCaches.Count);
             foreach (var messageCache in messageCaches)
@@ -205,14 +215,14 @@ namespace Tsumari.Bot
             return Task.CompletedTask;
         }
 
-        private Task OnMessageUpdatedAsync(Cacheable<IMessage, ulong> beforeCache, SocketMessage after, ISocketMessageChannel channel)
+        internal Task OnMessageUpdatedAsync(Cacheable<IMessage, ulong> beforeCache, SocketMessage after, ISocketMessageChannel channel)
         {
             var enqueued = _eventDispatcher.TryEnqueue(new MessageUpdatedGatewayEvent(beforeCache, after));
             _logger.LogMessageUpdatedEventReceived(after.Id, channel.Id, beforeCache.HasValue, enqueued);
             return Task.CompletedTask;
         }
 
-        private Task OnReactionAddedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
+        internal Task OnReactionAddedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
         {
             var enqueued = _eventDispatcher.TryEnqueue(new ReactionAddedGatewayEvent(new DiscordReactionEvent
             {
@@ -232,7 +242,7 @@ namespace Tsumari.Bot
             return Task.CompletedTask;
         }
 
-        private Task OnReactionRemovedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
+        internal Task OnReactionRemovedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, SocketReaction reaction)
         {
             var enqueued = _eventDispatcher.TryEnqueue(new ReactionRemovedGatewayEvent(new DiscordReactionEvent
             {
@@ -252,21 +262,23 @@ namespace Tsumari.Bot
             return Task.CompletedTask;
         }
 
-        private Task OnReactionsClearedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
+        internal Task OnReactionsClearedAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache)
         {
             var enqueued = _eventDispatcher.TryEnqueue(new ReactionsClearedGatewayEvent(messageCache.Id, channelCache.Id));
             _logger.LogReactionsClearedEventReceived(messageCache.Id, channelCache.Id, enqueued);
             return Task.CompletedTask;
         }
 
-        private Task OnReactionsRemovedForEmoteAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, IEmote emote)
+        internal Task OnReactionsRemovedForEmoteAsync(Cacheable<IUserMessage, ulong> messageCache, Cacheable<IMessageChannel, ulong> channelCache, IEmote emote)
         {
             var enqueued = _eventDispatcher.TryEnqueue(new ReactionsRemovedForEmoteGatewayEvent(messageCache.Id, channelCache.Id, emote));
             _logger.LogReactionsRemovedForEmoteEventReceived(messageCache.Id, channelCache.Id, emote.ToString() ?? string.Empty, enqueued);
             return Task.CompletedTask;
         }
 
-        public async Task HandleMessageReceivedAsync(IMessage rawMessage)
+        internal bool EventHandlersRegistered => _eventHandlersRegistered;
+
+        internal async Task HandleMessageReceivedAsync(IMessage rawMessage)
         {
             try
             {
@@ -278,7 +290,7 @@ namespace Tsumari.Bot
             }
         }
 
-        public async Task HandleMessageDeletedAsync(ulong messageId)
+        internal async Task HandleMessageDeletedAsync(ulong messageId)
         {
             try
             {
@@ -290,7 +302,7 @@ namespace Tsumari.Bot
             }
         }
 
-        public async Task HandleMessagesBulkDeletedAsync(IReadOnlyCollection<ulong> messageIds, ulong channelId)
+        internal async Task HandleMessagesBulkDeletedAsync(IReadOnlyCollection<ulong> messageIds, ulong channelId)
         {
             try
             {
@@ -302,7 +314,7 @@ namespace Tsumari.Bot
             }
         }
 
-        public async Task HandleMessageUpdatedAsync(bool hadCachedSnapshot, string? beforeContent, IMessage afterMessage)
+        internal async Task HandleMessageUpdatedAsync(bool hadCachedSnapshot, string? beforeContent, IMessage afterMessage)
         {
             try
             {
@@ -314,7 +326,7 @@ namespace Tsumari.Bot
             }
         }
 
-        public async Task HandleReactionAddedAsync(DiscordReactionEvent reaction)
+        internal async Task HandleReactionAddedAsync(DiscordReactionEvent reaction)
         {
             try
             {
@@ -326,7 +338,7 @@ namespace Tsumari.Bot
             }
         }
 
-        public async Task HandleReactionRemovedAsync(DiscordReactionEvent reaction)
+        internal async Task HandleReactionRemovedAsync(DiscordReactionEvent reaction)
         {
             try
             {
@@ -338,7 +350,7 @@ namespace Tsumari.Bot
             }
         }
 
-        public async Task HandleReactionsClearedAsync(ulong messageId, ulong channelId)
+        internal async Task HandleReactionsClearedAsync(ulong messageId, ulong channelId)
         {
             try
             {
@@ -350,7 +362,7 @@ namespace Tsumari.Bot
             }
         }
 
-        public async Task HandleReactionsRemovedForEmoteAsync(ulong messageId, ulong channelId, IEmote emote)
+        internal async Task HandleReactionsRemovedForEmoteAsync(ulong messageId, ulong channelId, IEmote emote)
         {
             try
             {
@@ -362,7 +374,7 @@ namespace Tsumari.Bot
             }
         }
 
-        private void RegisterEventHandlers()
+        internal void RegisterEventHandlers()
         {
             lock (_eventHandlerLock)
             {
@@ -388,7 +400,7 @@ namespace Tsumari.Bot
             }
         }
 
-        private void UnregisterEventHandlers()
+        internal void UnregisterEventHandlers()
         {
             lock (_eventHandlerLock)
             {

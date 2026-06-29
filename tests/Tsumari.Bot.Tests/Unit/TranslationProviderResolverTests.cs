@@ -43,6 +43,18 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.IsType<OpenAITranslationProvider>(result);
         }
 
+        [Fact]
+        public void Resolve_FallsBackToOllama_WhenProviderConfigIsUndefinedNumericEnumValue()
+        {
+            var configMock = new Mock<IConfiguration>();
+            configMock.Setup(c => c["Translation:Provider"]).Returns("999");
+            var resolver = CreateResolver(configMock.Object);
+
+            var result = resolver.Resolve();
+
+            Assert.IsType<OllamaTranslationProvider>(result);
+        }
+
         private static TranslationProviderResolver CreateResolver(IConfiguration configuration)
         {
             var httpClientFactory = new Mock<IHttpClientFactory>();

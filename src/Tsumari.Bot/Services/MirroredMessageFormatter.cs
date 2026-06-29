@@ -75,7 +75,7 @@ namespace Tsumari.Bot.Services
                 && !LanguageCodeService.AreSameLanguageCode(sourceLang, targetLang);
         }
 
-        public static string FormatEditedLinkedMessageText(
+        public static string FormatLinkedMessageText(
             ulong sourceChannelId,
             ulong linkedChannelId,
             string authorName,

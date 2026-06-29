@@ -61,6 +61,21 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Equal("FR", await service.NormalizeTargetLanguageCodeAsync("fr"));
         }
 
+        [Fact]
+        public async Task NormalizeTargetLanguageCodeAsync_SkipsMetadataLookup_WhenApiKeyIsMissing()
+        {
+            var configMock = new Mock<IConfiguration>();
+            var httpClientFactoryMock = new Mock<IHttpClientFactory>(MockBehavior.Strict);
+            var service = new DeepLLanguageService(
+                configMock.Object,
+                httpClientFactoryMock.Object,
+                NullLogger<DeepLLanguageService>.Instance);
+
+            Assert.Equal("EN-US", await service.NormalizeTargetLanguageCodeAsync("en"));
+            Assert.Equal("PT-PT", await service.NormalizeTargetLanguageCodeAsync("pt"));
+            httpClientFactoryMock.Verify(factory => factory.CreateClient(It.IsAny<string>()), Times.Never);
+        }
+
         private static DeepLLanguageService CreateService(string? jsonResponse, HttpStatusCode statusCode = HttpStatusCode.OK)
         {
             var configMock = new Mock<IConfiguration>();

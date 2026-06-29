@@ -7,6 +7,7 @@ namespace Tsumari.Bot.Services
 {
     public class DiscordMessagePublisherService
     {
+        private const int MaxParallelAttachmentDownloads = 4;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<DiscordMessagePublisherService> _logger;
 
@@ -20,34 +21,65 @@ namespace Tsumari.Bot.Services
 
         public async Task<List<MediaAsset>> DownloadMediaAssetsAsync(IReadOnlyCollection<IAttachment>? attachments)
         {
-            var mediaAssets = new List<MediaAsset>();
             if (attachments == null || attachments.Count == 0)
             {
-                return mediaAssets;
+                return [];
             }
 
+            var attachmentList = attachments.ToArray();
+            var downloadedAssets = new MediaAsset?[attachmentList.Length];
             using var discordCdnClient = _httpClientFactory.CreateClient(HttpClientNames.DiscordCdn);
-            foreach (var attachment in attachments)
+            using var throttler = new SemaphoreSlim(Math.Min(MaxParallelAttachmentDownloads, attachmentList.Length));
+
+            var downloadTasks = attachmentList.Select((attachment, index) => DownloadAttachmentAsync(
+                discordCdnClient,
+                throttler,
+                attachment,
+                index,
+                downloadedAssets));
+
+            await Task.WhenAll(downloadTasks);
+
+            var mediaAssets = new List<MediaAsset>(attachmentList.Length);
+            foreach (var asset in downloadedAssets)
             {
-                try
+                if (asset != null)
                 {
-                    using var response = await discordCdnClient.GetAsync(attachment.Url, HttpCompletionOption.ResponseHeadersRead);
-                    var bytes = await response.ReadBytesWithStatusCheckAsync(
-                        _logger,
-                        $"downloading Discord attachment '{attachment.Filename}'");
-                    mediaAssets.Add(new MediaAsset
-                    {
-                        Filename = attachment.Filename,
-                        Bytes = bytes
-                    });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogAttachmentDownloadFailed(ex, attachment.Filename, attachment.Url);
+                    mediaAssets.Add(asset);
                 }
             }
 
             return mediaAssets;
+        }
+
+        private async Task DownloadAttachmentAsync(
+            HttpClient discordCdnClient,
+            SemaphoreSlim throttler,
+            IAttachment attachment,
+            int index,
+            MediaAsset?[] downloadedAssets)
+        {
+            await throttler.WaitAsync();
+            try
+            {
+                using var response = await discordCdnClient.GetAsync(attachment.Url, HttpCompletionOption.ResponseHeadersRead);
+                var bytes = await response.ReadBytesWithStatusCheckAsync(
+                    _logger,
+                    $"downloading Discord attachment '{attachment.Filename}'");
+                downloadedAssets[index] = new MediaAsset
+                {
+                    Filename = attachment.Filename,
+                    Bytes = bytes
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogAttachmentDownloadFailed(ex, attachment.Filename, attachment.Url);
+            }
+            finally
+            {
+                throttler.Release();
+            }
         }
 
         public async Task EditJumpButtonsIntoSentMessagesAsync(

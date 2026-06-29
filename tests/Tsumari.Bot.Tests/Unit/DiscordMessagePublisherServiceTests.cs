@@ -207,6 +207,42 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task DownloadMediaAssetsAsync_PreservesAttachmentOrder_WhenRequestsCompleteOutOfOrder()
+        {
+            var handler = new DelayedStubHttpMessageHandler(async (request, cancellationToken) =>
+            {
+                if (request.RequestUri!.AbsoluteUri.EndsWith("slow", StringComparison.Ordinal))
+                {
+                    await Task.Delay(50, cancellationToken);
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new ByteArrayContent([1])
+                    };
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent([2])
+                };
+            });
+            var publisher = CreatePublisher(new HttpClient(handler));
+            var firstAttachment = new Mock<IAttachment>();
+            firstAttachment.SetupGet(attachment => attachment.Filename).Returns("first.txt");
+            firstAttachment.SetupGet(attachment => attachment.Url).Returns("https://cdn.example/slow");
+            var secondAttachment = new Mock<IAttachment>();
+            secondAttachment.SetupGet(attachment => attachment.Filename).Returns("second.txt");
+            secondAttachment.SetupGet(attachment => attachment.Url).Returns("https://cdn.example/fast");
+
+            var result = await publisher.DownloadMediaAssetsAsync([firstAttachment.Object, secondAttachment.Object]);
+
+            Assert.Equal(2, result.Count);
+            Assert.Equal("first.txt", result[0].Filename);
+            Assert.Equal([1], result[0].Bytes);
+            Assert.Equal("second.txt", result[1].Filename);
+            Assert.Equal([2], result[1].Bytes);
+        }
+
+        [Fact]
         public async Task SendMessageWithFilesAsync_ReturnsNull_WhenFallbackSendFails()
         {
             var publisher = CreatePublisher();
@@ -277,6 +313,21 @@ namespace Tsumari.Bot.Tests.Unit
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
                 return Task.FromResult(_responseFactory(request));
+            }
+        }
+
+        private sealed class DelayedStubHttpMessageHandler : HttpMessageHandler
+        {
+            private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _responseFactory;
+
+            public DelayedStubHttpMessageHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responseFactory)
+            {
+                _responseFactory = responseFactory;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                return _responseFactory(request, cancellationToken);
             }
         }
     }

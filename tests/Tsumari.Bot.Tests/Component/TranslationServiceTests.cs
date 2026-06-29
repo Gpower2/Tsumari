@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -17,13 +15,8 @@ namespace Tsumari.Bot.Tests.Component
         public async Task CanTranslateAsync_ReturnsTrue_WhenUsageIsUnderQuota()
         {
             // Arrange
-            var dbLogger = NullLogger<DatabaseService>.Instance;
-            var dbPath = $"test_tsumari_trans_{Guid.NewGuid():N}.db";
-            
-            var dbConfigMock = new Mock<IConfiguration>();
-            dbConfigMock.Setup(c => c["Database:FilePath"]).Returns(dbPath);
-            
-            var dbService = new DatabaseService(dbConfigMock.Object, dbLogger);
+            using var database = new TemporarySqliteDatabase("translation-service");
+            var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
             await dbService.InitializeDatabaseAsync();
 
             var transLogger = NullLogger<TranslationService>.Instance;
@@ -33,45 +26,28 @@ namespace Tsumari.Bot.Tests.Component
             providerMock.SetupGet(p => p.IsActive).Returns(true);
             var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
 
-            try
-            {
-                // Act: Initial limit check (should be 0 usage)
-                bool canTranslateSmall = await transService.CanTranslateAsync(100);
-                bool canTranslateLimit = await transService.CanTranslateAsync(500000);
-                bool canTranslateOver = await transService.CanTranslateAsync(500001);
+            // Act: Initial limit check (should be 0 usage)
+            bool canTranslateSmall = await transService.CanTranslateAsync(100);
+            bool canTranslateLimit = await transService.CanTranslateAsync(500000);
+            bool canTranslateOver = await transService.CanTranslateAsync(500001);
 
-                // Assert
-                Assert.True(canTranslateSmall);
-                Assert.True(canTranslateLimit);
-                Assert.False(canTranslateOver);
+            // Assert
+            Assert.True(canTranslateSmall);
+            Assert.True(canTranslateLimit);
+            Assert.False(canTranslateOver);
 
-                // Increment usage in database and test again
-                await dbService.IncrementUsageAsync(400000);
-                
-                Assert.True(await transService.CanTranslateAsync(100000));
-                Assert.False(await transService.CanTranslateAsync(100001)); // Would exceed 500,000 limit
-            }
-            finally
-            {
-                // Clean up database file
-                try
-                {
-                    if (File.Exists(dbPath)) File.Delete(dbPath);
-                    var wal = $"{dbPath}-wal";
-                    if (File.Exists(wal)) File.Delete(wal);
-                }
-                catch {}
-            }
+            // Increment usage in database and test again
+            await dbService.IncrementUsageAsync(400000);
+
+            Assert.True(await transService.CanTranslateAsync(100000));
+            Assert.False(await transService.CanTranslateAsync(100001)); // Would exceed 500,000 limit
         }
 
         [Fact]
         public async Task CanTranslateAsync_IgnoresQuota_ForNonQuotaProvider()
         {
-            var dbLogger = NullLogger<DatabaseService>.Instance;
-            var dbPath = $"test_tsumari_trans_{Guid.NewGuid():N}.db";
-            var dbConfigMock = new Mock<IConfiguration>();
-            dbConfigMock.Setup(c => c["Database:FilePath"]).Returns(dbPath);
-            var dbService = new DatabaseService(dbConfigMock.Object, dbLogger);
+            using var database = new TemporarySqliteDatabase("translation-service");
+            var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
             await dbService.InitializeDatabaseAsync();
             await dbService.IncrementUsageAsync(TranslationService.MonthlyCharacterLimit);
 
@@ -82,20 +58,7 @@ namespace Tsumari.Bot.Tests.Component
             providerMock.SetupGet(p => p.IsActive).Returns(true);
             var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
 
-            try
-            {
-                Assert.True(await transService.CanTranslateAsync(1000));
-            }
-            finally
-            {
-                try
-                {
-                    if (File.Exists(dbPath)) File.Delete(dbPath);
-                    var wal = $"{dbPath}-wal";
-                    if (File.Exists(wal)) File.Delete(wal);
-                }
-                catch {}
-            }
+            Assert.True(await transService.CanTranslateAsync(1000));
         }
 
         [Fact]
@@ -115,11 +78,8 @@ namespace Tsumari.Bot.Tests.Component
         [Fact]
         public async Task DetectLanguageAsync_LogsTruncatedPreview()
         {
-            var dbLogger = NullLogger<DatabaseService>.Instance;
-            var dbPath = $"test_tsumari_trans_{Guid.NewGuid():N}.db";
-            var dbConfigMock = new Mock<IConfiguration>();
-            dbConfigMock.Setup(c => c["Database:FilePath"]).Returns(dbPath);
-            var dbService = new DatabaseService(dbConfigMock.Object, dbLogger);
+            using var database = new TemporarySqliteDatabase("translation-service");
+            var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
             await dbService.InitializeDatabaseAsync();
 
             var transLogger = new ListLogger<TranslationService>();
@@ -130,28 +90,15 @@ namespace Tsumari.Bot.Tests.Component
             providerMock.Setup(p => p.DetectLanguageAsync(It.IsAny<string>())).ReturnsAsync("EN");
             var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
 
-            try
-            {
-                var result = await transService.DetectLanguageAsync("12345678901234567890");
+            var result = await transService.DetectLanguageAsync("12345678901234567890");
 
-                Assert.Equal("EN", result);
-                Assert.Contains(
-                    transLogger.Entries,
-                    entry => entry.Level == LogLevel.Information
-                        && entry.Message.Contains("Language detected: 'EN'")
-                        && entry.Message.Contains("123456789012345")
-                        && !entry.Message.Contains("1234567890123456"));
-            }
-            finally
-            {
-                try
-                {
-                    if (File.Exists(dbPath)) File.Delete(dbPath);
-                    var wal = $"{dbPath}-wal";
-                    if (File.Exists(wal)) File.Delete(wal);
-                }
-                catch {}
-            }
+            Assert.Equal("EN", result);
+            Assert.Contains(
+                transLogger.Entries,
+                entry => entry.Level == LogLevel.Information
+                    && entry.Message.Contains("Language detected: 'EN'")
+                    && entry.Message.Contains("123456789012345")
+                    && !entry.Message.Contains("1234567890123456"));
         }
 
         private sealed class ListLogger<T> : ILogger<T>

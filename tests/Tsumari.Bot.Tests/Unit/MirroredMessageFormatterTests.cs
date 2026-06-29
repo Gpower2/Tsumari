@@ -103,33 +103,33 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
-        public void FormatEditedLinkedMessageText_ReturnsTranslatedCrossChannelFormat()
+        public void FormatLinkedMessageText_ReturnsTranslatedCrossChannelFormat()
         {
-            var result = MirroredMessageFormatter.FormatEditedLinkedMessageText(10, 20, "Alice", "en", "de", "Hallo");
+            var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 20, "Alice", "en", "de", "Hallo");
 
             Assert.Equal("**Alice** (EN to DE):\nHallo", result);
         }
 
         [Fact]
-        public void FormatEditedLinkedMessageText_ReturnsTranslatedReplyFormat_ForSourceChannelReply()
+        public void FormatLinkedMessageText_ReturnsTranslatedReplyFormat_ForSourceChannelReply()
         {
-            var result = MirroredMessageFormatter.FormatEditedLinkedMessageText(10, 10, "Alice", "en", "de", "Hallo");
+            var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 10, "Alice", "en", "de", "Hallo");
 
             Assert.Equal("*(EN to DE):* Hallo", result);
         }
 
         [Fact]
-        public void FormatEditedLinkedMessageText_ReturnsRawFormat_WhenEditedSourceNowMatchesTargetLanguage()
+        public void FormatLinkedMessageText_ReturnsRawFormat_WhenEditedSourceNowMatchesTargetLanguage()
         {
-            var result = MirroredMessageFormatter.FormatEditedLinkedMessageText(10, 20, "Alice", "de", "de", "Hallo");
+            var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 20, "Alice", "de", "de", "Hallo");
 
             Assert.Equal("**Alice**:\nHallo", result);
         }
 
         [Fact]
-        public void FormatEditedLinkedMessageText_SwitchesReplyToRaw_WhenEditedSourceNowMatchesSourceChannelLanguage()
+        public void FormatLinkedMessageText_SwitchesReplyToRaw_WhenEditedSourceNowMatchesSourceChannelLanguage()
         {
-            var result = MirroredMessageFormatter.FormatEditedLinkedMessageText(10, 10, "Alice", "de", "de", "Hallo");
+            var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 10, "Alice", "de", "de", "Hallo");
 
             Assert.Equal("**Alice**:\nHallo", result);
         }

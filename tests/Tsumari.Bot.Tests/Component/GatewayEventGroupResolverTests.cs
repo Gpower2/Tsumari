@@ -1,7 +1,5 @@
 using Discord;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 using Tsumari.Bot.Services;
 using Xunit;
 
@@ -9,43 +7,18 @@ namespace Tsumari.Bot.Tests.Component
 {
     public class GatewayEventGroupResolverTests : IDisposable
     {
-        private readonly string _testDbPath;
+        private readonly TemporarySqliteDatabase _database;
         private readonly DatabaseService _dbService;
 
         public GatewayEventGroupResolverTests()
         {
-            _testDbPath = $"test_tsumari_gateway_resolver_{Guid.NewGuid():N}.db";
-
-            var configMock = new Mock<IConfiguration>();
-            configMock.Setup(configuration => configuration["Database:FilePath"]).Returns(_testDbPath);
-
-            _dbService = new DatabaseService(configMock.Object, NullLogger<DatabaseService>.Instance);
+            _database = new TemporarySqliteDatabase("gateway-resolver");
+            _dbService = _database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
         }
 
         public void Dispose()
         {
-            try
-            {
-                if (File.Exists(_testDbPath))
-                {
-                    File.Delete(_testDbPath);
-                }
-
-                var walFile = $"{_testDbPath}-wal";
-                if (File.Exists(walFile))
-                {
-                    File.Delete(walFile);
-                }
-
-                var shmFile = $"{_testDbPath}-shm";
-                if (File.Exists(shmFile))
-                {
-                    File.Delete(shmFile);
-                }
-            }
-            catch
-            {
-            }
+            _database.Dispose();
         }
 
         [Fact]

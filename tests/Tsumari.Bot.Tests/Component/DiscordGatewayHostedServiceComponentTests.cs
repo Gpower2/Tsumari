@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
 using Discord;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tsumari.Bot;
@@ -17,43 +15,18 @@ namespace Tsumari.Bot.Tests.Component
 {
     public class DiscordGatewayHostedServiceComponentTests : IDisposable
     {
-        private readonly string _testDbPath;
+        private readonly TemporarySqliteDatabase _database;
         private readonly DatabaseService _dbService;
 
         public DiscordGatewayHostedServiceComponentTests()
         {
-            _testDbPath = $"test_tsumari_gateway_component_{Guid.NewGuid():N}.db";
-
-            var configMock = new Mock<IConfiguration>();
-            configMock.Setup(c => c["Database:FilePath"]).Returns(_testDbPath);
-
-            _dbService = new DatabaseService(configMock.Object, NullLogger<DatabaseService>.Instance);
+            _database = new TemporarySqliteDatabase("gateway-component");
+            _dbService = _database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
         }
 
         public void Dispose()
         {
-            try
-            {
-                if (File.Exists(_testDbPath))
-                {
-                    File.Delete(_testDbPath);
-                }
-
-                var walFile = $"{_testDbPath}-wal";
-                if (File.Exists(walFile))
-                {
-                    File.Delete(walFile);
-                }
-
-                var shmFile = $"{_testDbPath}-shm";
-                if (File.Exists(shmFile))
-                {
-                    File.Delete(shmFile);
-                }
-            }
-            catch
-            {
-            }
+            _database.Dispose();
         }
 
         [Fact]
@@ -98,6 +71,15 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Equal("**Alice** (EN to IT):\nCiao mondo", italianChannel.SentMessages[0].Content);
             Assert.Null(italianChannel.SentMessages[0].ReplyReference);
             Assert.Equal(1, italianChannel.SentMessages[0].ModifyCallCount);
+
+            var expectedJumpButtons = new Dictionary<string, string>
+            {
+                ["Original"] = "https://discord.com/channels/1/10/100",
+                ["DE"] = $"https://discord.com/channels/1/20/{germanChannel.SentMessages[0].Id}",
+                ["IT"] = $"https://discord.com/channels/1/30/{italianChannel.SentMessages[0].Id}"
+            };
+            AssertJumpButtons(germanChannel.SentMessages[0].Components, expectedJumpButtons);
+            AssertJumpButtons(italianChannel.SentMessages[0].Components, expectedJumpButtons);
 
             var links = await _dbService.GetMirroredMessagesAsync(100UL);
             Assert.Equal(2, links.Count);
@@ -262,6 +244,51 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
+        public async Task HandleMessageReceivedAsync_SkipsNativeMismatchReply_WhenSourceChannelTranslationFails()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+            await _dbService.RegisterLocalChannelAsync(30UL, 10UL, "it");
+
+            var translationProvider = CreateTranslationProvider(
+                detections: new Dictionary<string, string>
+                {
+                    ["Hello from Germany"] = "EN"
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [("Hello from Germany", "IT")] = "Ciao dalla Germania"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            var italianChannel = new ChannelCapture(30UL, 1UL, "general-it");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+            discordMessageService.RegisterChannel(italianChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var message = CreateIncomingMessage(600UL, germanChannel.Channel, author, "Hello from Germany");
+
+            await hostedService.HandleMessageReceivedAsync(message.Object);
+
+            Assert.Empty(germanChannel.SentMessages);
+            Assert.Single(masterChannel.SentMessages);
+            Assert.Equal("**Alice**:\nHello from Germany", masterChannel.SentMessages[0].Content);
+            Assert.Single(italianChannel.SentMessages);
+            Assert.False(string.IsNullOrWhiteSpace(italianChannel.SentMessages[0].Content));
+
+            var links = await _dbService.GetMirroredMessagesAsync(600UL);
+            Assert.Equal(2, links.Count);
+            Assert.DoesNotContain(links, link => link.ChannelId == 20UL);
+            Assert.Contains(links, link => link.ChannelId == 10UL && link.LanguageCode == "MASTER");
+            Assert.Contains(links, link => link.ChannelId == 30UL && link.LanguageCode == "IT");
+        }
+
+        [Fact]
         public async Task HandleMessageUpdatedAsync_ModifiesExistingLinkedMessages_InPlace()
         {
             await _dbService.InitializeDatabaseAsync();
@@ -299,6 +326,113 @@ namespace Tsumari.Bot.Tests.Component
             var links = await _dbService.GetMirroredMessagesAsync(700UL);
             Assert.Single(links);
             Assert.Equal(720UL, links[0].MirroredMessageId);
+        }
+
+        [Fact]
+        public async Task HandleMessageUpdatedAsync_ModifiesLocalizedMismatchFamily_InPlace()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+            await _dbService.RegisterLocalChannelAsync(30UL, 10UL, "it");
+            await _dbService.RegisterLocalChannelAsync(40UL, 10UL, "en");
+            await _dbService.LinkMessagesAsync(700UL, 20UL, 710UL, 10UL, "master");
+            await _dbService.LinkMessagesAsync(700UL, 20UL, 720UL, 20UL, "de");
+            await _dbService.LinkMessagesAsync(700UL, 20UL, 730UL, 30UL, "it");
+            await _dbService.LinkMessagesAsync(700UL, 20UL, 740UL, 40UL, "en");
+
+            var translationProvider = CreateTranslationProvider(
+                detections: new Dictionary<string, string>
+                {
+                    ["Updated text"] = "EN"
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [("Updated text", "DE")] = "Aktualisierter Text",
+                    [("Updated text", "IT")] = "Testo aggiornato"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            var italianChannel = new ChannelCapture(30UL, 1UL, "general-it");
+            var englishChannel = new ChannelCapture(40UL, 1UL, "general-en");
+            var masterMirror = masterChannel.RegisterExistingMessage(710UL, "**Alice**:\nOld text");
+            var germanReply = germanChannel.RegisterExistingMessage(720UL, "*(EN to DE):* Alter Text");
+            var italianMirror = italianChannel.RegisterExistingMessage(730UL, "**Alice** (EN to IT):\nVecchio testo");
+            var englishMirror = englishChannel.RegisterExistingMessage(740UL, "**Alice**:\nOld text");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+            discordMessageService.RegisterChannel(italianChannel);
+            discordMessageService.RegisterChannel(englishChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var editedMessage = CreateIncomingMessage(700UL, germanChannel.Channel, author, "Updated text");
+
+            await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
+
+            Assert.Equal("**Alice**:\nUpdated text", masterMirror.Content);
+            Assert.Equal(1, masterMirror.ModifyCallCount);
+            Assert.Equal("*(EN to DE):* Aktualisierter Text", germanReply.Content);
+            Assert.Equal(1, germanReply.ModifyCallCount);
+            Assert.Equal("**Alice** (EN to IT):\nTesto aggiornato", italianMirror.Content);
+            Assert.Equal(1, italianMirror.ModifyCallCount);
+            Assert.Equal("**Alice**:\nUpdated text", englishMirror.Content);
+            Assert.Equal(1, englishMirror.ModifyCallCount);
+            Assert.Empty(masterChannel.SentMessages);
+            Assert.Empty(germanChannel.SentMessages);
+            Assert.Empty(italianChannel.SentMessages);
+            Assert.Empty(englishChannel.SentMessages);
+        }
+
+        [Fact]
+        public async Task HandleMessageUpdatedAsync_UsesFailureFallback_WhenLocalizedSiblingRetranslationFails()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+            await _dbService.RegisterLocalChannelAsync(30UL, 10UL, "it");
+            await _dbService.LinkMessagesAsync(700UL, 20UL, 710UL, 10UL, "master");
+            await _dbService.LinkMessagesAsync(700UL, 20UL, 720UL, 20UL, "de");
+            await _dbService.LinkMessagesAsync(700UL, 20UL, 730UL, 30UL, "it");
+
+            var translationProvider = CreateTranslationProvider(
+                detections: new Dictionary<string, string>
+                {
+                    ["Updated text"] = "EN"
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [("Updated text", "DE")] = "Aktualisierter Text"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            var italianChannel = new ChannelCapture(30UL, 1UL, "general-it");
+            var masterMirror = masterChannel.RegisterExistingMessage(710UL, "**Alice**:\nOld text");
+            var germanReply = germanChannel.RegisterExistingMessage(720UL, "*(EN to DE):* Alter Text");
+            var italianMirror = italianChannel.RegisterExistingMessage(730UL, "**Alice** (EN to IT):\nVecchio testo");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+            discordMessageService.RegisterChannel(italianChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var editedMessage = CreateIncomingMessage(700UL, germanChannel.Channel, author, "Updated text");
+
+            await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
+
+            Assert.Equal("**Alice**:\nUpdated text", masterMirror.Content);
+            Assert.Equal(1, masterMirror.ModifyCallCount);
+            Assert.Equal("*(EN to DE):* Aktualisierter Text", germanReply.Content);
+            Assert.Equal(1, germanReply.ModifyCallCount);
+            Assert.Equal("**Alice**:\nUpdated text *(Translation Failed)*", italianMirror.Content);
+            Assert.Equal(1, italianMirror.ModifyCallCount);
+            Assert.Empty(masterChannel.SentMessages);
+            Assert.Empty(germanChannel.SentMessages);
+            Assert.Empty(italianChannel.SentMessages);
         }
 
         [Fact]
@@ -403,7 +537,6 @@ namespace Tsumari.Bot.Tests.Component
                 reactionMirroringService,
                 NullLogger<DiscordGatewayEventProcessorService>.Instance);
 
-            var configMock = new Mock<IConfiguration>();
             var dispatcherMock = new Mock<IDiscordGatewayEventDispatcher>();
 
             return new DiscordGatewayHostedService(
@@ -413,7 +546,7 @@ namespace Tsumari.Bot.Tests.Component
                 dispatcherMock.Object,
                 eventProcessor,
                 null!,
-                configMock.Object,
+                null!,
                 NullLogger<DiscordGatewayHostedService>.Instance);
         }
 
@@ -511,6 +644,47 @@ namespace Tsumari.Bot.Tests.Component
             var field = typeof(ReactionMetadata).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
                 ?? throw new InvalidOperationException($"Could not find ReactionMetadata field '{fieldName}'.");
             field.SetValue(boxedReactionMetadata, value);
+        }
+
+        private static void AssertJumpButtons(
+            MessageComponent? components,
+            IReadOnlyDictionary<string, string> expectedButtons)
+        {
+            Assert.NotNull(components);
+            var actualButtons = ExtractButtonLinks(components!);
+            Assert.Equal(expectedButtons.Count, actualButtons.Count);
+
+            foreach (var expectedButton in expectedButtons)
+            {
+                Assert.True(actualButtons.TryGetValue(expectedButton.Key, out var actualUrl), $"Missing jump button '{expectedButton.Key}'.");
+                Assert.Equal(expectedButton.Value, actualUrl);
+            }
+        }
+
+        private static Dictionary<string, string> ExtractButtonLinks(MessageComponent components)
+        {
+            var buttons = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var topLevelComponent in components.Components)
+            {
+                if (topLevelComponent is ButtonComponent button)
+                {
+                    buttons[button.Label] = button.Url ?? string.Empty;
+                    continue;
+                }
+
+                if (topLevelComponent is not ActionRowComponent row)
+                {
+                    continue;
+                }
+
+                foreach (var rowButton in row.Components.OfType<ButtonComponent>())
+                {
+                    buttons[rowButton.Label] = rowButton.Url ?? string.Empty;
+                }
+            }
+
+            return buttons;
         }
 
         private sealed class ComponentDiscordMessageService : IDiscordMessageService

@@ -16,78 +16,28 @@ namespace Tsumari.Bot.Tests.Unit
         [Fact]
         public async Task HandleMessageReceivedAsync_SwallowsBoundaryExceptions()
         {
-            var client = new DiscordSocketClient(new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.None
-            });
-            var interactionService = new InteractionService(client, new InteractionServiceConfig());
-            var configMock = new Mock<IConfiguration>();
             var processorMock = new Mock<IDiscordGatewayEventProcessor>();
-            var hostedService = new DiscordGatewayHostedService(
-                client,
-                interactionService,
-                null!,
-                null!,
-                processorMock.Object,
-                null!,
-                configMock.Object,
-                NullLogger<DiscordGatewayHostedService>.Instance);
+            using var harness = CreateHarness(processorMock.Object);
             var messageMock = new Mock<IMessage>();
             messageMock.As<ISnowflakeEntity>().SetupGet(message => message.Id).Returns(12345UL);
 
-            try
-            {
-                await hostedService.HandleMessageReceivedAsync(messageMock.Object);
-            }
-            finally
-            {
-                hostedService.Dispose();
-                client.Dispose();
-            }
+            await harness.HostedService.HandleMessageReceivedAsync(messageMock.Object);
         }
 
         [Fact]
         public async Task HandleMessageUpdatedAsync_SwallowsBoundaryExceptions()
         {
-            var client = new DiscordSocketClient(new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.None
-            });
-            var interactionService = new InteractionService(client, new InteractionServiceConfig());
-            var configMock = new Mock<IConfiguration>();
             var processorMock = new Mock<IDiscordGatewayEventProcessor>();
-            var hostedService = new DiscordGatewayHostedService(
-                client,
-                interactionService,
-                null!,
-                null!,
-                processorMock.Object,
-                null!,
-                configMock.Object,
-                NullLogger<DiscordGatewayHostedService>.Instance);
+            using var harness = CreateHarness(processorMock.Object);
             var messageMock = new Mock<IMessage>();
             messageMock.As<ISnowflakeEntity>().SetupGet(message => message.Id).Returns(67890UL);
 
-            try
-            {
-                await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "before", messageMock.Object);
-            }
-            finally
-            {
-                hostedService.Dispose();
-                client.Dispose();
-            }
+            await harness.HostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "before", messageMock.Object);
         }
 
         [Fact]
         public async Task OnMessageDeletedAsync_ReturnsBeforeQueuedProcessingCompletes()
         {
-            var client = new DiscordSocketClient(new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.None
-            });
-            var interactionService = new InteractionService(client, new InteractionServiceConfig());
-            var configMock = new Mock<IConfiguration>();
             var processorStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var allowProcessingToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -110,184 +60,212 @@ namespace Tsumari.Bot.Tests.Unit
                 NullLogger<DiscordGatewayEventDispatcherService>.Instance);
             await dispatcher.StartAsync(CancellationToken.None);
 
-            var hostedService = new DiscordGatewayHostedService(
-                client,
-                interactionService,
-                null!,
-                dispatcher,
-                processorMock.Object,
-                null!,
-                configMock.Object,
-                NullLogger<DiscordGatewayHostedService>.Instance);
+            using var harness = CreateHarness(processorMock.Object, dispatcher, dispatcher);
             var messageCache = new Cacheable<IMessage, ulong>(null!, 12345UL, false, () => Task.FromResult<IMessage>(null!));
             var channelCache = new Cacheable<IMessageChannel, ulong>(null!, 10UL, false, () => Task.FromResult<IMessageChannel>(null!));
 
-            try
-            {
-                var invokeTask = InvokeHostedServiceAsync(
-                    hostedService,
-                    "OnMessageDeletedAsync",
-                    messageCache,
-                    channelCache);
+            var invokeTask = harness.HostedService.OnMessageDeletedAsync(messageCache, channelCache);
 
-                await invokeTask.WaitAsync(TimeSpan.FromSeconds(2));
-                await processorStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
-            }
-            finally
-            {
-                allowProcessingToFinish.TrySetResult();
-                await dispatcher.StopAsync(CancellationToken.None);
-                dispatcher.Dispose();
-                hostedService.Dispose();
-                client.Dispose();
-            }
+            await invokeTask.WaitAsync(TimeSpan.FromSeconds(2));
+            await processorStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            allowProcessingToFinish.TrySetResult();
         }
 
         [Fact]
-        public async Task EnsureInteractionCommandsInitializedAsync_OnlyLoadsModulesAndRegistersCommandsOnce()
+        public async Task EnsureReadyInitializationAsync_OnlyInitializesDatabaseLoadsModulesAndRegistersCommandsOnce()
         {
-            var client = new DiscordSocketClient(new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.None
-            });
-            var interactionService = new InteractionService(client, new InteractionServiceConfig());
-            var configMock = new Mock<IConfiguration>();
-            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
-            var hostedService = new DiscordGatewayHostedService(
-                client,
-                interactionService,
-                null!,
-                null!,
-                processorMock.Object,
-                null!,
-                configMock.Object,
-                NullLogger<DiscordGatewayHostedService>.Instance);
+            using var harness = CreateHarness();
+            var initializeDatabaseCallCount = 0;
             var addModulesCallCount = 0;
             var registerCommandsCallCount = 0;
 
-            try
-            {
-                await InvokeHostedServiceAsync(
-                    hostedService,
-                    "EnsureInteractionCommandsInitializedAsync",
-                    new Func<Task>(() =>
-                    {
-                        addModulesCallCount++;
-                        return Task.CompletedTask;
-                    }),
-                    new Func<Task>(() =>
-                    {
-                        registerCommandsCallCount++;
-                        return Task.CompletedTask;
-                    }));
+            await harness.HostedService.EnsureReadyInitializationAsync(
+                () =>
+                {
+                    initializeDatabaseCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    addModulesCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    registerCommandsCallCount++;
+                    return Task.CompletedTask;
+                });
 
-                await InvokeHostedServiceAsync(
-                    hostedService,
-                    "EnsureInteractionCommandsInitializedAsync",
-                    new Func<Task>(() =>
-                    {
-                        addModulesCallCount++;
-                        return Task.CompletedTask;
-                    }),
-                    new Func<Task>(() =>
-                    {
-                        registerCommandsCallCount++;
-                        return Task.CompletedTask;
-                    }));
+            await harness.HostedService.EnsureReadyInitializationAsync(
+                () =>
+                {
+                    initializeDatabaseCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    addModulesCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    registerCommandsCallCount++;
+                    return Task.CompletedTask;
+                });
 
-                Assert.Equal(1, addModulesCallCount);
-                Assert.Equal(1, registerCommandsCallCount);
-            }
-            finally
-            {
-                hostedService.Dispose();
-                client.Dispose();
-            }
+            Assert.Equal(1, initializeDatabaseCallCount);
+            Assert.Equal(1, addModulesCallCount);
+            Assert.Equal(1, registerCommandsCallCount);
         }
 
         [Fact]
-        public async Task EnsureInteractionCommandsInitializedAsync_RetriesCommandRegistrationWithoutReloadingModules()
+        public async Task EnsureReadyInitializationAsync_RetriesCommandRegistrationWithoutReloadingModulesOrDatabase()
         {
-            var client = new DiscordSocketClient(new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.None
-            });
-            var interactionService = new InteractionService(client, new InteractionServiceConfig());
-            var configMock = new Mock<IConfiguration>();
-            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
-            var hostedService = new DiscordGatewayHostedService(
-                client,
-                interactionService,
-                null!,
-                null!,
-                processorMock.Object,
-                null!,
-                configMock.Object,
-                NullLogger<DiscordGatewayHostedService>.Instance);
+            using var harness = CreateHarness();
+            var initializeDatabaseCallCount = 0;
             var addModulesCallCount = 0;
             var registerCommandsCallCount = 0;
 
-            try
-            {
-                await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                    InvokeHostedServiceAsync(
-                        hostedService,
-                        "EnsureInteractionCommandsInitializedAsync",
-                        new Func<Task>(() =>
-                        {
-                            addModulesCallCount++;
-                            return Task.CompletedTask;
-                        }),
-                        new Func<Task>(() =>
-                        {
-                            registerCommandsCallCount++;
-                            throw new InvalidOperationException("register failed");
-                        })));
-
-                await InvokeHostedServiceAsync(
-                    hostedService,
-                    "EnsureInteractionCommandsInitializedAsync",
-                    new Func<Task>(() =>
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                harness.HostedService.EnsureReadyInitializationAsync(
+                    () =>
+                    {
+                        initializeDatabaseCallCount++;
+                        return Task.CompletedTask;
+                    },
+                    () =>
                     {
                         addModulesCallCount++;
                         return Task.CompletedTask;
-                    }),
-                    new Func<Task>(() =>
+                    },
+                    () =>
+                    {
+                        registerCommandsCallCount++;
+                        throw new InvalidOperationException("register failed");
+                    }));
+
+            await harness.HostedService.EnsureReadyInitializationAsync(
+                () =>
+                {
+                    initializeDatabaseCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    addModulesCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    registerCommandsCallCount++;
+                    return Task.CompletedTask;
+                });
+
+            Assert.Equal(1, initializeDatabaseCallCount);
+            Assert.Equal(1, addModulesCallCount);
+            Assert.Equal(2, registerCommandsCallCount);
+        }
+
+        [Fact]
+        public async Task EnsureReadyInitializationAsync_RetriesDatabaseInitializationBeforeLoadingModules()
+        {
+            using var harness = CreateHarness();
+            var initializeDatabaseCallCount = 0;
+            var addModulesCallCount = 0;
+            var registerCommandsCallCount = 0;
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                harness.HostedService.EnsureReadyInitializationAsync(
+                    () =>
+                    {
+                        initializeDatabaseCallCount++;
+                        throw new InvalidOperationException("db failed");
+                    },
+                    () =>
+                    {
+                        addModulesCallCount++;
+                        return Task.CompletedTask;
+                    },
+                    () =>
                     {
                         registerCommandsCallCount++;
                         return Task.CompletedTask;
                     }));
 
-                Assert.Equal(1, addModulesCallCount);
-                Assert.Equal(2, registerCommandsCallCount);
-            }
-            finally
-            {
-                hostedService.Dispose();
-                client.Dispose();
-            }
+            await harness.HostedService.EnsureReadyInitializationAsync(
+                () =>
+                {
+                    initializeDatabaseCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    addModulesCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    registerCommandsCallCount++;
+                    return Task.CompletedTask;
+                });
+
+            Assert.Equal(2, initializeDatabaseCallCount);
+            Assert.Equal(1, addModulesCallCount);
+            Assert.Equal(1, registerCommandsCallCount);
         }
 
         [Fact]
-        public void RegisterAndUnregisterEventHandlers_AreIdempotent_AndRestoreSubscriberCounts()
+        public async Task EnsureReadyInitializationAsync_RetriesModuleLoadingWithoutReinitializingDatabaseOrRegisteringCommands()
         {
-            var client = new DiscordSocketClient(new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.None
-            });
-            var interactionService = new InteractionService(client, new InteractionServiceConfig());
-            var configMock = new Mock<IConfiguration>();
-            var processorMock = new Mock<IDiscordGatewayEventProcessor>();
-            var hostedService = new DiscordGatewayHostedService(
-                client,
-                interactionService,
-                null!,
-                null!,
-                processorMock.Object,
-                null!,
-                configMock.Object,
-                NullLogger<DiscordGatewayHostedService>.Instance);
+            using var harness = CreateHarness();
+            var initializeDatabaseCallCount = 0;
+            var addModulesCallCount = 0;
+            var registerCommandsCallCount = 0;
 
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                harness.HostedService.EnsureReadyInitializationAsync(
+                    () =>
+                    {
+                        initializeDatabaseCallCount++;
+                        return Task.CompletedTask;
+                    },
+                    () =>
+                    {
+                        addModulesCallCount++;
+                        throw new InvalidOperationException("module load failed");
+                    },
+                    () =>
+                    {
+                        registerCommandsCallCount++;
+                        return Task.CompletedTask;
+                    }));
+
+            await harness.HostedService.EnsureReadyInitializationAsync(
+                () =>
+                {
+                    initializeDatabaseCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    addModulesCallCount++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    registerCommandsCallCount++;
+                    return Task.CompletedTask;
+                });
+
+            Assert.Equal(1, initializeDatabaseCallCount);
+            Assert.Equal(2, addModulesCallCount);
+            Assert.Equal(1, registerCommandsCallCount);
+        }
+
+        [Fact]
+        public void RegisterAndUnregisterEventHandlers_AreIdempotent()
+        {
+            using var harness = CreateHarness();
             var clientEventFields = new[]
             {
                 "_logEvent",
@@ -306,38 +284,33 @@ namespace Tsumari.Bot.Tests.Unit
             {
                 "_logEvent"
             };
-
             var baselineCounts = clientEventFields.ToDictionary(
                 fieldName => $"client:{fieldName}",
-                fieldName => GetAsyncEventSubscriptionCount(client, fieldName));
+                fieldName => GetAsyncEventSubscriptionCount(harness.Client, fieldName));
             foreach (var fieldName in interactionEventFields)
             {
-                baselineCounts[$"interaction:{fieldName}"] = GetAsyncEventSubscriptionCount(interactionService, fieldName);
+                baselineCounts[$"interaction:{fieldName}"] = GetAsyncEventSubscriptionCount(harness.InteractionService, fieldName);
             }
 
-            try
-            {
-                InvokePrivateMethod(hostedService, "RegisterEventHandlers");
-                AssertSubscriberDeltas(client, clientEventFields, baselineCounts, expectedDelta: 1, "client");
-                AssertSubscriberDeltas(interactionService, interactionEventFields, baselineCounts, expectedDelta: 1, "interaction");
+            harness.HostedService.RegisterEventHandlers();
+            Assert.True(harness.HostedService.EventHandlersRegistered);
+            AssertSubscriberDeltas(harness.Client, clientEventFields, baselineCounts, expectedDelta: 1, "client");
+            AssertSubscriberDeltas(harness.InteractionService, interactionEventFields, baselineCounts, expectedDelta: 1, "interaction");
 
-                InvokePrivateMethod(hostedService, "RegisterEventHandlers");
-                AssertSubscriberDeltas(client, clientEventFields, baselineCounts, expectedDelta: 1, "client");
-                AssertSubscriberDeltas(interactionService, interactionEventFields, baselineCounts, expectedDelta: 1, "interaction");
+            harness.HostedService.RegisterEventHandlers();
+            Assert.True(harness.HostedService.EventHandlersRegistered);
+            AssertSubscriberDeltas(harness.Client, clientEventFields, baselineCounts, expectedDelta: 1, "client");
+            AssertSubscriberDeltas(harness.InteractionService, interactionEventFields, baselineCounts, expectedDelta: 1, "interaction");
 
-                InvokePrivateMethod(hostedService, "UnregisterEventHandlers");
-                AssertSubscriberDeltas(client, clientEventFields, baselineCounts, expectedDelta: 0, "client");
-                AssertSubscriberDeltas(interactionService, interactionEventFields, baselineCounts, expectedDelta: 0, "interaction");
+            harness.HostedService.UnregisterEventHandlers();
+            Assert.False(harness.HostedService.EventHandlersRegistered);
+            AssertSubscriberDeltas(harness.Client, clientEventFields, baselineCounts, expectedDelta: 0, "client");
+            AssertSubscriberDeltas(harness.InteractionService, interactionEventFields, baselineCounts, expectedDelta: 0, "interaction");
 
-                InvokePrivateMethod(hostedService, "UnregisterEventHandlers");
-                AssertSubscriberDeltas(client, clientEventFields, baselineCounts, expectedDelta: 0, "client");
-                AssertSubscriberDeltas(interactionService, interactionEventFields, baselineCounts, expectedDelta: 0, "interaction");
-            }
-            finally
-            {
-                hostedService.Dispose();
-                client.Dispose();
-            }
+            harness.HostedService.UnregisterEventHandlers();
+            Assert.False(harness.HostedService.EventHandlersRegistered);
+            AssertSubscriberDeltas(harness.Client, clientEventFields, baselineCounts, expectedDelta: 0, "client");
+            AssertSubscriberDeltas(harness.InteractionService, interactionEventFields, baselineCounts, expectedDelta: 0, "interaction");
         }
 
         private static void AssertSubscriberDeltas(
@@ -388,20 +361,56 @@ namespace Tsumari.Bot.Tests.Unit
             return null;
         }
 
-        private static void InvokePrivateMethod(object instance, string methodName)
+        private static HostedServiceHarness CreateHarness(
+            IDiscordGatewayEventProcessor? processor = null,
+            IDiscordGatewayEventDispatcher? dispatcher = null,
+            DiscordGatewayEventDispatcherService? managedDispatcher = null)
         {
-            var method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
-                ?? throw new InvalidOperationException($"Could not find private method '{methodName}' on {instance.GetType().FullName}.");
-            method.Invoke(instance, null);
+            return new HostedServiceHarness(
+                processor ?? Mock.Of<IDiscordGatewayEventProcessor>(),
+                dispatcher ?? Mock.Of<IDiscordGatewayEventDispatcher>(),
+                managedDispatcher);
         }
 
-        private static async Task InvokeHostedServiceAsync(object instance, string methodName, params object[] arguments)
+        private sealed class HostedServiceHarness : IDisposable
         {
-            var method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
-                ?? throw new InvalidOperationException($"Could not find private method '{methodName}' on {instance.GetType().FullName}.");
-            var task = (Task?)method.Invoke(instance, arguments)
-                ?? throw new InvalidOperationException($"Method '{methodName}' on {instance.GetType().FullName} did not return a task.");
-            await task;
+            private readonly DiscordGatewayEventDispatcherService? _managedDispatcher;
+
+            public HostedServiceHarness(
+                IDiscordGatewayEventProcessor processor,
+                IDiscordGatewayEventDispatcher dispatcher,
+                DiscordGatewayEventDispatcherService? managedDispatcher)
+            {
+                _managedDispatcher = managedDispatcher;
+                Client = new DiscordSocketClient(new DiscordSocketConfig
+                {
+                    GatewayIntents = GatewayIntents.None
+                });
+                InteractionService = new InteractionService(Client, new InteractionServiceConfig());
+                HostedService = new DiscordGatewayHostedService(
+                    Client,
+                    InteractionService,
+                    null!,
+                    dispatcher,
+                    processor,
+                    null!,
+                    new ConfigurationBuilder().Build(),
+                    NullLogger<DiscordGatewayHostedService>.Instance);
+            }
+
+            public DiscordSocketClient Client { get; }
+
+            public InteractionService InteractionService { get; }
+
+            public DiscordGatewayHostedService HostedService { get; }
+
+            public void Dispose()
+            {
+                _managedDispatcher?.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+                _managedDispatcher?.Dispose();
+                HostedService.Dispose();
+                Client.Dispose();
+            }
         }
     }
 }
