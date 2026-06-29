@@ -6,13 +6,15 @@ Discord CDN attachment URLs expire. Tsumari avoids stale CDN links by downloadin
 
 During `MirroredMessageRoutingService` fan-out:
 
-1. `DiscordMessagePublisherService.DownloadMediaAssetsAsync(...)` downloads each inbound attachment URL once.
-2. The download uses `HttpClient.GetAsync(..., HttpCompletionOption.ResponseHeadersRead)` plus `ReadBytesWithStatusCheckAsync(...)` so HTTP failures are surfaced with the full logged response details.
-3. The downloaded bytes are stored as:
+1. Tsumari first compares each `IAttachment.Size` against the current guild `MaxUploadLimit`.
+2. Attachments that exceed the current guild upload cap are skipped before any CDN download begins.
+3. `DiscordMessagePublisherService.DownloadMediaAssetsAsync(...)` downloads each remaining inbound attachment URL once.
+4. The download uses `HttpClient.GetAsync(..., HttpCompletionOption.ResponseHeadersRead)` plus `ReadBytesWithStatusCheckAsync(...)` so HTTP failures are surfaced with the full logged response details.
+5. The downloaded bytes are stored as:
    - filename
    - `byte[]`
-4. Every outbound destination gets a fresh `MemoryStream` created from the shared `byte[]`.
-5. `SendFilesAsync(...)` sends those streams as native Discord attachments.
+6. Every outbound destination gets a fresh `MemoryStream` created from the shared `byte[]`.
+7. `SendFilesAsync(...)` sends those streams as native Discord attachments.
 
 ## Why Separate Streams Are Created
 
@@ -34,6 +36,14 @@ original text
 ```
 
 The same button components are still attached to that fallback text message.
+
+If Tsumari can tell up front that one or more attachments exceed the current guild upload limit, it skips downloading those files entirely and appends a short localized note to the mirrored text:
+
+```text
+*(Attachment too large to mirror - use Original.)*
+```
+
+The exact wording is localized from the destination/source language context for the mirrored copy. That pre-check saves time on oversized uploads while still leaving the `Original` jump button available for the source message.
 
 ## Interaction with Message Edit Sync
 

@@ -116,5 +116,12 @@ namespace Tsumari.Bot.Logging
             Message = "Skipping localized routing for message {MessageId} in channel {ChannelId} because parent master channel {ParentChannelId} could not be resolved."
         )]
         public static partial void LogLocalizedParentChannelNotResolved(this ILogger logger, ulong messageId, ulong channelId, ulong parentChannelId);
+
+        [LoggerMessage(
+            EventId = 1116,
+            Level = LogLevel.Warning,
+            Message = "Message {MessageId} in channel {ChannelId} has attachments that exceed the guild upload limit of {MaxUploadLimitBytes} bytes and will not be mirrored: {Filenames}"
+        )]
+        public static partial void LogOversizedAttachmentsSkipped(this ILogger logger, ulong messageId, ulong channelId, ulong maxUploadLimitBytes, string filenames);
     }
 }

@@ -149,6 +149,50 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
+        public async Task HandleMessageReceivedAsync_SkipsOversizedAttachmentsBeforeDownload_AndFallsBackToTextNotice()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+
+            var translationProvider = CreateTranslationProvider();
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general", maxUploadLimit: 10UL);
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de", maxUploadLimit: 10UL);
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+
+            var requestCount = 0;
+            var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            {
+                requestCount++;
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent([1, 2, 3])
+                };
+            }));
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object, httpClient);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var attachmentMock = new Mock<IAttachment>();
+            attachmentMock.SetupGet(attachment => attachment.Filename).Returns("large-file.mp4");
+            attachmentMock.SetupGet(attachment => attachment.Url).Returns("https://cdn.example/large-file.mp4");
+            attachmentMock.SetupGet(attachment => attachment.Size).Returns(11);
+            var message = CreateIncomingMessage(
+                100UL,
+                masterChannel.Channel,
+                author,
+                string.Empty,
+                attachments: [attachmentMock.Object]);
+
+            await hostedService.HandleMessageReceivedAsync(message.Object);
+
+            Assert.Single(germanChannel.SentMessages);
+            Assert.Equal("**Alice**:\n*(Anhang zu gross zum Spiegeln - nutze Original.)*", germanChannel.SentMessages[0].Content);
+            Assert.Equal(0, germanChannel.SentMessages[0].AttachedFileCount);
+            Assert.Equal(0, requestCount);
+        }
+
+        [Fact]
         public async Task HandleMessageReceivedAsync_MirrorsRepliesAcrossChannels_ForLocalizedMismatchFlow()
         {
             await _dbService.InitializeDatabaseAsync();
@@ -571,7 +615,7 @@ namespace Tsumari.Bot.Tests.Component
             private readonly Dictionary<ulong, TrackedUserMessage> _messages = [];
             private ulong _nextMessageId;
 
-            public ChannelCapture(ulong channelId, ulong guildId, string name)
+            public ChannelCapture(ulong channelId, ulong guildId, string name, ulong maxUploadLimit = 26214400UL)
             {
                 Id = channelId;
                 Name = name;
@@ -580,6 +624,7 @@ namespace Tsumari.Bot.Tests.Component
 
                 var guildMock = new Mock<IGuild>();
                 guildMock.As<ISnowflakeEntity>().SetupGet(guild => guild.Id).Returns(guildId);
+                guildMock.SetupGet(guild => guild.MaxUploadLimit).Returns(maxUploadLimit);
 
                 var channelMock = new Mock<IMessageChannel>();
                 channelMock.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(channelId);

@@ -108,6 +108,7 @@ E:\Development\Tsumari\
 │           ├── LanguageCodeService.cs
 │           ├── LinkedMessageDeletionService.cs
 │           ├── MirroredMessageFormatter.cs
+│           ├── MirroredMessageNoticeLocalizer.cs
 │           ├── MirroredMessageRoutingService.cs
 │           ├── ReplyMirroringService.cs
 │           ├── ReactionMirroringService.cs
@@ -137,6 +138,7 @@ E:\Development\Tsumari\
             ├── HttpResponseExtensionsTests.cs
             ├── LanguageCodeServiceTests.cs
             ├── MirroredMessageFormatterTests.cs
+            ├── MirroredMessageNoticeLocalizerTests.cs
             ├── MirroredMessageRoutingServiceTests.cs
             ├── OllamaTranslationProviderTests.cs
             ├── OpenAITranslationProviderTests.cs

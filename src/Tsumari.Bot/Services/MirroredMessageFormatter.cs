@@ -45,6 +45,19 @@ namespace Tsumari.Bot.Services
                 : $"**{authorName}**:\n{content}";
         }
 
+        public static string AppendAttachmentMirrorNotice(string content, string? languageCode, bool hasOversizedAttachments)
+        {
+            if (!hasOversizedAttachments)
+            {
+                return content;
+            }
+
+            var notice = MirroredMessageNoticeLocalizer.GetOversizedAttachmentNotice(languageCode);
+            return string.IsNullOrWhiteSpace(content)
+                ? notice
+                : $"{content}\n{notice}";
+        }
+
         public static string? ResolveLinkedMessageTargetLanguageCode(string? storedLanguageCode, string? configuredTargetLanguageCode)
         {
             if (!string.IsNullOrWhiteSpace(configuredTargetLanguageCode))

@@ -84,19 +84,20 @@ namespace Tsumari.Bot.Services
             var content = message.Content ?? string.Empty;
             var detectedLang = await DetectLanguageAsync(content, isLocalized, channelId);
             var replyContext = await _replyMirroringService.ResolveReplyContextAsync(channelId, message.Reference);
-            var mediaAssets = hasAttachments
-                ? await _discordMessagePublisherService.DownloadMediaAssetsAsync(message.Attachments)
-                : [];
             var authorName = MirroredMessageFormatter.ResolveAuthorDisplayName(message.Author);
+            var attachmentPlan = BuildAttachmentMirroringPlan(message, hasAttachments);
+            var mediaAssets = attachmentPlan.AttachmentsToDownload.Count > 0
+                ? await _discordMessagePublisherService.DownloadMediaAssetsAsync(attachmentPlan.AttachmentsToDownload)
+                : [];
 
             if (isMaster)
             {
                 var sourceLang = LanguageCodeService.NormalizeLanguageCode(detectedLang);
-                await RouteMasterMessageAsync(message, content, sourceLang, authorName, replyContext, mediaAssets);
+                await RouteMasterMessageAsync(message, content, sourceLang, authorName, replyContext, mediaAssets, attachmentPlan.HasOversizedAttachments);
                 return;
             }
 
-            await RouteLocalizedMessageAsync(message, content, detectedLang, authorName, replyContext, mediaAssets);
+            await RouteLocalizedMessageAsync(message, content, detectedLang, authorName, replyContext, mediaAssets, attachmentPlan.HasOversizedAttachments);
         }
 
         private async Task<string> DetectLanguageAsync(string content, bool isLocalizedChannel, ulong channelId)
@@ -132,7 +133,8 @@ namespace Tsumari.Bot.Services
             string sourceLang,
             string authorName,
             ReplyMirroringContext? replyContext,
-            IReadOnlyCollection<MediaAsset> mediaAssets)
+            IReadOnlyCollection<MediaAsset> mediaAssets,
+            bool hasOversizedAttachments)
         {
             var channelId = message.Channel.Id;
             var localizedChannels = await _dbService.GetLocalizedChannelsForMasterAsync(channelId);
@@ -182,6 +184,11 @@ namespace Tsumari.Bot.Services
                     textToSend = MirroredMessageFormatter.FormatMirroredAuthorText(authorName, content);
                 }
 
+                textToSend = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
+                    textToSend,
+                    localizedChannel.TargetLanguageCode,
+                    hasOversizedAttachments);
+
                 var sentMessage = await _discordMessagePublisherService.SendMessageWithFilesAsync(
                     channel,
                     textToSend,
@@ -212,7 +219,8 @@ namespace Tsumari.Bot.Services
             string detectedLang,
             string authorName,
             ReplyMirroringContext? replyContext,
-            IReadOnlyCollection<MediaAsset> mediaAssets)
+            IReadOnlyCollection<MediaAsset> mediaAssets,
+            bool hasOversizedAttachments)
         {
             var channelId = message.Channel.Id;
             var parentMasterId = await _dbService.GetParentMasterChannelIdAsync(channelId);
@@ -254,6 +262,7 @@ namespace Tsumari.Bot.Services
                     authorName,
                     replyContext,
                     mediaAssets,
+                    hasOversizedAttachments,
                     targetLang,
                     parentMasterId.Value,
                     parentChannel,
@@ -270,6 +279,7 @@ namespace Tsumari.Bot.Services
                 authorName,
                 replyContext,
                 mediaAssets,
+                hasOversizedAttachments,
                 targetLang,
                 parentMasterId.Value,
                 parentChannel,
@@ -285,6 +295,7 @@ namespace Tsumari.Bot.Services
             string authorName,
             ReplyMirroringContext? replyContext,
             IReadOnlyCollection<MediaAsset> mediaAssets,
+            bool hasOversizedAttachments,
             string targetLang,
             ulong parentMasterId,
             IMessageChannel parentChannel,
@@ -293,7 +304,10 @@ namespace Tsumari.Bot.Services
             MessageComponent initialComponents)
         {
             var parentReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, parentChannel.Id);
-            var parentText = MirroredMessageFormatter.FormatMirroredAuthorText(authorName, content);
+            var parentText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
+                MirroredMessageFormatter.FormatMirroredAuthorText(authorName, content),
+                sourceLang,
+                hasOversizedAttachments);
             var parentSentMessage = await _discordMessagePublisherService.SendMessageWithFilesAsync(
                 parentChannel,
                 parentText,
@@ -338,6 +352,11 @@ namespace Tsumari.Bot.Services
                     siblingText = MirroredMessageFormatter.FormatMirroredAuthorText(authorName, string.Empty);
                 }
 
+                siblingText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
+                    siblingText,
+                    sibling.TargetLanguageCode,
+                    hasOversizedAttachments);
+
                 var siblingSentMessage = await _discordMessagePublisherService.SendMessageWithFilesAsync(
                     siblingChannel,
                     siblingText,
@@ -369,6 +388,7 @@ namespace Tsumari.Bot.Services
             string authorName,
             ReplyMirroringContext? replyContext,
             IReadOnlyCollection<MediaAsset> mediaAssets,
+            bool hasOversizedAttachments,
             string targetLang,
             ulong parentMasterId,
             IMessageChannel parentChannel,
@@ -382,9 +402,13 @@ namespace Tsumari.Bot.Services
                 try
                 {
                     var nativeTranslation = await _translationService.TranslateTextAsync(content, targetLang);
+                    var nativeReplyText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
+                        MirroredMessageFormatter.FormatTranslatedReplyText(sourceLang, targetLang, nativeTranslation),
+                        targetLang,
+                        hasOversizedAttachments);
                     var nativeReply = await _discordMessagePublisherService.SendMessageWithFilesAsync(
                         message.Channel,
-                        MirroredMessageFormatter.FormatTranslatedReplyText(sourceLang, targetLang, nativeTranslation),
+                        nativeReplyText,
                         [],
                         components: null,
                         nativeReplyReference);
@@ -402,7 +426,10 @@ namespace Tsumari.Bot.Services
             }
 
             var parentReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, parentChannel.Id);
-            var parentText = MirroredMessageFormatter.FormatMirroredAuthorText(authorName, content);
+            var parentText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
+                MirroredMessageFormatter.FormatMirroredAuthorText(authorName, content),
+                sourceLang,
+                hasOversizedAttachments);
             var parentSentMessage = await _discordMessagePublisherService.SendMessageWithFilesAsync(
                 parentChannel,
                 parentText,
@@ -452,6 +479,11 @@ namespace Tsumari.Bot.Services
                     siblingText = MirroredMessageFormatter.FormatMirroredAuthorText(authorName, string.Empty);
                 }
 
+                siblingText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
+                    siblingText,
+                    sibling.TargetLanguageCode,
+                    hasOversizedAttachments);
+
                 var siblingSentMessage = await _discordMessagePublisherService.SendMessageWithFilesAsync(
                     siblingChannel,
                     siblingText,
@@ -474,6 +506,51 @@ namespace Tsumari.Bot.Services
             }
 
             await _discordMessagePublisherService.EditJumpButtonsIntoSentMessagesAsync(message, sentMessages, targets);
+        }
+
+        private AttachmentMirroringPlan BuildAttachmentMirroringPlan(IUserMessage message, bool hasAttachments)
+        {
+            if (!hasAttachments || message.Attachments == null || message.Attachments.Count == 0)
+            {
+                return AttachmentMirroringPlan.Empty;
+            }
+
+            if (message.Channel is not IGuildChannel guildChannel || guildChannel.Guild.MaxUploadLimit == 0)
+            {
+                return new AttachmentMirroringPlan(message.Attachments, HasOversizedAttachments: false);
+            }
+
+            var mirrorableAttachments = new List<IAttachment>(message.Attachments.Count);
+            var oversizedFilenames = new List<string>();
+
+            foreach (var attachment in message.Attachments)
+            {
+                if ((ulong)attachment.Size > guildChannel.Guild.MaxUploadLimit)
+                {
+                    oversizedFilenames.Add(attachment.Filename);
+                    continue;
+                }
+
+                mirrorableAttachments.Add(attachment);
+            }
+
+            if (oversizedFilenames.Count > 0)
+            {
+                _logger.LogOversizedAttachmentsSkipped(
+                    message.Id,
+                    message.Channel.Id,
+                    guildChannel.Guild.MaxUploadLimit,
+                    string.Join(", ", oversizedFilenames));
+            }
+
+            return new AttachmentMirroringPlan(mirrorableAttachments, oversizedFilenames.Count > 0);
+        }
+
+        private readonly record struct AttachmentMirroringPlan(
+            IReadOnlyCollection<IAttachment> AttachmentsToDownload,
+            bool HasOversizedAttachments)
+        {
+            public static AttachmentMirroringPlan Empty { get; } = new([], false);
         }
     }
 }
