@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -213,6 +214,41 @@ namespace Tsumari.Bot.Tests.Component
             // Assert
             Assert.Equal(0, initialUsage);
             Assert.Equal(350, finalUsage);
+        }
+
+        [Fact]
+        public async Task InitializeDatabaseAsync_LogsDatabaseStatusSummary()
+        {
+            var logger = new Tsumari.Bot.Tests.ListLogger<DatabaseService>();
+            var dbService = _database.CreateDatabaseService(logger);
+
+            await dbService.InitializeDatabaseAsync();
+            await dbService.AddMasterChannelAsync(111UL);
+            await dbService.AddMasterChannelAsync(222UL);
+            await dbService.RegisterLocalChannelAsync(333UL, 111UL, "de");
+            await dbService.RegisterLocalChannelAsync(444UL, 111UL, "el");
+            await dbService.LinkMessagesAsync(9000UL, 111UL, 9001UL, 111UL, "master");
+            await dbService.LinkMessagesAsync(9000UL, 111UL, 9002UL, 333UL, "de");
+            await dbService.LinkMessagesAsync(9003UL, 222UL, 9004UL, 444UL, "el");
+            await dbService.IncrementUsageAsync(100);
+            await dbService.IncrementUsageAsync(250);
+
+            logger.Entries.Clear();
+
+            await dbService.InitializeDatabaseAsync();
+
+            var fileStatusLog = logger.Entries.Single(entry => entry.EventId.Id == 1009);
+            var contentStatusLog = logger.Entries.Single(entry => entry.EventId.Id == 1010);
+
+            Assert.Contains(Path.GetFullPath(_database.DatabasePath), fileStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("Last write (UTC):", fileStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("2 master channels", contentStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("2 localized channels", contentStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("4 configured channels", contentStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("2 linked message families", contentStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("3 mirrored message links", contentStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("2 localized message links", contentStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("350 provider characters this month", contentStatusLog.Message, StringComparison.Ordinal);
         }
 
         [Fact]

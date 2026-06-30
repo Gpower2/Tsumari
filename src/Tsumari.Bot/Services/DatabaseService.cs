@@ -12,6 +12,7 @@ namespace Tsumari.Bot.Services
     public class DatabaseService
     {
         private readonly string _connectionString;
+        private readonly string _databaseFilePath;
         private readonly ILogger<DatabaseService> _logger;
 
         public DatabaseService(IConfiguration configuration, ILogger<DatabaseService> logger)
@@ -20,11 +21,12 @@ namespace Tsumari.Bot.Services
             
             // Allow setting from config or default to localized database
             var dbPath = configuration["Database:FilePath"] ?? "tsumari.db";
+            _databaseFilePath = Path.GetFullPath(dbPath);
             
             // Build SQLite connection string with optimization flags
             var builder = new SqliteConnectionStringBuilder
             {
-                DataSource = dbPath,
+                DataSource = _databaseFilePath,
                 Mode = SqliteOpenMode.ReadWriteCreate,
                 Cache = SqliteCacheMode.Shared,
                 ForeignKeys = true
@@ -115,6 +117,15 @@ namespace Tsumari.Bot.Services
                  
                 await transaction.CommitAsync();
                 _logger.LogDatabaseTablesInitialized();
+
+                try
+                {
+                    await LogDatabaseStatusAsync(connection);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDatabaseStatusCaptureFailed(ex);
+                }
             }
             catch (Exception ex)
             {
@@ -147,6 +158,49 @@ namespace Tsumari.Bot.Services
             }
 
             return false;
+        }
+
+        private async Task LogDatabaseStatusAsync(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT
+                    (SELECT COUNT(*) FROM MasterChannels) AS MasterChannelCount,
+                    (SELECT COUNT(*) FROM LocalizedChannels) AS LocalizedChannelCount,
+                    (SELECT COUNT(DISTINCT OriginalMessageId) FROM MessageLinks) AS LinkedMessageFamilyCount,
+                    (SELECT COUNT(*) FROM MessageLinks) AS MirroredMessageCount,
+                    (SELECT COUNT(*) FROM MessageLinks WHERE UPPER(LanguageCode) != 'MASTER') AS LocalizedMessageLinkCount,
+                    COALESCE((SELECT CharacterCount FROM UsageTracker WHERE YearMonth = $ym LIMIT 1), 0) AS CurrentMonthCharacterCount;";
+            cmd.Parameters.AddWithValue("$ym", GetCurrentYearMonth());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            await reader.ReadAsync();
+
+            var masterChannelCount = reader.GetInt64(0);
+            var localizedChannelCount = reader.GetInt64(1);
+            var linkedMessageFamilyCount = reader.GetInt64(2);
+            var mirroredMessageCount = reader.GetInt64(3);
+            var localizedMessageLinkCount = reader.GetInt64(4);
+            var currentMonthCharacterCount = reader.GetInt64(5);
+            var configuredChannelCount = masterChannelCount + localizedChannelCount;
+
+            // We only log metrics that are stored explicitly. The schema does not currently
+            // distinguish true translations from same-language localized pass-through mirrors.
+            var databaseFileInfo = new FileInfo(_databaseFilePath);
+            var databaseFileSizeBytes = databaseFileInfo.Exists ? databaseFileInfo.Length : 0;
+            var databaseFileLastWriteUtc = databaseFileInfo.Exists
+                ? databaseFileInfo.LastWriteTimeUtc.ToString("O")
+                : "unknown";
+
+            _logger.LogDatabaseFileStatus(_databaseFilePath, databaseFileSizeBytes, databaseFileLastWriteUtc);
+            _logger.LogDatabaseContentStatus(
+                masterChannelCount,
+                localizedChannelCount,
+                configuredChannelCount,
+                linkedMessageFamilyCount,
+                mirroredMessageCount,
+                localizedMessageLinkCount,
+                currentMonthCharacterCount);
         }
 
         // ==========================================
