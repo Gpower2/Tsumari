@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using DeepL;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Tsumari.Bot.Models;
+using Tsumari.Bot.Services;
 
 namespace Tsumari.Bot.TranslationProviders
 {
@@ -53,7 +55,7 @@ namespace Tsumari.Bot.TranslationProviders
 
         public bool UsesCharacterQuota => true;
 
-        public async Task<string> DetectLanguageAsync(string text)
+        public async Task<LanguageAnalysisResult> AnalyzeLanguageAsync(string text)
         {
             if (!IsActive)
             {
@@ -61,10 +63,13 @@ namespace Tsumari.Bot.TranslationProviders
             }
 
             var response = await _translator!.TranslateTextAsync(text, null, "EN-US");
-            return response.DetectedSourceLanguageCode.ToUpperInvariant();
+            return LanguageAnalysisResult.SingleLanguage(
+                response.DetectedSourceLanguageCode.ToUpperInvariant(),
+                isMixed: null,
+                hasClearDominantLanguage: null);
         }
 
-        public async Task<string> TranslateTextAsync(string text, string targetLanguageCode)
+        public async Task<string> TranslateTextAsync(string text, string targetLanguageCode, string? sourceLanguageCode = null)
         {
             if (!IsActive)
             {
@@ -72,7 +77,11 @@ namespace Tsumari.Bot.TranslationProviders
             }
 
             var normalizedTargetLanguageCode = await _deepLLanguageService.NormalizeTargetLanguageCodeAsync(targetLanguageCode);
-            var response = await _translator!.TranslateTextAsync(text, null, normalizedTargetLanguageCode);
+            var normalizedSourceLanguageCode = _deepLLanguageService.NormalizeSourceLanguageCode(sourceLanguageCode);
+            var response = await _translator!.TranslateTextAsync(
+                text,
+                string.IsNullOrWhiteSpace(normalizedSourceLanguageCode) ? null : normalizedSourceLanguageCode,
+                normalizedTargetLanguageCode);
             return response.Text;
         }
     }

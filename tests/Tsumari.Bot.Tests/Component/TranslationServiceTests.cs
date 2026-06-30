@@ -76,7 +76,58 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
-        public async Task DetectLanguageAsync_LogsTruncatedPreview()
+        public async Task TranslateTextAsync_PassesSourceLanguageHintToProvider()
+        {
+            using var database = new TemporarySqliteDatabase("translation-service");
+            var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
+            await dbService.InitializeDatabaseAsync();
+
+            var transLogger = NullLogger<TranslationService>.Instance;
+            var loggerFactory = new NullLoggerFactory();
+            var providerMock = new Mock<ITranslationProvider>();
+            providerMock.SetupGet(p => p.UsesCharacterQuota).Returns(false);
+            providerMock.SetupGet(p => p.IsActive).Returns(true);
+            providerMock
+                .Setup(p => p.TranslateTextAsync("Si Tasos , sanno essere divertenti", "EN", "IT"))
+                .ReturnsAsync("Yes, Tasos, they can be fun.");
+            var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
+
+            var result = await transService.TranslateTextAsync("Si Tasos , sanno essere divertenti", "EN", "IT");
+
+            Assert.Equal("Yes, Tasos, they can be fun.", result);
+            providerMock.Verify(p => p.TranslateTextAsync("Si Tasos , sanno essere divertenti", "EN", "IT"), Times.Once);
+        }
+
+        [Fact]
+        public async Task AnalyzeLanguageAsync_FailureDoesNotBlockSubsequentTranslation()
+        {
+            using var database = new TemporarySqliteDatabase("translation-service");
+            var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
+            await dbService.InitializeDatabaseAsync();
+
+            var transLogger = NullLogger<TranslationService>.Instance;
+            var loggerFactory = new NullLoggerFactory();
+            var providerMock = new Mock<ITranslationProvider>();
+            providerMock.SetupGet(p => p.UsesCharacterQuota).Returns(false);
+            providerMock.SetupGet(p => p.IsActive).Returns(true);
+            providerMock
+                .Setup(p => p.AnalyzeLanguageAsync("Updated text"))
+                .ThrowsAsync(new InvalidOperationException("analysis failed"));
+            providerMock
+                .Setup(p => p.TranslateTextAsync("Updated text", "DE", "EN"))
+                .ReturnsAsync("Aktualisierter Text");
+            var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => transService.AnalyzeLanguageAsync("Updated text"));
+
+            var result = await transService.TranslateTextAsync("Updated text", "DE", "EN");
+
+            Assert.Equal("Aktualisierter Text", result);
+            providerMock.Verify(p => p.TranslateTextAsync("Updated text", "DE", "EN"), Times.Once);
+        }
+
+        [Fact]
+        public async Task AnalyzeLanguageAsync_LogsTruncatedPreview()
         {
             using var database = new TemporarySqliteDatabase("translation-service");
             var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
@@ -87,16 +138,16 @@ namespace Tsumari.Bot.Tests.Component
             var providerMock = new Mock<ITranslationProvider>();
             providerMock.SetupGet(p => p.UsesCharacterQuota).Returns(false);
             providerMock.SetupGet(p => p.IsActive).Returns(true);
-            providerMock.Setup(p => p.DetectLanguageAsync(It.IsAny<string>())).ReturnsAsync("EN");
+            providerMock.Setup(p => p.AnalyzeLanguageAsync(It.IsAny<string>())).ReturnsAsync(LanguageAnalysisResult.SingleLanguage("EN"));
             var transService = new TranslationService(dbService, providerMock.Object, transLogger, loggerFactory);
 
-            var result = await transService.DetectLanguageAsync("12345678901234567890");
+            var result = await transService.AnalyzeLanguageAsync("12345678901234567890");
 
-            Assert.Equal("EN", result);
+            Assert.Equal("EN", result.PrimaryLanguageCode);
             Assert.Contains(
                 transLogger.Entries,
                 entry => entry.Level == LogLevel.Information
-                    && entry.Message.Contains("Language detected: 'EN'")
+                    && entry.Message.Contains("primary 'EN'")
                     && entry.Message.Contains("123456789012345")
                     && !entry.Message.Contains("1234567890123456"));
         }

@@ -76,6 +76,25 @@ namespace Tsumari.Bot.Tests.Unit
             httpClientFactoryMock.Verify(factory => factory.CreateClient(It.IsAny<string>()), Times.Never);
         }
 
+        [Theory]
+        [InlineData("en-us", "EN")]
+        [InlineData("pt-br", "PT")]
+        [InlineData("zh-hans", "ZH")]
+        [InlineData("fr", "FR")]
+        public void NormalizeSourceLanguageCode_StripsLocaleVariants(string input, string expected)
+        {
+            var configMock = new Mock<IConfiguration>();
+            var httpClientFactoryMock = new Mock<IHttpClientFactory>(MockBehavior.Strict);
+            var service = new DeepLLanguageService(
+                configMock.Object,
+                httpClientFactoryMock.Object,
+                NullLogger<DeepLLanguageService>.Instance);
+
+            var result = service.NormalizeSourceLanguageCode(input);
+
+            Assert.Equal(expected, result);
+        }
+
         private static DeepLLanguageService CreateService(string? jsonResponse, HttpStatusCode statusCode = HttpStatusCode.OK)
         {
             var configMock = new Mock<IConfiguration>();

@@ -25,6 +25,21 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task AnalyzeLanguageAsync_ParsesStructuredChoiceMessageContent()
+        {
+            var provider = CreateProvider("""{ "choices": [ { "message": { "content": "{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.7},{\"languageCode\":\"FR\",\"share\":0.3}],\"isMixed\":true,\"hasClearDominantLanguage\":true}" } } ] }""");
+
+            var result = await provider.AnalyzeLanguageAsync("Ma cherie! How are you doing?");
+
+            Assert.Equal("EN", result.PrimaryLanguageCode);
+            Assert.Equal(2, result.DetectedLanguages.Count);
+            Assert.Equal("EN", result.DetectedLanguages[0].LanguageCode);
+            Assert.Equal("FR", result.DetectedLanguages[1].LanguageCode);
+            Assert.True(result.IsMixed);
+            Assert.True(result.HasClearDominantLanguage);
+        }
+
+        [Fact]
         public async Task TranslateTextAsync_ThrowsMeaningfulError_WhenResponseIsNotJson()
         {
             var provider = CreateProvider("not-json");

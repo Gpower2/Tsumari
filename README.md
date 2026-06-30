@@ -7,9 +7,9 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Cluster-based routing:** one master channel can fan out to multiple localized channels, and localized channels can route back into the cluster.
 - **Bi-directional flows:** supports master-to-localized routing plus localized match/mismatch routing.
 - **Pluggable translation backends:** `DeepL`, `Ollama`, and `OpenAI` (OpenAI-compatible chat-completions endpoint).
-- **Automatic language detection:** every text message is detected before routing decisions are made.
+- **Best-effort language analysis:** every text message is analyzed before routing decisions are made, including mixed-language/code-switched messages when the selected provider can infer them.
 - **Separate locale targets:** locale tags such as `pt` and `pt-br` are preserved as distinct translation targets and are not collapsed together during fan-out.
-- **Clear translated headers:** cross-channel translated mirrors use `**Author** (XX to YY):`, while same-channel localized mismatch replies use `*(XX to YY):*`.
+- **Clear translated headers:** single-language translations keep `XX to YY`, while mixed-language translations surface the detected source list as `XX,YY => ZZ`.
 - **Jump-link buttons:** generated bot messages are edited after send so they can include `Original` plus language-code buttons for other generated copies.
 - **Reply mirroring:** when a user replies to a tracked message, mirrored bot messages reply to the corresponding linked message in each destination channel.
 - **Edited-message synchronization:** when a user edits a text message, mirrored bot messages are updated in place.
@@ -19,7 +19,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Gateway-safe dispatching:** Discord gateway callbacks enqueue work immediately, then a dispatcher routes events into per-linked-group FIFO workers so local-LLM latency does not block the gateway task.
 - **SQLite persistence:** channel mappings, mirrored message IDs, and usage tracking are stored in SQLite.
 - **DeepL quota protection:** the monthly `500,000` character guard is enforced only when `Translation.Provider` is `DeepL`.
-- **Built-in resiliency:** translation/detection calls are wrapped in a custom retry + circuit-breaker helper.
+- **Built-in resiliency:** translation/language-analysis calls are wrapped in a custom retry + circuit-breaker helper.
 
 ## Current Behavior Notes
 
@@ -76,6 +76,7 @@ E:\Development\Tsumari\
 │       │   ├── DiscordReactionEvent.cs
 │       │   ├── GatewayIngressEvent.cs
 │       │   ├── JumpLinkTarget.cs
+│       │   ├── LanguageAnalysisResult.cs
 │       │   ├── LinkedMessageFamily.cs
 │       │   ├── MediaAsset.cs
 │       │   ├── ReplyMirroringContext.cs

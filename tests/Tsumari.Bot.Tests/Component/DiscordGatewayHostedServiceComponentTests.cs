@@ -289,6 +289,206 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
+        public async Task HandleMessageReceivedAsync_FallsBackToEnglish_WhenAnalysisFailsInLocalizedChannel()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+            await _dbService.RegisterLocalChannelAsync(30UL, 10UL, "it");
+
+            var translationProvider = CreateTranslationProvider(
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [("Hello from Germany", "DE")] = "Hallo aus Deutschland",
+                    [("Hello from Germany", "IT")] = "Ciao dalla Germania"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            var italianChannel = new ChannelCapture(30UL, 1UL, "general-it");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+            discordMessageService.RegisterChannel(italianChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var message = CreateIncomingMessage(601UL, germanChannel.Channel, author, "Hello from Germany");
+
+            await hostedService.HandleMessageReceivedAsync(message.Object);
+
+            Assert.Single(germanChannel.SentMessages);
+            Assert.Equal("*(EN to DE):* Hallo aus Deutschland", germanChannel.SentMessages[0].Content);
+            Assert.Single(masterChannel.SentMessages);
+            Assert.Equal("**Alice**:\nHello from Germany", masterChannel.SentMessages[0].Content);
+            Assert.Single(italianChannel.SentMessages);
+            Assert.Equal("**Alice** (EN to IT):\nCiao dalla Germania", italianChannel.SentMessages[0].Content);
+            translationProvider.Verify(provider =>
+                provider.TranslateTextAsync(
+                    "Hello from Germany",
+                    It.Is<string>(targetLanguage => LanguageCodeService.AreSameLanguageCode(targetLanguage, "DE")),
+                    "EN"),
+                Times.Never);
+            translationProvider.Verify(provider =>
+                provider.TranslateTextAsync(
+                    "Hello from Germany",
+                    It.Is<string>(targetLanguage => LanguageCodeService.AreSameLanguageCode(targetLanguage, "DE")),
+                    null),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task HandleMessageReceivedAsync_DoesNotPassSourceHint_WhenDominantLanguageIsNotClear()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+
+            const string content = "Thank you fratello! How are you doing?";
+            var translationProvider = CreateTranslationProvider(
+                analyses: new Dictionary<string, LanguageAnalysisResult>
+                {
+                    [content] = new(
+                        "EN",
+                        [
+                            new DetectedLanguage("EN", 0.55),
+                            new DetectedLanguage("IT", 0.45)
+                        ],
+                        isMixed: true,
+                        hasClearDominantLanguage: false)
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [(content, "DE")] = "Danke Bruder! Wie geht es dir?"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var message = CreateIncomingMessage(602UL, masterChannel.Channel, author, content);
+
+            await hostedService.HandleMessageReceivedAsync(message.Object);
+
+            Assert.Single(germanChannel.SentMessages);
+            Assert.Equal("**Alice** (EN,IT => DE):\nDanke Bruder! Wie geht es dir?", germanChannel.SentMessages[0].Content);
+            translationProvider.Verify(provider =>
+                provider.TranslateTextAsync(
+                    content,
+                    It.Is<string>(targetLanguage => LanguageCodeService.AreSameLanguageCode(targetLanguage, "DE")),
+                    "EN"),
+                Times.Never);
+            translationProvider.Verify(provider =>
+                provider.TranslateTextAsync(
+                    content,
+                    It.Is<string>(targetLanguage => LanguageCodeService.AreSameLanguageCode(targetLanguage, "DE")),
+                    null),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task HandleMessageReceivedAsync_TreatsFratelloExampleAsEnglishDominantInLocalizedItalianChannel()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "it");
+            await _dbService.RegisterLocalChannelAsync(30UL, 10UL, "de");
+
+            const string content = "Thank you fratello! 🤗\nThings are already heating up, they are placing bets like crazy 😅";
+            var translationProvider = CreateTranslationProvider(
+                analyses: new Dictionary<string, LanguageAnalysisResult>
+                {
+                    [content] = new(
+                        "EN",
+                        [
+                            new DetectedLanguage("EN", 0.88),
+                            new DetectedLanguage("IT", 0.12)
+                        ],
+                        isMixed: true,
+                        hasClearDominantLanguage: true)
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [(content, "IT")] = "Grazie fratello! 🤗\nLe cose si stanno gia scaldando, stanno scommettendo come matti 😅",
+                    [(content, "DE")] = "Danke Bruder! 🤗\nDie Lage heizt sich schon auf, sie wetten wie verrueckt 😅"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var italianChannel = new ChannelCapture(20UL, 1UL, "general-it");
+            var germanChannel = new ChannelCapture(30UL, 1UL, "general-de");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(italianChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var message = CreateIncomingMessage(650UL, italianChannel.Channel, author, content);
+
+            await hostedService.HandleMessageReceivedAsync(message.Object);
+
+            Assert.Single(italianChannel.SentMessages);
+            Assert.Equal("*(EN,IT => IT):* Grazie fratello! 🤗\nLe cose si stanno gia scaldando, stanno scommettendo come matti 😅", italianChannel.SentMessages[0].Content);
+            Assert.Single(masterChannel.SentMessages);
+            Assert.Equal($"**Alice**:\n{content}", masterChannel.SentMessages[0].Content);
+            Assert.Single(germanChannel.SentMessages);
+            Assert.Equal("**Alice** (EN,IT => DE):\nDanke Bruder! 🤗\nDie Lage heizt sich schon auf, sie wetten wie verrueckt 😅", germanChannel.SentMessages[0].Content);
+        }
+
+        [Fact]
+        public async Task HandleMessageReceivedAsync_TreatsMaCherieExampleAsEnglishDominantInLocalizedFrenchChannel()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "fr");
+            await _dbService.RegisterLocalChannelAsync(30UL, 10UL, "el");
+
+            const string content = "Ma cherie! How are you doing?";
+            var translationProvider = CreateTranslationProvider(
+                analyses: new Dictionary<string, LanguageAnalysisResult>
+                {
+                    [content] = new(
+                        "EN",
+                        [
+                            new DetectedLanguage("EN", 0.67),
+                            new DetectedLanguage("FR", 0.33)
+                        ],
+                        isMixed: true,
+                        hasClearDominantLanguage: true)
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [(content, "FR")] = "Ma cherie ! Comment vas-tu ?",
+                    [(content, "EL")] = "Μα σερί! Τι κάνεις;"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var frenchChannel = new ChannelCapture(20UL, 1UL, "general-fr");
+            var greekChannel = new ChannelCapture(30UL, 1UL, "general-el");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(frenchChannel);
+            discordMessageService.RegisterChannel(greekChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var message = CreateIncomingMessage(660UL, frenchChannel.Channel, author, content);
+
+            await hostedService.HandleMessageReceivedAsync(message.Object);
+
+            Assert.Single(frenchChannel.SentMessages);
+            Assert.Equal("*(EN,FR => FR):* Ma cherie ! Comment vas-tu ?", frenchChannel.SentMessages[0].Content);
+            Assert.Single(masterChannel.SentMessages);
+            Assert.Equal($"**Alice**:\n{content}", masterChannel.SentMessages[0].Content);
+            Assert.Single(greekChannel.SentMessages);
+            Assert.Equal("**Alice** (EN,FR => EL):\nΜα σερί! Τι κάνεις;", greekChannel.SentMessages[0].Content);
+        }
+
+        [Fact]
         public async Task HandleMessageUpdatedAsync_ModifiesExistingLinkedMessages_InPlace()
         {
             await _dbService.InitializeDatabaseAsync();
@@ -326,6 +526,103 @@ namespace Tsumari.Bot.Tests.Component
             var links = await _dbService.GetMirroredMessagesAsync(700UL);
             Assert.Single(links);
             Assert.Equal(720UL, links[0].MirroredMessageId);
+        }
+
+        [Fact]
+        public async Task HandleMessageUpdatedAsync_UsesMixedLanguageLabelForEditedMasterMessage()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+            await _dbService.LinkMessagesAsync(701UL, 10UL, 721UL, 20UL, "de");
+
+            const string content = "Thank you fratello! 🤗\nThings are already heating up, they are placing bets like crazy 😅";
+            var translationProvider = CreateTranslationProvider(
+                analyses: new Dictionary<string, LanguageAnalysisResult>
+                {
+                    [content] = new(
+                        "EN",
+                        [
+                            new DetectedLanguage("EN", 0.88),
+                            new DetectedLanguage("IT", 0.12)
+                        ],
+                        isMixed: true,
+                        hasClearDominantLanguage: true)
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [(content, "DE")] = "Danke Bruder! 🤗\nDie Lage heizt sich schon auf, sie wetten wie verrueckt 😅"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            var mirroredMessage = germanChannel.RegisterExistingMessage(721UL, "**Alice** (EN to DE):\nOld text");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var editedMessage = CreateIncomingMessage(701UL, masterChannel.Channel, author, content);
+
+            await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
+
+            Assert.Equal("**Alice** (EN,IT => DE):\nDanke Bruder! 🤗\nDie Lage heizt sich schon auf, sie wetten wie verrueckt 😅", mirroredMessage.Content);
+            Assert.Equal(1, mirroredMessage.ModifyCallCount);
+        }
+
+        [Fact]
+        public async Task HandleMessageUpdatedAsync_DoesNotPassSourceHint_WhenDominantLanguageIsNotClear()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+            await _dbService.LinkMessagesAsync(703UL, 10UL, 723UL, 20UL, "de");
+
+            const string content = "Thank you fratello! How are you doing?";
+            var translationProvider = CreateTranslationProvider(
+                analyses: new Dictionary<string, LanguageAnalysisResult>
+                {
+                    [content] = new(
+                        "EN",
+                        [
+                            new DetectedLanguage("EN", 0.55),
+                            new DetectedLanguage("IT", 0.45)
+                        ],
+                        isMixed: true,
+                        hasClearDominantLanguage: false)
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [(content, "DE")] = "Danke Bruder! Wie geht es dir?"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            var mirroredMessage = germanChannel.RegisterExistingMessage(723UL, "**Alice** (EN to DE):\nOld text");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var editedMessage = CreateIncomingMessage(703UL, masterChannel.Channel, author, content);
+
+            await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
+
+            Assert.Equal("**Alice** (EN,IT => DE):\nDanke Bruder! Wie geht es dir?", mirroredMessage.Content);
+            translationProvider.Verify(provider =>
+                provider.TranslateTextAsync(
+                    content,
+                    It.Is<string>(targetLanguage => LanguageCodeService.AreSameLanguageCode(targetLanguage, "DE")),
+                    "EN"),
+                Times.Never);
+            translationProvider.Verify(provider =>
+                provider.TranslateTextAsync(
+                    content,
+                    It.Is<string>(targetLanguage => LanguageCodeService.AreSameLanguageCode(targetLanguage, "DE")),
+                    null),
+                Times.Once);
         }
 
         [Fact]
@@ -384,6 +681,64 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Empty(germanChannel.SentMessages);
             Assert.Empty(italianChannel.SentMessages);
             Assert.Empty(englishChannel.SentMessages);
+        }
+
+        [Fact]
+        public async Task HandleMessageUpdatedAsync_FallsBackToEnglish_WhenAnalysisFailsInLocalizedChannel()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+            await _dbService.RegisterLocalChannelAsync(30UL, 10UL, "it");
+            await _dbService.RegisterLocalChannelAsync(40UL, 10UL, "en");
+            await _dbService.LinkMessagesAsync(702UL, 20UL, 712UL, 10UL, "master");
+            await _dbService.LinkMessagesAsync(702UL, 20UL, 722UL, 20UL, "de");
+            await _dbService.LinkMessagesAsync(702UL, 20UL, 732UL, 30UL, "it");
+            await _dbService.LinkMessagesAsync(702UL, 20UL, 742UL, 40UL, "en");
+
+            var translationProvider = CreateTranslationProvider(
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [("Updated text", "DE")] = "Aktualisierter Text",
+                    [("Updated text", "IT")] = "Testo aggiornato"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general");
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
+            var italianChannel = new ChannelCapture(30UL, 1UL, "general-it");
+            var englishChannel = new ChannelCapture(40UL, 1UL, "general-en");
+            var masterMirror = masterChannel.RegisterExistingMessage(712UL, "**Alice**:\nOld text");
+            var germanReply = germanChannel.RegisterExistingMessage(722UL, "*(EN to DE):* Alter Text");
+            var italianMirror = italianChannel.RegisterExistingMessage(732UL, "**Alice** (EN to IT):\nVecchio testo");
+            var englishMirror = englishChannel.RegisterExistingMessage(742UL, "**Alice**:\nOld text");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+            discordMessageService.RegisterChannel(italianChannel);
+            discordMessageService.RegisterChannel(englishChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var editedMessage = CreateIncomingMessage(702UL, germanChannel.Channel, author, "Updated text");
+
+            await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
+
+            Assert.Equal("**Alice**:\nUpdated text", masterMirror.Content);
+            Assert.Equal("*(EN to DE):* Aktualisierter Text", germanReply.Content);
+            Assert.Equal("**Alice** (EN to IT):\nTesto aggiornato", italianMirror.Content);
+            Assert.Equal("**Alice**:\nUpdated text", englishMirror.Content);
+            translationProvider.Verify(provider =>
+                provider.TranslateTextAsync(
+                    "Updated text",
+                    It.Is<string>(targetLanguage => LanguageCodeService.AreSameLanguageCode(targetLanguage, "DE")),
+                    "EN"),
+                Times.Never);
+            translationProvider.Verify(provider =>
+                provider.TranslateTextAsync(
+                    "Updated text",
+                    It.Is<string>(targetLanguage => LanguageCodeService.AreSameLanguageCode(targetLanguage, "DE")),
+                    null),
+                Times.Once);
         }
 
         [Fact]
@@ -552,28 +907,35 @@ namespace Tsumari.Bot.Tests.Component
 
         private static Mock<ITranslationProvider> CreateTranslationProvider(
             Dictionary<string, string>? detections = null,
+            Dictionary<string, LanguageAnalysisResult>? analyses = null,
             Dictionary<(string Text, string TargetLanguage), string>? translations = null)
         {
             detections ??= [];
+            analyses ??= [];
             translations ??= [];
 
             var providerMock = new Mock<ITranslationProvider>();
             providerMock.SetupGet(provider => provider.IsActive).Returns(true);
             providerMock.SetupGet(provider => provider.UsesCharacterQuota).Returns(false);
             providerMock
-                .Setup(provider => provider.DetectLanguageAsync(It.IsAny<string>()))
+                .Setup(provider => provider.AnalyzeLanguageAsync(It.IsAny<string>()))
                 .ReturnsAsync((string text) =>
                 {
-                    if (detections.TryGetValue(text, out var detectedLanguage))
+                    if (analyses.TryGetValue(text, out var analysis))
                     {
-                        return detectedLanguage;
+                        return analysis;
                     }
 
-                    throw new InvalidOperationException($"No detection configured for '{text}'.");
+                    if (detections.TryGetValue(text, out var detectedLanguage))
+                    {
+                        return LanguageAnalysisResult.SingleLanguage(detectedLanguage);
+                    }
+
+                    throw new InvalidOperationException($"No language analysis configured for '{text}'.");
                 });
             providerMock
-                .Setup(provider => provider.TranslateTextAsync(It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync((string text, string targetLanguage) =>
+                .Setup(provider => provider.TranslateTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+                .ReturnsAsync((string text, string targetLanguage, string? _) =>
                 {
                     var normalizedTargetLanguage = LanguageCodeService.NormalizeLanguageCode(targetLanguage);
                     if (translations.TryGetValue((text, normalizedTargetLanguage), out var translatedText))

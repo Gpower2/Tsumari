@@ -37,6 +37,16 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Theory]
+        [InlineData("EN", "en-us", true)]
+        [InlineData("PT-BR", "pt", true)]
+        [InlineData("PT-BR", "pt-pt", true)]
+        [InlineData("EN", "de", false)]
+        public void AreSameLanguageFamily_MatchesBaseLanguage(string left, string right, bool expected)
+        {
+            Assert.Equal(expected, LanguageCodeService.AreSameLanguageFamily(left, right));
+        }
+
+        [Theory]
         [InlineData("PT", "pt-br", true)]
         [InlineData("PT", "pt", true)]
         [InlineData("EN", "en-us", true)]
@@ -56,6 +66,43 @@ namespace Tsumari.Bot.Tests.Unit
         public void ResolveSourceLanguageCode_PreservesConfiguredSourceLocaleWhenCompatible(string detected, string configured, string expected)
         {
             Assert.Equal(expected, LanguageCodeService.ResolveSourceLanguageCode(detected, configured));
+        }
+
+        [Fact]
+        public void ResolveSourceLanguageInfo_PrefersConfiguredPrimaryLocale_AndDedupesGenericSourceLanguage()
+        {
+            var analysis = new LanguageAnalysisResult(
+                "EN",
+                [
+                    new DetectedLanguage("EN", 0.88),
+                    new DetectedLanguage("IT", 0.12)
+                ],
+                isMixed: true,
+                hasClearDominantLanguage: true);
+
+            var result = LanguageCodeService.ResolveSourceLanguageInfo(analysis, "en-us");
+
+            Assert.Equal("EN-US", result.PrimaryLanguageCode);
+            Assert.Equal(["EN-US", "IT"], result.LabelLanguageCodes);
+        }
+
+        [Fact]
+        public void ResolveSourceLanguageInfo_PreservesMixedLanguageOrder()
+        {
+            var analysis = new LanguageAnalysisResult(
+                "EN",
+                [
+                    new DetectedLanguage("EN", 0.60),
+                    new DetectedLanguage("FR", 0.25),
+                    new DetectedLanguage("IT", 0.15)
+                ],
+                isMixed: true,
+                hasClearDominantLanguage: true);
+
+            var result = LanguageCodeService.ResolveSourceLanguageInfo(analysis, null);
+
+            Assert.Equal("EN", result.PrimaryLanguageCode);
+            Assert.Equal(["EN", "FR", "IT"], result.LabelLanguageCodes);
         }
 
     }

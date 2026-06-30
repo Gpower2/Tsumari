@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Discord;
 using Microsoft.Extensions.Logging;
+using Tsumari.Bot.Models;
 
 namespace Tsumari.Bot.Services
 {
@@ -81,7 +82,7 @@ namespace Tsumari.Bot.Services
             }
 
             var content = message.Content ?? string.Empty;
-            var detectedLang = await DetectLanguageAsync(content, channelRoutingContext.TargetLanguageCode);
+            var analysisContext = await AnalyzeLanguageAsync(content, channelRoutingContext.TargetLanguageCode);
             var replyContext = await _replyMirroringService.ResolveReplyContextAsync(message.Channel.Id, message.Reference);
             var authorName = MirroredMessageFormatter.ResolveAuthorDisplayName(message.Author);
             var attachmentPlan = BuildAttachmentMirroringPlan(message, hasAttachments);
@@ -91,15 +92,24 @@ namespace Tsumari.Bot.Services
 
             if (isMaster)
             {
-                var sourceLang = LanguageCodeService.NormalizeLanguageCode(detectedLang);
-                await RouteMasterMessageAsync(message, content, sourceLang, authorName, replyContext, mediaAssets, attachmentPlan.HasOversizedAttachments);
+                var sourceLanguageInfo = LanguageCodeService.ResolveSourceLanguageInfo(analysisContext.Analysis, currentChannelLanguageCode: null);
+                await RouteMasterMessageAsync(
+                    message,
+                    content,
+                    sourceLanguageInfo,
+                    authorName,
+                    replyContext,
+                    mediaAssets,
+                    attachmentPlan.HasOversizedAttachments,
+                    analysisContext.IsTranslationSourceLanguageHintTrusted ? sourceLanguageInfo.PrimaryLanguageCode : null);
                 return;
             }
 
             await RouteLocalizedMessageAsync(
                 message,
                 content,
-                detectedLang,
+                analysisContext.Analysis,
+                analysisContext.IsTranslationSourceLanguageHintTrusted,
                 authorName,
                 replyContext,
                 mediaAssets,
@@ -107,37 +117,52 @@ namespace Tsumari.Bot.Services
                 channelRoutingContext);
         }
 
-        private async Task<string> DetectLanguageAsync(string content, string? localizedChannelLanguageCode)
+        private async Task<LanguageAnalysisContext> AnalyzeLanguageAsync(string content, string? localizedChannelLanguageCode)
         {
             if (!string.IsNullOrWhiteSpace(content))
             {
                 try
                 {
-                    return await _translationService.DetectLanguageAsync(content);
+                    var analysis = await _translationService.AnalyzeLanguageAsync(content);
+                    return new LanguageAnalysisContext(
+                        analysis,
+                        IsTranslationSourceLanguageHintTrusted: analysis.HasClearDominantLanguage != false);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogLanguageDetectionFailedFallbackToEnglish(ex);
-                    return "EN";
+                    return new LanguageAnalysisContext(
+                        CreateAnalysisFailureFallbackLanguageAnalysis(),
+                        IsTranslationSourceLanguageHintTrusted: false);
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(localizedChannelLanguageCode))
-            {
-                return LanguageCodeService.NormalizeLanguageCode(localizedChannelLanguageCode);
-            }
+            return new LanguageAnalysisContext(
+                CreateAttachmentOnlyFallbackLanguageAnalysis(localizedChannelLanguageCode),
+                IsTranslationSourceLanguageHintTrusted: false);
+        }
 
-            return "EN";
+        private static LanguageAnalysisResult CreateAttachmentOnlyFallbackLanguageAnalysis(string? localizedChannelLanguageCode)
+        {
+            return !string.IsNullOrWhiteSpace(localizedChannelLanguageCode)
+                ? LanguageAnalysisResult.SingleLanguage(LanguageCodeService.NormalizeLanguageCode(localizedChannelLanguageCode))
+                : LanguageAnalysisResult.SingleLanguage("EN");
+        }
+
+        private static LanguageAnalysisResult CreateAnalysisFailureFallbackLanguageAnalysis()
+        {
+            return LanguageAnalysisResult.SingleLanguage("EN");
         }
 
         private async Task RouteMasterMessageAsync(
             IUserMessage message,
             string content,
-            string sourceLang,
+            SourceLanguageInfo sourceLanguageInfo,
             string authorName,
             ReplyMirroringContext? replyContext,
             IReadOnlyCollection<MediaAsset> mediaAssets,
-            bool hasOversizedAttachments)
+            bool hasOversizedAttachments,
+            string? translationSourceLanguageCode)
         {
             var channelId = message.Channel.Id;
             var localizedChannels = await _dbService.GetLocalizedChannelsForMasterAsync(channelId);
@@ -168,7 +193,8 @@ namespace Tsumari.Bot.Services
                     channelId,
                     channel.Id,
                     authorName,
-                    sourceLang,
+                    sourceLanguageInfo,
+                    translationSourceLanguageCode,
                     localizedChannel.TargetLanguageCode,
                     content,
                     ex => _logger.LogMasterTranslationFailedForwardingRaw(ex, message.Id, localizedChannel.TargetLanguageCode));
@@ -198,7 +224,8 @@ namespace Tsumari.Bot.Services
         private async Task RouteLocalizedMessageAsync(
             IUserMessage message,
             string content,
-            string detectedLang,
+            LanguageAnalysisResult languageAnalysis,
+            bool isTranslationSourceLanguageHintTrusted,
             string authorName,
             ReplyMirroringContext? replyContext,
             IReadOnlyCollection<MediaAsset> mediaAssets,
@@ -222,8 +249,11 @@ namespace Tsumari.Bot.Services
                 return;
             }
 
-            var sourceLang = LanguageCodeService.ResolveSourceLanguageCode(detectedLang, targetLang);
-            var isMatch = LanguageCodeService.AreSameLanguageCode(sourceLang, targetLang);
+            var sourceLanguageInfo = LanguageCodeService.ResolveSourceLanguageInfo(languageAnalysis, targetLang);
+            var translationSourceLanguageCode = isTranslationSourceLanguageHintTrusted
+                ? sourceLanguageInfo.PrimaryLanguageCode
+                : null;
+            var isMatch = LanguageCodeService.AreSameLanguageCode(sourceLanguageInfo.PrimaryLanguageCode, targetLang);
 
             var sentMessages = new Dictionary<ulong, IUserMessage>();
             var targets = new List<JumpLinkTarget>
@@ -239,7 +269,8 @@ namespace Tsumari.Bot.Services
                 await RouteLocalizedMatchFlowAsync(
                     message,
                     content,
-                    sourceLang,
+                    sourceLanguageInfo,
+                    translationSourceLanguageCode,
                     authorName,
                     replyContext,
                     mediaAssets,
@@ -254,7 +285,8 @@ namespace Tsumari.Bot.Services
             await RouteLocalizedMismatchFlowAsync(
                 message,
                 content,
-                sourceLang,
+                sourceLanguageInfo,
+                translationSourceLanguageCode,
                 authorName,
                 replyContext,
                 mediaAssets,
@@ -269,7 +301,8 @@ namespace Tsumari.Bot.Services
         private async Task RouteLocalizedMatchFlowAsync(
             IUserMessage message,
             string content,
-            string sourceLang,
+            SourceLanguageInfo sourceLanguageInfo,
+            string? translationSourceLanguageCode,
             string authorName,
             ReplyMirroringContext? replyContext,
             IReadOnlyCollection<MediaAsset> mediaAssets,
@@ -285,10 +318,10 @@ namespace Tsumari.Bot.Services
                     message.Channel.Id,
                     parentChannel.Id,
                     authorName,
-                    sourceLang,
+                    sourceLanguageInfo,
                     targetLang: null,
                     content),
-                sourceLang,
+                sourceLanguageInfo.PrimaryLanguageCode,
                 hasOversizedAttachments);
             await SendAndTrackMirrorAsync(
                 message,
@@ -317,7 +350,8 @@ namespace Tsumari.Bot.Services
                     message.Channel.Id,
                     siblingChannel.Id,
                     authorName,
-                    sourceLang,
+                    sourceLanguageInfo,
+                    translationSourceLanguageCode,
                     sibling.TargetLanguageCode,
                     content,
                     ex => _logger.LogMatchFlowSiblingTranslationFailed(ex, sibling.TargetLanguageCode));
@@ -347,7 +381,8 @@ namespace Tsumari.Bot.Services
         private async Task RouteLocalizedMismatchFlowAsync(
             IUserMessage message,
             string content,
-            string sourceLang,
+            SourceLanguageInfo sourceLanguageInfo,
+            string? translationSourceLanguageCode,
             string authorName,
             ReplyMirroringContext? replyContext,
             IReadOnlyCollection<MediaAsset> mediaAssets,
@@ -363,13 +398,13 @@ namespace Tsumari.Bot.Services
                 var nativeReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, message.Channel.Id);
                 try
                 {
-                    var nativeTranslation = await _translationService.TranslateTextAsync(content, targetLang);
+                    var nativeTranslation = await _translationService.TranslateTextAsync(content, targetLang, translationSourceLanguageCode);
                     var nativeReplyText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
                         MirroredMessageFormatter.FormatLinkedMessageText(
                             message.Channel.Id,
                             message.Channel.Id,
                             authorName,
-                            sourceLang,
+                            sourceLanguageInfo,
                             targetLang,
                             nativeTranslation),
                         targetLang,
@@ -398,10 +433,10 @@ namespace Tsumari.Bot.Services
                     message.Channel.Id,
                     parentChannel.Id,
                     authorName,
-                    sourceLang,
+                    sourceLanguageInfo,
                     targetLang: null,
                     content),
-                sourceLang,
+                sourceLanguageInfo.PrimaryLanguageCode,
                 hasOversizedAttachments);
             await SendAndTrackMirrorAsync(
                 message,
@@ -430,7 +465,8 @@ namespace Tsumari.Bot.Services
                     message.Channel.Id,
                     siblingChannel.Id,
                     authorName,
-                    sourceLang,
+                    sourceLanguageInfo,
+                    translationSourceLanguageCode,
                     sibling.TargetLanguageCode,
                     content,
                     ex => _logger.LogMismatchFlowSiblingTranslationFailed(ex, sibling.TargetLanguageCode));
@@ -468,18 +504,19 @@ namespace Tsumari.Bot.Services
             ulong sourceChannelId,
             ulong destinationChannelId,
             string authorName,
-            string sourceLang,
+            SourceLanguageInfo sourceLanguageInfo,
+            string? translationSourceLanguageCode,
             string? targetLang,
             string content,
             Action<Exception> logTranslationFailure)
         {
-            if (!MirroredMessageFormatter.ShouldTranslateLinkedMessage(sourceLang, targetLang) || string.IsNullOrWhiteSpace(content))
+            if (!MirroredMessageFormatter.ShouldTranslateLinkedMessage(sourceLanguageInfo.PrimaryLanguageCode, targetLang) || string.IsNullOrWhiteSpace(content))
             {
                 return MirroredMessageFormatter.FormatLinkedMessageText(
                     sourceChannelId,
                     destinationChannelId,
                     authorName,
-                    sourceLang,
+                    sourceLanguageInfo,
                     targetLang,
                     content);
             }
@@ -487,12 +524,12 @@ namespace Tsumari.Bot.Services
             var translationTargetLanguage = targetLang!;
             try
             {
-                var translatedText = await _translationService.TranslateTextAsync(content, translationTargetLanguage);
+                var translatedText = await _translationService.TranslateTextAsync(content, translationTargetLanguage, translationSourceLanguageCode);
                 return MirroredMessageFormatter.FormatLinkedMessageText(
                     sourceChannelId,
                     destinationChannelId,
                     authorName,
-                    sourceLang,
+                    sourceLanguageInfo,
                     translationTargetLanguage,
                     translatedText);
             }
@@ -503,7 +540,7 @@ namespace Tsumari.Bot.Services
                     sourceChannelId,
                     destinationChannelId,
                     authorName,
-                    sourceLang,
+                    sourceLanguageInfo,
                     translationTargetLanguage,
                     content);
             }
@@ -591,5 +628,9 @@ namespace Tsumari.Bot.Services
         {
             public static AttachmentMirroringPlan Empty { get; } = new([], false);
         }
+
+        private readonly record struct LanguageAnalysisContext(
+            LanguageAnalysisResult Analysis,
+            bool IsTranslationSourceLanguageHintTrusted);
     }
 }

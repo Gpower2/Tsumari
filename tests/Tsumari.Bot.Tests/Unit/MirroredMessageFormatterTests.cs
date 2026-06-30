@@ -19,6 +19,16 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public void FormatLanguagePair_Returns_MixedLanguage_Format()
+        {
+            var sourceLanguageInfo = new SourceLanguageInfo("EN", ["EN", "IT"]);
+
+            var result = MirroredMessageFormatter.FormatLanguagePair(sourceLanguageInfo, "de");
+
+            Assert.Equal("(EN,IT => DE)", result);
+        }
+
+        [Fact]
         public void BuildJumpUrl_ReturnsGuildUrl_ForGuildMessages()
         {
             var channelMock = new Mock<IMessageChannel>();
@@ -71,6 +81,16 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public void FormatTranslatedReplyText_ReturnsMixedLanguageReplyFormat()
+        {
+            var sourceLanguageInfo = new SourceLanguageInfo("EN", ["EN", "IT"]);
+
+            var result = MirroredMessageFormatter.FormatTranslatedReplyText(sourceLanguageInfo, "de", "Hallo");
+
+            Assert.Equal("*(EN,IT => DE):* Hallo", result);
+        }
+
+        [Fact]
         public void FormatMirroredAuthorText_OmitsBlankLine_WhenContentIsEmpty()
         {
             var result = MirroredMessageFormatter.FormatMirroredAuthorText("Alice", string.Empty);
@@ -116,6 +136,16 @@ namespace Tsumari.Bot.Tests.Unit
             var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 10, "Alice", "en", "de", "Hallo");
 
             Assert.Equal("*(EN to DE):* Hallo", result);
+        }
+
+        [Fact]
+        public void FormatLinkedMessageText_ReturnsTranslatedCrossChannelFormat_ForMixedSources()
+        {
+            var sourceLanguageInfo = new SourceLanguageInfo("EN", ["EN", "IT"]);
+
+            var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 20, "Alice", sourceLanguageInfo, "de", "Hallo");
+
+            Assert.Equal("**Alice** (EN,IT => DE):\nHallo", result);
         }
 
         [Fact]

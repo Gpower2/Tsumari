@@ -29,7 +29,7 @@ namespace Tsumari.Bot.Logging
         [LoggerMessage(
             EventId = 1103,
             Level = LogLevel.Error,
-            Message = "Failed to run language detection. Fallback to EN."
+            Message = "Failed to run language analysis. Fallback to EN."
         )]
         public static partial void LogLanguageDetectionFailedFallbackToEnglish(this ILogger logger, Exception exception);
 

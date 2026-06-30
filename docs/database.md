@@ -71,7 +71,7 @@ Current behavior:
 
 - used only for DeepL quota enforcement
 - ignored for `Ollama` and `OpenAI` providers
-- incremented after successful language detection and successful translation when DeepL is active
+- incremented after successful language analysis and successful translation when DeepL is active
 
 ## Why IDs Are Stored as `TEXT`
 

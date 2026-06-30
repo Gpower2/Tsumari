@@ -1,5 +1,6 @@
 using Discord;
 using Microsoft.Extensions.Logging;
+using Tsumari.Bot.Models;
 
 namespace Tsumari.Bot.Services
 {
@@ -79,22 +80,32 @@ namespace Tsumari.Bot.Services
                 }
 
                 var afterContent = message.Content ?? string.Empty;
-                string detectedLang = "EN";
-                if (!string.IsNullOrWhiteSpace(afterContent))
+                var sourceChannelLang = await _dbService.GetTargetLanguageCodeAsync(message.Channel.Id);
+                LanguageAnalysisResult languageAnalysis;
+                var isTranslationSourceLanguageHintTrusted = false;
+                if (string.IsNullOrWhiteSpace(afterContent))
+                {
+                    languageAnalysis = CreateAttachmentOnlyFallbackLanguageAnalysis(sourceChannelLang);
+                }
+                else
                 {
                     try
                     {
-                        detectedLang = await _translationService.DetectLanguageAsync(afterContent);
+                        languageAnalysis = await _translationService.AnalyzeLanguageAsync(afterContent);
+                        isTranslationSourceLanguageHintTrusted = languageAnalysis.HasClearDominantLanguage != false;
                     }
                     catch (Exception ex)
                     {
                         _logger.LogEditedMessageLanguageDetectionFailed(ex, message.Id);
+                        languageAnalysis = CreateAnalysisFailureFallbackLanguageAnalysis();
                     }
                 }
 
                 var authorName = MirroredMessageFormatter.ResolveAuthorDisplayName(message.Author);
-                var sourceChannelLang = await _dbService.GetTargetLanguageCodeAsync(message.Channel.Id);
-                var sourceLang = LanguageCodeService.ResolveSourceLanguageCode(detectedLang, sourceChannelLang);
+                var sourceLanguageInfo = LanguageCodeService.ResolveSourceLanguageInfo(languageAnalysis, sourceChannelLang);
+                var translationSourceLanguageCode = isTranslationSourceLanguageHintTrusted
+                    ? sourceLanguageInfo.PrimaryLanguageCode
+                    : null;
 
                 foreach (var link in mirroredMessages)
                 {
@@ -114,13 +125,13 @@ namespace Tsumari.Bot.Services
                         var targetLang = MirroredMessageFormatter.ResolveLinkedMessageTargetLanguageCode(link.LanguageCode, configuredTargetLang);
                         string newText;
 
-                        if (!MirroredMessageFormatter.ShouldTranslateLinkedMessage(sourceLang, targetLang) || string.IsNullOrWhiteSpace(afterContent))
+                        if (!MirroredMessageFormatter.ShouldTranslateLinkedMessage(sourceLanguageInfo.PrimaryLanguageCode, targetLang) || string.IsNullOrWhiteSpace(afterContent))
                         {
                             newText = MirroredMessageFormatter.FormatLinkedMessageText(
                                 message.Channel.Id,
                                 mirroredChannelId,
                                 authorName,
-                                sourceLang,
+                                sourceLanguageInfo,
                                 targetLang,
                                 afterContent);
                         }
@@ -129,12 +140,12 @@ namespace Tsumari.Bot.Services
                             var translationTargetLang = targetLang!;
                             try
                             {
-                                var translatedText = await _translationService.TranslateTextAsync(afterContent, translationTargetLang);
+                                var translatedText = await _translationService.TranslateTextAsync(afterContent, translationTargetLang, translationSourceLanguageCode);
                                 newText = MirroredMessageFormatter.FormatLinkedMessageText(
                                     message.Channel.Id,
                                     mirroredChannelId,
                                     authorName,
-                                    sourceLang,
+                                    sourceLanguageInfo,
                                     translationTargetLang,
                                     translatedText);
                             }
@@ -145,7 +156,7 @@ namespace Tsumari.Bot.Services
                                     message.Channel.Id,
                                     mirroredChannelId,
                                     authorName,
-                                    sourceLang,
+                                    sourceLanguageInfo,
                                     translationTargetLang,
                                     afterContent);
                             }
@@ -167,6 +178,18 @@ namespace Tsumari.Bot.Services
             {
                 _logger.LogEditedMessageProcessingFailed(ex, message.Id);
             }
+        }
+
+        private static LanguageAnalysisResult CreateAttachmentOnlyFallbackLanguageAnalysis(string? sourceChannelLanguageCode)
+        {
+            return !string.IsNullOrWhiteSpace(sourceChannelLanguageCode)
+                ? LanguageAnalysisResult.SingleLanguage(LanguageCodeService.NormalizeLanguageCode(sourceChannelLanguageCode))
+                : LanguageAnalysisResult.SingleLanguage("EN");
+        }
+
+        private static LanguageAnalysisResult CreateAnalysisFailureFallbackLanguageAnalysis()
+        {
+            return LanguageAnalysisResult.SingleLanguage("EN");
         }
     }
 }

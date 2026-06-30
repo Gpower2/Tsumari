@@ -78,6 +78,18 @@ namespace Tsumari.Bot.TranslationProviders
             return clean;
         }
 
+        public string NormalizeSourceLanguageCode(string? code)
+        {
+            var clean = LanguageCodeService.NormalizeLanguageCode(code);
+            if (string.IsNullOrWhiteSpace(clean))
+            {
+                return clean;
+            }
+
+            var separatorIndex = clean.IndexOf('-');
+            return separatorIndex >= 0 ? clean[..separatorIndex] : clean;
+        }
+
         public async Task<IReadOnlyCollection<string>> GetSupportedTargetLanguageCodesAsync()
         {
             var supportedTargetLanguageCodes = await TryGetSupportedTargetLanguageCodesAsync();

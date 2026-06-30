@@ -1,4 +1,5 @@
 using Discord;
+using Tsumari.Bot.Models;
 
 namespace Tsumari.Bot.Services
 {
@@ -20,6 +21,19 @@ namespace Tsumari.Bot.Services
             return $"({sourceLang} to {targetLang})";
         }
 
+        public static string FormatLanguagePair(SourceLanguageInfo sourceLanguageInfo, string targetLang)
+        {
+            ArgumentNullException.ThrowIfNull(sourceLanguageInfo);
+
+            targetLang = LanguageCodeService.NormalizeLanguageCode(targetLang);
+            if (sourceLanguageInfo.LabelLanguageCodes.Count <= 1)
+            {
+                return $"({sourceLanguageInfo.PrimaryLanguageCode} to {targetLang})";
+            }
+
+            return $"({string.Join(",", sourceLanguageInfo.LabelLanguageCodes)} => {targetLang})";
+        }
+
         public static string BuildJumpUrl(IMessage message)
         {
             ArgumentNullException.ThrowIfNull(message);
@@ -32,7 +46,15 @@ namespace Tsumari.Bot.Services
 
         public static string FormatTranslatedReplyText(string sourceLang, string targetLang, string translatedText)
         {
-            var prefix = $"*{FormatLanguagePair(sourceLang, targetLang)}:*";
+            var sourceLanguageInfo = new SourceLanguageInfo(
+                LanguageCodeService.NormalizeLanguageCode(sourceLang),
+                [LanguageCodeService.NormalizeLanguageCode(sourceLang)]);
+            return FormatTranslatedReplyText(sourceLanguageInfo, targetLang, translatedText);
+        }
+
+        public static string FormatTranslatedReplyText(SourceLanguageInfo sourceLanguageInfo, string targetLang, string translatedText)
+        {
+            var prefix = $"*{FormatLanguagePair(sourceLanguageInfo, targetLang)}:*";
             return string.IsNullOrWhiteSpace(translatedText)
                 ? prefix
                 : $"{prefix} {translatedText}";
@@ -83,16 +105,30 @@ namespace Tsumari.Bot.Services
             string? targetLang,
             string content)
         {
-            if (!ShouldTranslateLinkedMessage(sourceLang, targetLang))
+            var sourceLanguageInfo = new SourceLanguageInfo(
+                LanguageCodeService.NormalizeLanguageCode(sourceLang),
+                [LanguageCodeService.NormalizeLanguageCode(sourceLang)]);
+            return FormatLinkedMessageText(sourceChannelId, linkedChannelId, authorName, sourceLanguageInfo, targetLang, content);
+        }
+
+        public static string FormatLinkedMessageText(
+            ulong sourceChannelId,
+            ulong linkedChannelId,
+            string authorName,
+            SourceLanguageInfo sourceLanguageInfo,
+            string? targetLang,
+            string content)
+        {
+            if (!ShouldTranslateLinkedMessage(sourceLanguageInfo.PrimaryLanguageCode, targetLang))
             {
                 return FormatMirroredAuthorText(authorName, content);
             }
 
             return sourceChannelId == linkedChannelId
-                ? FormatTranslatedReplyText(sourceLang, targetLang!, content)
+                ? FormatTranslatedReplyText(sourceLanguageInfo, targetLang!, content)
                 : string.IsNullOrWhiteSpace(content)
                     ? FormatMirroredAuthorText(authorName, string.Empty)
-                    : $"**{authorName}** {FormatLanguagePair(sourceLang, targetLang!)}:\n{content}";
+                    : $"**{authorName}** {FormatLanguagePair(sourceLanguageInfo, targetLang!)}:\n{content}";
         }
 
         public static string FormatTranslationFailureText(
@@ -103,8 +139,28 @@ namespace Tsumari.Bot.Services
             string targetLang,
             string sourceContent)
         {
+            var sourceLanguageInfo = new SourceLanguageInfo(
+                LanguageCodeService.NormalizeLanguageCode(sourceLang),
+                [LanguageCodeService.NormalizeLanguageCode(sourceLang)]);
+            return FormatTranslationFailureText(
+                sourceChannelId,
+                linkedChannelId,
+                authorName,
+                sourceLanguageInfo,
+                targetLang,
+                sourceContent);
+        }
+
+        public static string FormatTranslationFailureText(
+            ulong sourceChannelId,
+            ulong linkedChannelId,
+            string authorName,
+            SourceLanguageInfo sourceLanguageInfo,
+            string targetLang,
+            string sourceContent)
+        {
             return sourceChannelId == linkedChannelId
-                ? FormatTranslatedReplyText(sourceLang, targetLang, $"{sourceContent} *(Translation Failed)*")
+                ? FormatTranslatedReplyText(sourceLanguageInfo, targetLang, $"{sourceContent} *(Translation Failed)*")
                 : FormatMirroredAuthorText(authorName, $"{sourceContent} *(Translation Failed)*");
         }
     }

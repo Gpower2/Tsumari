@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Tsumari.Bot.Models;
 
 namespace Tsumari.Bot.TranslationProviders.Abstractions
 {
@@ -8,8 +9,8 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
 
         bool UsesCharacterQuota { get; }
 
-        Task<string> DetectLanguageAsync(string text);
+        Task<LanguageAnalysisResult> AnalyzeLanguageAsync(string text);
 
-        Task<string> TranslateTextAsync(string text, string targetLanguageCode);
+        Task<string> TranslateTextAsync(string text, string targetLanguageCode, string? sourceLanguageCode = null);
     }
 }

@@ -14,16 +14,16 @@ namespace Tsumari.Bot.Logging
         [LoggerMessage(
             EventId = 1401,
             Level = LogLevel.Warning,
-            Message = "Detection request blocked! Monthly translation limit of {MonthlyCharacterLimit} characters exceeded."
+            Message = "Language analysis request blocked! Monthly translation limit of {MonthlyCharacterLimit} characters exceeded."
         )]
         public static partial void LogDetectionRequestBlockedByQuota(this ILogger logger, int monthlyCharacterLimit);
 
         [LoggerMessage(
             EventId = 1402,
             Level = LogLevel.Information,
-            Message = "Language detected: '{LanguageCode}' for text prefix '{TextPrefix}'"
+            Message = "Language analysis resolved primary '{PrimaryLanguageCode}' with languages '{DetectedLanguageCodes}' (Mixed: {IsMixed}, ClearDominant: {HasClearDominantLanguage}) for text prefix '{TextPrefix}'"
         )]
-        public static partial void LogLanguageDetected(this ILogger logger, string languageCode, string textPrefix);
+        public static partial void LogLanguageAnalyzed(this ILogger logger, string primaryLanguageCode, string detectedLanguageCodes, bool? isMixed, bool? hasClearDominantLanguage, string textPrefix);
 
         [LoggerMessage(
             EventId = 1403,

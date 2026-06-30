@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+
+using Tsumari.Bot.Models;
 
 namespace Tsumari.Bot.Services
 {
@@ -29,6 +33,24 @@ namespace Tsumari.Bot.Services
             return NormalizedEquals(left, right);
         }
 
+        public static bool AreSameLanguageFamily(string? leftLanguageCode, string? rightLanguageCode)
+        {
+            var left = TrimWhitespace(leftLanguageCode.AsSpan());
+            var right = TrimWhitespace(rightLanguageCode.AsSpan());
+
+            if (left.IsEmpty || right.IsEmpty)
+            {
+                return false;
+            }
+
+            if (NormalizedEquals(left, right))
+            {
+                return true;
+            }
+
+            return NormalizedEquals(GetBaseLanguageCode(left), GetBaseLanguageCode(right));
+        }
+
         public static bool MatchesCurrentChannelLanguage(string? detectedLanguageCode, string? configuredLanguageCode)
         {
             var detected = TrimWhitespace(detectedLanguageCode.AsSpan());
@@ -49,7 +71,7 @@ namespace Tsumari.Bot.Services
                 return false;
             }
 
-            return NormalizedEquals(detected, GetBaseLanguageCode(configured));
+            return AreSameLanguageFamily(detectedLanguageCode, configuredLanguageCode);
         }
 
         public static string ResolveSourceLanguageCode(string? detectedLanguageCode, string? currentChannelLanguageCode)
@@ -60,6 +82,38 @@ namespace Tsumari.Bot.Services
             }
 
             return NormalizeLanguageCode(detectedLanguageCode);
+        }
+
+        public static SourceLanguageInfo ResolveSourceLanguageInfo(
+            LanguageAnalysisResult analysis,
+            string? currentChannelLanguageCode)
+        {
+            ArgumentNullException.ThrowIfNull(analysis);
+
+            var primaryLanguageCode = ResolveSourceLanguageCode(analysis.PrimaryLanguageCode, currentChannelLanguageCode);
+            if (string.IsNullOrWhiteSpace(primaryLanguageCode))
+            {
+                primaryLanguageCode = "EN";
+            }
+
+            var labelLanguageCodes = new List<string> { primaryLanguageCode };
+            foreach (var detectedLanguage in analysis.DetectedLanguages)
+            {
+                var normalizedLanguageCode = NormalizeLanguageCode(detectedLanguage.LanguageCode);
+                if (string.IsNullOrWhiteSpace(normalizedLanguageCode))
+                {
+                    continue;
+                }
+
+                if (labelLanguageCodes.Any(existingLanguageCode => AreSameLanguageFamily(existingLanguageCode, normalizedLanguageCode)))
+                {
+                    continue;
+                }
+
+                labelLanguageCodes.Add(normalizedLanguageCode);
+            }
+
+            return new SourceLanguageInfo(primaryLanguageCode, labelLanguageCodes);
         }
 
         private static string NormalizeLanguageCodeCore(string? code, bool useUpperCase)

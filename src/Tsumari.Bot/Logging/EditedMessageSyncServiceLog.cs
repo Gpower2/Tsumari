@@ -15,7 +15,7 @@ namespace Tsumari.Bot.Logging
         [LoggerMessage(
             EventId = 1201,
             Level = LogLevel.Error,
-            Message = "Failed to detect language for edited message {MessageId}."
+            Message = "Failed to analyze language for edited message {MessageId}."
         )]
         public static partial void LogEditedMessageLanguageDetectionFailed(this ILogger logger, Exception exception, ulong messageId);
 

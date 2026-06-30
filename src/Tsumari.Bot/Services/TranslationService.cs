@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Tsumari.Bot.Models;
 
 namespace Tsumari.Bot.Services
 {
@@ -8,7 +9,8 @@ namespace Tsumari.Bot.Services
         private readonly DatabaseService _dbService;
         private readonly ITranslationProvider _translationProvider;
         private readonly ILogger<TranslationService> _logger;
-        private readonly ResiliencyHelper _resiliencyHelper;
+        private readonly ResiliencyHelper _analysisResiliencyHelper;
+        private readonly ResiliencyHelper _translationResiliencyHelper;
 
         public const int MonthlyCharacterLimit = 500000;
 
@@ -22,15 +24,8 @@ namespace Tsumari.Bot.Services
             _translationProvider = translationProvider;
             _logger = logger;
 
-            _resiliencyHelper = new ResiliencyHelper(
-                // Keep retries conservative: translation calls are user-facing, but we do not want a
-                // temporary provider outage to multiply cost/latency or stall the Discord event loop.
-                failureThreshold: 3,
-                breakDuration: TimeSpan.FromSeconds(30),
-                maxRetryAttempts: 3,
-                initialRetryDelay: TimeSpan.FromSeconds(1),
-                logger: loggerFactory.CreateLogger<ResiliencyHelper>()
-            );
+            _analysisResiliencyHelper = CreateResiliencyHelper(loggerFactory, "LanguageAnalysis");
+            _translationResiliencyHelper = CreateResiliencyHelper(loggerFactory, "Translation");
 
             _logger.LogProviderImplementationConfigured(_translationProvider.GetType().Name);
         }
@@ -56,11 +51,11 @@ namespace Tsumari.Bot.Services
             }
         }
 
-        public async Task<string> DetectLanguageAsync(string text)
+        public async Task<LanguageAnalysisResult> AnalyzeLanguageAsync(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                return "EN";
+                return LanguageAnalysisResult.SingleLanguage("EN");
             }
 
             if (!IsActive)
@@ -75,15 +70,20 @@ namespace Tsumari.Bot.Services
                 throw new InvalidOperationException("Monthly translation quota limit reached.");
             }
 
-            string code = await _resiliencyHelper.ExecuteAsync(() => _translationProvider.DetectLanguageAsync(text));
+            var analysis = await _analysisResiliencyHelper.ExecuteAsync(() => _translationProvider.AnalyzeLanguageAsync(text));
             await IncrementTranslationUsageAsync(charCount);
 
-            _logger.LogLanguageDetected(code, CreateTextPreview(text));
+            _logger.LogLanguageAnalyzed(
+                analysis.PrimaryLanguageCode,
+                string.Join(", ", analysis.DetectedLanguages.Select(language => language.LanguageCode)),
+                analysis.IsMixed,
+                analysis.HasClearDominantLanguage,
+                CreateTextPreview(text));
 
-            return code;
+            return analysis;
         }
 
-        public async Task<string> TranslateTextAsync(string text, string targetLanguageCode)
+        public async Task<string> TranslateTextAsync(string text, string targetLanguageCode, string? sourceLanguageCode = null)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -102,10 +102,23 @@ namespace Tsumari.Bot.Services
                 throw new InvalidOperationException("Monthly translation quota limit reached.");
             }
 
-            string translatedResult = await _resiliencyHelper.ExecuteAsync(() => _translationProvider.TranslateTextAsync(text, targetLanguageCode));
+            string translatedResult = await _translationResiliencyHelper.ExecuteAsync(() => _translationProvider.TranslateTextAsync(text, targetLanguageCode, sourceLanguageCode));
             await IncrementTranslationUsageAsync(charCount);
 
             return translatedResult;
+        }
+
+        private static ResiliencyHelper CreateResiliencyHelper(ILoggerFactory loggerFactory, string operationName)
+        {
+            return new ResiliencyHelper(
+                // Keep retries conservative: provider calls are user-facing, but we do not want a
+                // temporary provider outage to multiply cost/latency or stall the Discord event loop.
+                failureThreshold: 3,
+                breakDuration: TimeSpan.FromSeconds(30),
+                maxRetryAttempts: 3,
+                initialRetryDelay: TimeSpan.FromSeconds(1),
+                logger: loggerFactory.CreateLogger($"ResiliencyHelper.{operationName}")
+            );
         }
 
         private static string CreateTextPreview(string text)

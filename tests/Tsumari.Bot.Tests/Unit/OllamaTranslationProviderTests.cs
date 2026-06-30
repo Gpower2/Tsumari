@@ -14,7 +14,7 @@ namespace Tsumari.Bot.Tests.Unit
     public class OllamaTranslationProviderTests
     {
         [Fact]
-        public async Task DetectLanguageAsync_ParsesResponsePayload()
+        public async Task AnalyzeLanguageAsync_ParsesResponsePayload()
         {
             var configMock = new Mock<IConfiguration>();
             configMock.Setup(c => c["Translation:Ollama:ApiUrl"]).Returns("http://localhost:11434/api/generate");
@@ -23,20 +23,22 @@ namespace Tsumari.Bot.Tests.Unit
             var httpClientFactory = new Mock<IHttpClientFactory>();
             httpClientFactory
                 .Setup(f => f.CreateClient(HttpClientNames.OllamaTranslation))
-                .Returns(new HttpClient(new StubHttpMessageHandler("""{ "response": "**EN**" }""")));
+                .Returns(new HttpClient(new StubHttpMessageHandler("""{ "response": "{ \"dominantLanguageCode\": \"EN\", \"languages\": [\"EN\"], \"isMixed\": false, \"hasClearDominantLanguage\": true }" }""")));
 
             var provider = new OllamaTranslationProvider(
                 configMock.Object,
                 httpClientFactory.Object,
                 NullLogger<OllamaTranslationProvider>.Instance);
 
-            var result = await provider.DetectLanguageAsync("hello");
+            var result = await provider.AnalyzeLanguageAsync("hello");
 
-            Assert.Equal("EN", result);
+            Assert.Equal("EN", result.PrimaryLanguageCode);
+            Assert.Single(result.DetectedLanguages);
+            Assert.Equal("EN", result.DetectedLanguages[0].LanguageCode);
         }
 
         [Fact]
-        public async Task DetectLanguageAsync_StripsMarkdownArtifactsAndWhitespace()
+        public async Task AnalyzeLanguageAsync_StripsMarkdownArtifactsAndWhitespace()
         {
             var configMock = new Mock<IConfiguration>();
             configMock.Setup(c => c["Translation:Ollama:ApiUrl"]).Returns("http://localhost:11434/api/generate");
@@ -45,16 +47,19 @@ namespace Tsumari.Bot.Tests.Unit
             var httpClientFactory = new Mock<IHttpClientFactory>();
             httpClientFactory
                 .Setup(f => f.CreateClient(HttpClientNames.OllamaTranslation))
-                .Returns(new HttpClient(new StubHttpMessageHandler("""{ "response": "  *`en`*  " }""")));
+                .Returns(new HttpClient(new StubHttpMessageHandler("""{ "response": "```json\n{ \"dominantLanguageCode\": \"en\", \"languages\": [{ \"languageCode\": \"it\", \"share\": 0.12 }, { \"languageCode\": \"en\", \"share\": 0.88 }], \"isMixed\": true, \"hasClearDominantLanguage\": true }\n```" }""")));
 
             var provider = new OllamaTranslationProvider(
                 configMock.Object,
                 httpClientFactory.Object,
                 NullLogger<OllamaTranslationProvider>.Instance);
 
-            var result = await provider.DetectLanguageAsync("hello");
+            var result = await provider.AnalyzeLanguageAsync("hello");
 
-            Assert.Equal("EN", result);
+            Assert.Equal("EN", result.PrimaryLanguageCode);
+            Assert.Equal(2, result.DetectedLanguages.Count);
+            Assert.Equal("EN", result.DetectedLanguages[0].LanguageCode);
+            Assert.Equal("IT", result.DetectedLanguages[1].LanguageCode);
         }
 
         private sealed class StubHttpMessageHandler : HttpMessageHandler
