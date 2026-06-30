@@ -137,10 +137,10 @@ namespace Tsumari.Bot.Tests.Unit
                 harness.InteractionService.SlashCommands,
                 command => command.Name == "translate");
 
-            Assert.Equal([InteractionContextType.Guild], addMasterCommand.ContextTypes);
-            Assert.Equal([InteractionContextType.Guild], registerLocalCommand.ContextTypes);
-            Assert.Equal([InteractionContextType.Guild], unregisterCommand.ContextTypes);
-            Assert.Equal([InteractionContextType.Guild], statusCommand.ContextTypes);
+            Assert.True(addMasterCommand.IsEnabledInDm);
+            Assert.True(registerLocalCommand.IsEnabledInDm);
+            Assert.True(unregisterCommand.IsEnabledInDm);
+            Assert.True(statusCommand.IsEnabledInDm);
             Assert.True(detectLanguageCommand.IsEnabledInDm);
             Assert.True(translateCommand.IsEnabledInDm);
         }

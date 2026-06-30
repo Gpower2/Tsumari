@@ -12,9 +12,10 @@ using Tsumari.Bot.Services;
 namespace Tsumari.Bot.Modules
 {
     [Group("tsumari", "Tsumari admin, channel configuration, and diagnostic commands")]
-    // Do not use DefaultMemberPermissions on this grouped command. Discord applies permissions
-    // at the top-level /tsumari group, and mixing guild-only admin commands with DM-capable
-    // probe commands otherwise prevents the updated command group from publishing correctly.
+    // Do not use DefaultMemberPermissions or per-subcommand contexts on this grouped command.
+    // Discord applies both at the top-level /tsumari group, and mixing guild-only admin
+    // commands with DM-capable probe commands otherwise prevents the updated command group
+    // from publishing correctly.
     public class InteractionModule : InteractionModuleBase<IInteractionContext>
     {
         private const int MaxInteractionResponseLength = 1900;
@@ -31,7 +32,6 @@ namespace Tsumari.Bot.Modules
         }
 
         [SlashCommand("add-master", "Registers an independent Master Channel.")]
-        [CommandContextType(InteractionContextType.Guild)]
         public async Task AddMasterAsync(
             [Summary("channel", "The channel to register as Master")] IChannel channel)
         {
@@ -75,7 +75,6 @@ namespace Tsumari.Bot.Modules
         }
 
         [SlashCommand("register-local", "Links a localized channel to a specific parent Master Channel.")]
-        [CommandContextType(InteractionContextType.Guild)]
         public async Task RegisterLocalAsync(
             [Summary("local-channel", "The localized channel to register")] IChannel localChannel,
             [Summary("master-channel", "The parent Master channel")] IChannel masterChannel,
@@ -143,7 +142,6 @@ namespace Tsumari.Bot.Modules
         }
 
         [SlashCommand("unregister", "Dynamically unregisters a Master or Localized channel.")]
-        [CommandContextType(InteractionContextType.Guild)]
         public async Task UnregisterAsync(
             [Summary("channel", "The channel to remove from Tsumari configuration")] IChannel channel)
         {
@@ -333,7 +331,6 @@ namespace Tsumari.Bot.Modules
         }
 
         [SlashCommand("status", "Shows the current bot/database status counts.")]
-        [CommandContextType(InteractionContextType.Guild)]
         public async Task StatusAsync()
         {
             if (!await EnsureGuildAdministratorAsync())
