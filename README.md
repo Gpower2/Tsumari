@@ -225,7 +225,7 @@ Useful categories when narrowing production diagnostics:
 
 ## Administrative Slash Commands
 
-All `/tsumari` commands require **Administrator** permissions in guilds. The two language-probe commands can also be used in DMs for ad-hoc testing, while the configuration commands and status command reject DM use at runtime:
+All `/tsumari` commands require **Administrator** permissions in guilds. The two language-probe commands can also be used in DMs for ad-hoc testing, while the configuration commands and status command reject DM use at runtime. Discord applies availability/permissions at the grouped-command level, so the guild Administrator check is enforced at runtime instead of via a hidden Discord-side default permission:
 
 - `/tsumari add-master [channel]`
 - `/tsumari register-local [local-channel] [master-channel] [language-code]`

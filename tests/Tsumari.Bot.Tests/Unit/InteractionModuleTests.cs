@@ -158,6 +158,18 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task AddMasterAsync_RejectsNonAdministratorGuildUser()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL, guildAdministrator: false);
+            var channelMock = new Mock<IChannel>();
+
+            await harness.Module.AddMasterAsync(channelMock.Object);
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("requires Administrator permissions", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public async Task TranslateAsync_SkipsProviderCallWhenSourceAlreadyMatchesTarget()
         {
             using var harness = await CreateHarnessAsync();
@@ -221,6 +233,21 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Contains("**Hint used:** none (analysis failed)", response, StringComparison.Ordinal);
             Assert.Contains("**Translation** (?? => EN):", response, StringComparison.Ordinal);
             Assert.Contains("Translated anyway", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task DetectLanguageAsync_RejectsNonAdministratorGuildUser()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL, guildAdministrator: false);
+
+            await harness.Module.DetectLanguageAsync("Hello");
+
+            harness.InteractionMock.Verify(
+                interaction => interaction.DeferAsync(It.IsAny<bool>(), It.IsAny<RequestOptions>()),
+                Times.Never);
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("requires Administrator permissions", response, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -292,7 +319,8 @@ namespace Tsumari.Bot.Tests.Unit
         private static async Task<InteractionModuleHarness> CreateHarnessAsync(
             ulong? guildId = null,
             ulong contextChannelId = 555UL,
-            bool usesCharacterQuota = false)
+            bool usesCharacterQuota = false,
+            bool guildAdministrator = true)
         {
             var database = new TemporarySqliteDatabase("interaction-module");
             var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
@@ -353,8 +381,19 @@ namespace Tsumari.Bot.Tests.Unit
                     It.IsAny<MessageFlags>()))
                 .ReturnsAsync(Mock.Of<IUserMessage>());
 
-            var userMock = new Mock<IUser>();
-            userMock.SetupGet(user => user.Username).Returns("tester");
+            Mock<IUser> userMock;
+            if (guildId.HasValue)
+            {
+                var guildUserMock = new Mock<IGuildUser>();
+                guildUserMock.SetupGet(user => user.Username).Returns("tester");
+                guildUserMock.SetupGet(user => user.GuildPermissions).Returns(new GuildPermissions(administrator: guildAdministrator));
+                userMock = guildUserMock.As<IUser>();
+            }
+            else
+            {
+                userMock = new Mock<IUser>();
+                userMock.SetupGet(user => user.Username).Returns("tester");
+            }
 
             IGuild? guild = guildId.HasValue ? Mock.Of<IGuild>() : null;
             var channelMock = new Mock<IMessageChannel>();

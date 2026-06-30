@@ -12,7 +12,9 @@ using Tsumari.Bot.Services;
 namespace Tsumari.Bot.Modules
 {
     [Group("tsumari", "Tsumari admin, channel configuration, and diagnostic commands")]
-    [DefaultMemberPermissions(GuildPermission.Administrator)]
+    // Do not use DefaultMemberPermissions on this grouped command. Discord applies permissions
+    // at the top-level /tsumari group, and mixing guild-only admin commands with DM-capable
+    // probe commands otherwise prevents the updated command group from publishing correctly.
     public class InteractionModule : InteractionModuleBase<IInteractionContext>
     {
         private const int MaxInteractionResponseLength = 1900;
@@ -33,7 +35,7 @@ namespace Tsumari.Bot.Modules
         public async Task AddMasterAsync(
             [Summary("channel", "The channel to register as Master")] IChannel channel)
         {
-            if (!await EnsureGuildContextAsync())
+            if (!await EnsureGuildAdministratorAsync())
             {
                 return;
             }
@@ -79,7 +81,7 @@ namespace Tsumari.Bot.Modules
             [Summary("master-channel", "The parent Master channel")] IChannel masterChannel,
             [Summary("language-code", "Target language or locale code (e.g. en, el, it, pt-br)")] string languageCode)
         {
-            if (!await EnsureGuildContextAsync())
+            if (!await EnsureGuildAdministratorAsync())
             {
                 return;
             }
@@ -145,7 +147,7 @@ namespace Tsumari.Bot.Modules
         public async Task UnregisterAsync(
             [Summary("channel", "The channel to remove from Tsumari configuration")] IChannel channel)
         {
-            if (!await EnsureGuildContextAsync())
+            if (!await EnsureGuildAdministratorAsync())
             {
                 return;
             }
@@ -181,6 +183,11 @@ namespace Tsumari.Bot.Modules
         public async Task DetectLanguageAsync(
             [Summary("text", "The text to analyze")] string text)
         {
+            if (!await EnsureGuildAdministratorOrAllowDmAsync())
+            {
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(text))
             {
                 await RespondAsync("❌ Error: You must provide text to analyze.", ephemeral: true);
@@ -223,6 +230,11 @@ namespace Tsumari.Bot.Modules
             [Summary("target-language", "Target language or locale code (e.g. en, el, it, pt-br)")] string targetLanguageCode,
             [Summary("text", "The text to translate")] string text)
         {
+            if (!await EnsureGuildAdministratorOrAllowDmAsync())
+            {
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(targetLanguageCode))
             {
                 await RespondAsync("❌ Error: You must specify a target language code.", ephemeral: true);
@@ -324,7 +336,7 @@ namespace Tsumari.Bot.Modules
         [CommandContextType(InteractionContextType.Guild)]
         public async Task StatusAsync()
         {
-            if (!await EnsureGuildContextAsync())
+            if (!await EnsureGuildAdministratorAsync())
             {
                 return;
             }
@@ -449,16 +461,30 @@ namespace Tsumari.Bot.Modules
             return TruncateForDiscord(string.Join("\n", lines));
         }
 
-        private async Task<bool> EnsureGuildContextAsync()
+        private async Task<bool> EnsureGuildAdministratorAsync()
         {
-            // Discord applies DM availability at the grouped command level, so we still guard
-            // the configuration commands at runtime to prevent DM-only invocations.
-            if (Context.Guild != null)
+            if (Context.Guild == null)
+            {
+                await RespondAsync("❌ Error: This command can only be used inside a guild channel.", ephemeral: true);
+                return false;
+            }
+
+            return await EnsureGuildAdministratorOrAllowDmAsync();
+        }
+
+        private async Task<bool> EnsureGuildAdministratorOrAllowDmAsync()
+        {
+            if (Context.Guild == null)
             {
                 return true;
             }
 
-            await RespondAsync("❌ Error: This command can only be used inside a guild channel.", ephemeral: true);
+            if (Context.User is IGuildUser guildUser && guildUser.GuildPermissions.Administrator)
+            {
+                return true;
+            }
+
+            await RespondAsync("❌ Error: This command requires Administrator permissions in the current guild.", ephemeral: true);
             return false;
         }
 
