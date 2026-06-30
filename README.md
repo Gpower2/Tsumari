@@ -218,13 +218,17 @@ Useful categories when narrowing production diagnostics:
 
 ## Administrative Slash Commands
 
-All configuration commands live under the `/tsumari` group and require **Administrator** permissions:
+All `/tsumari` commands require **Administrator** permissions in guilds. The two diagnostic commands can also be used in DMs for ad-hoc testing, while the configuration commands reject DM use at runtime:
 
 - `/tsumari add-master [channel]`
 - `/tsumari register-local [local-channel] [master-channel] [language-code]`
 - `/tsumari unregister [channel]`
+- `/tsumari detect-language [text]`
+- `/tsumari translate [target-language] [text]`
 
 `register-local` stores language codes in normalized lowercase form (`pt_BR` becomes `pt-br`), and re-registering an existing localized channel updates its mapping because the database operation uses `INSERT OR REPLACE`.
+
+The two diagnostic commands respond **ephemerally** so they do not clutter the channel. `detect-language` runs the provider-backed analysis directly, and `translate` intentionally uses the same analysis + trusted source-hint flow as live message routing so ad-hoc probes match runtime behavior. Both commands count against the same provider usage/quota rules as normal translation work.
 
 ## Build, Test, and Publish
 

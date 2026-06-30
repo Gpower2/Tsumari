@@ -45,5 +45,40 @@ namespace Tsumari.Bot.Logging
             Message = "Error unregistering channel {ChannelId}."
         )]
         public static partial void LogChannelUnregisterByUserFailed(this ILogger logger, Exception exception, ulong channelId);
+
+        [LoggerMessage(
+            EventId = 1806,
+            Level = LogLevel.Information,
+            Message = "Manual language detection completed for user {Username} with primary language {PrimaryLanguageCode}. Mixed: {IsMixed}. Clear dominant: {HasClearDominantLanguage}."
+        )]
+        public static partial void LogManualLanguageDetectionCompleted(this ILogger logger, string username, string primaryLanguageCode, bool? isMixed, bool? hasClearDominantLanguage);
+
+        [LoggerMessage(
+            EventId = 1807,
+            Level = LogLevel.Error,
+            Message = "Manual language detection failed for user {Username}."
+        )]
+        public static partial void LogManualLanguageDetectionFailed(this ILogger logger, Exception exception, string username);
+
+        [LoggerMessage(
+            EventId = 1808,
+            Level = LogLevel.Warning,
+            Message = "Manual translation analysis failed for user {Username} while targeting {TargetLanguageCode}. Continuing without a trusted source hint."
+        )]
+        public static partial void LogManualTranslationAnalysisFailed(this ILogger logger, Exception exception, string username, string targetLanguageCode);
+
+        [LoggerMessage(
+            EventId = 1809,
+            Level = LogLevel.Information,
+            Message = "Manual translation completed for user {Username}. Target: {TargetLanguageCode}. Hint used: {UsedSourceHint}. Source hint: {SourceLanguageCode}."
+        )]
+        public static partial void LogManualTranslationCompleted(this ILogger logger, string username, string targetLanguageCode, bool usedSourceHint, string? sourceLanguageCode);
+
+        [LoggerMessage(
+            EventId = 1810,
+            Level = LogLevel.Error,
+            Message = "Manual translation failed for user {Username} while targeting {TargetLanguageCode}."
+        )]
+        public static partial void LogManualTranslationFailed(this ILogger logger, Exception exception, string username, string targetLanguageCode);
     }
 }

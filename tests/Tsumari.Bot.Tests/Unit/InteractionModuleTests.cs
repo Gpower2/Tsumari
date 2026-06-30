@@ -1,0 +1,340 @@
+using System;
+using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
+using Discord;
+using Discord.Interactions;
+using Discord.WebSocket;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Tsumari.Bot.Models;
+using Tsumari.Bot.Modules;
+using Tsumari.Bot.Services;
+using Xunit;
+
+namespace Tsumari.Bot.Tests.Unit
+{
+    public class InteractionModuleTests
+    {
+        [Fact]
+        public async Task DetectLanguageAsync_RespondsWithAnalysisSummary()
+        {
+            using var harness = await CreateHarnessAsync();
+            harness.ProviderMock
+                .Setup(provider => provider.AnalyzeLanguageAsync("Hello fratello"))
+                .ReturnsAsync(new LanguageAnalysisResult(
+                    "EN",
+                    [
+                        new DetectedLanguage("EN", 0.85),
+                        new DetectedLanguage("IT", 0.15)
+                    ],
+                    isMixed: true,
+                    hasClearDominantLanguage: true));
+
+            await harness.Module.DetectLanguageAsync("Hello fratello");
+
+            harness.InteractionMock.Verify(
+                interaction => interaction.DeferAsync(true, It.IsAny<RequestOptions>()),
+                Times.Once);
+            harness.InteractionMock.Verify(
+                interaction => interaction.FollowupAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Embed[]>(),
+                    It.IsAny<bool>(),
+                    true,
+                    It.IsAny<AllowedMentions>(),
+                    It.IsAny<MessageComponent>(),
+                    It.IsAny<Embed>(),
+                    It.IsAny<RequestOptions>(),
+                    It.IsAny<PollProperties>(),
+                    It.IsAny<MessageFlags>()),
+                Times.Once);
+
+            var response = GetLatestFollowupText(harness.InteractionMock);
+            Assert.Contains("**Dominant:** EN", response, StringComparison.Ordinal);
+            Assert.Contains("**Detected:** EN (85%), IT (15%)", response, StringComparison.Ordinal);
+            Assert.Contains("**Mixed:** yes", response, StringComparison.Ordinal);
+            Assert.Contains("**Clear dominant:** yes", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task TranslateAsync_UsesTrustedSourceHintAndFormatsResponse()
+        {
+            using var harness = await CreateHarnessAsync();
+            harness.ProviderMock
+                .Setup(provider => provider.AnalyzeLanguageAsync("Si Tasos , sanno essere divertenti"))
+                .ReturnsAsync(LanguageAnalysisResult.SingleLanguage("IT"));
+            harness.ProviderMock
+                .Setup(provider => provider.TranslateTextAsync("Si Tasos , sanno essere divertenti", "en", "IT"))
+                .ReturnsAsync("Yes, Tasos, they can be fun.");
+
+            await harness.Module.TranslateAsync("en", "Si Tasos , sanno essere divertenti");
+
+            harness.ProviderMock.Verify(
+                provider => provider.TranslateTextAsync("Si Tasos , sanno essere divertenti", "en", "IT"),
+                Times.Once);
+
+            var response = GetLatestFollowupText(harness.InteractionMock);
+            Assert.Contains("**Hint used:** IT", response, StringComparison.Ordinal);
+            Assert.Contains("**Translation** (IT to EN):", response, StringComparison.Ordinal);
+            Assert.Contains("Yes, Tasos, they can be fun.", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task TranslateAsync_SkipsSourceHintWhenDominantIsUnclear()
+        {
+            using var harness = await CreateHarnessAsync();
+            harness.ProviderMock
+                .Setup(provider => provider.AnalyzeLanguageAsync("Hello ciao"))
+                .ReturnsAsync(new LanguageAnalysisResult(
+                    "EN",
+                    [
+                        new DetectedLanguage("EN", 0.5),
+                        new DetectedLanguage("IT", 0.5)
+                    ],
+                    isMixed: true,
+                    hasClearDominantLanguage: false));
+            harness.ProviderMock
+                .Setup(provider => provider.TranslateTextAsync("Hello ciao", "de", null))
+                .ReturnsAsync("Hallo ciao");
+
+            await harness.Module.TranslateAsync("de", "Hello ciao");
+
+            harness.ProviderMock.Verify(
+                provider => provider.TranslateTextAsync("Hello ciao", "de", null),
+                Times.Once);
+
+            var response = GetLatestFollowupText(harness.InteractionMock);
+            Assert.Contains("**Hint used:** none (dominant unclear)", response, StringComparison.Ordinal);
+            Assert.Contains("**Translation** (EN,IT => DE):", response, StringComparison.Ordinal);
+            Assert.Contains("Hallo ciao", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task InteractionModule_RegistersManualDiagnosticSlashCommands()
+        {
+            using var harness = await CreateHarnessAsync();
+            await harness.InteractionService.AddModulesAsync(typeof(Program).Assembly, harness.Services);
+
+            var addMasterCommand = Assert.Single(
+                harness.InteractionService.SlashCommands,
+                command => command.Name == "add-master");
+            var registerLocalCommand = Assert.Single(
+                harness.InteractionService.SlashCommands,
+                command => command.Name == "register-local");
+            var unregisterCommand = Assert.Single(
+                harness.InteractionService.SlashCommands,
+                command => command.Name == "unregister");
+            var detectLanguageCommand = Assert.Single(
+                harness.InteractionService.SlashCommands,
+                command => command.Name == "detect-language");
+            var translateCommand = Assert.Single(
+                harness.InteractionService.SlashCommands,
+                command => command.Name == "translate");
+
+            Assert.Equal([InteractionContextType.Guild], addMasterCommand.ContextTypes);
+            Assert.Equal([InteractionContextType.Guild], registerLocalCommand.ContextTypes);
+            Assert.Equal([InteractionContextType.Guild], unregisterCommand.ContextTypes);
+            Assert.True(detectLanguageCommand.IsEnabledInDm);
+            Assert.True(translateCommand.IsEnabledInDm);
+        }
+
+        [Fact]
+        public async Task AddMasterAsync_RejectsDmContext()
+        {
+            using var harness = await CreateHarnessAsync();
+            var channelMock = new Mock<IChannel>();
+
+            await harness.Module.AddMasterAsync(channelMock.Object);
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("only be used inside a guild channel", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task TranslateAsync_SkipsProviderCallWhenSourceAlreadyMatchesTarget()
+        {
+            using var harness = await CreateHarnessAsync();
+            harness.ProviderMock
+                .Setup(provider => provider.AnalyzeLanguageAsync("Already in English"))
+                .ReturnsAsync(LanguageAnalysisResult.SingleLanguage("EN"));
+
+            await harness.Module.TranslateAsync("en", "Already in English");
+
+            harness.ProviderMock.Verify(
+                provider => provider.TranslateTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()),
+                Times.Never);
+
+            var response = GetLatestFollowupText(harness.InteractionMock);
+            Assert.Contains("**Translation skipped:** source already matches target", response, StringComparison.Ordinal);
+            Assert.Contains("**Output** (EN):", response, StringComparison.Ordinal);
+            Assert.Contains("Already in English", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task DetectLanguageAsync_DoesNotExposeRawProviderErrors()
+        {
+            using var harness = await CreateHarnessAsync();
+            harness.ProviderMock
+                .Setup(provider => provider.AnalyzeLanguageAsync("fail"))
+                .ThrowsAsync(new InvalidOperationException("Url: http://localhost:11434/api/generate Response body: sensitive details"));
+
+            await harness.Module.DetectLanguageAsync("fail");
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.FollowupAsync));
+            Assert.DoesNotContain("http://localhost:11434", response, StringComparison.Ordinal);
+            Assert.DoesNotContain("Response body", response, StringComparison.Ordinal);
+            Assert.Contains("Language detection failed. Check the bot logs for details.", response, StringComparison.Ordinal);
+        }
+
+        private static string GetLatestFollowupText(Mock<IDiscordInteraction> interactionMock)
+        {
+            return GetLatestInteractionText(interactionMock, nameof(IDiscordInteraction.FollowupAsync));
+        }
+
+        private static string GetLatestInteractionText(Mock<IDiscordInteraction> interactionMock, string methodName)
+        {
+            var invocation = interactionMock.Invocations.Last(invocation => invocation.Method.Name == methodName);
+            return Assert.IsType<string>(invocation.Arguments[0]);
+        }
+
+        private static async Task<InteractionModuleHarness> CreateHarnessAsync()
+        {
+            var database = new TemporarySqliteDatabase("interaction-module");
+            var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
+            await dbService.InitializeDatabaseAsync();
+
+            var providerMock = new Mock<ITranslationProvider>();
+            providerMock.SetupGet(provider => provider.IsActive).Returns(true);
+            providerMock.SetupGet(provider => provider.UsesCharacterQuota).Returns(false);
+            var translationService = new TranslationService(
+                dbService,
+                providerMock.Object,
+                NullLogger<TranslationService>.Instance,
+                new NullLoggerFactory());
+
+            var interactionMock = new Mock<IDiscordInteraction>();
+            interactionMock
+                .Setup(interaction => interaction.RespondAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Embed[]>(),
+                    It.IsAny<bool>(),
+                    It.IsAny<bool>(),
+                    It.IsAny<AllowedMentions>(),
+                    It.IsAny<MessageComponent>(),
+                    It.IsAny<Embed>(),
+                    It.IsAny<RequestOptions>(),
+                    It.IsAny<PollProperties>(),
+                    It.IsAny<MessageFlags>()))
+                .Returns(Task.CompletedTask);
+            interactionMock
+                .Setup(interaction => interaction.DeferAsync(It.IsAny<bool>(), It.IsAny<RequestOptions>()))
+                .Returns(Task.CompletedTask);
+            interactionMock
+                .SetupGet(interaction => interaction.HasResponded)
+                .Returns(false);
+            interactionMock
+                .Setup(interaction => interaction.FollowupAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Embed[]>(),
+                    It.IsAny<bool>(),
+                    It.IsAny<bool>(),
+                    It.IsAny<AllowedMentions>(),
+                    It.IsAny<MessageComponent>(),
+                    It.IsAny<Embed>(),
+                    It.IsAny<RequestOptions>(),
+                    It.IsAny<PollProperties>(),
+                    It.IsAny<MessageFlags>()))
+                .ReturnsAsync(Mock.Of<IUserMessage>());
+
+            var userMock = new Mock<IUser>();
+            userMock.SetupGet(user => user.Username).Returns("tester");
+
+            var contextMock = new Mock<IInteractionContext>();
+            contextMock.SetupGet(context => context.User).Returns(userMock.Object);
+            contextMock.SetupGet(context => context.Interaction).Returns(interactionMock.Object);
+
+            var module = new InteractionModule(
+                dbService,
+                translationService,
+                NullLogger<InteractionModule>.Instance);
+            SetModuleContext(module, contextMock.Object);
+
+            var services = new ServiceCollection()
+                .AddSingleton(dbService)
+                .AddSingleton(translationService)
+                .AddSingleton(providerMock.Object)
+                .AddSingleton<ILogger<InteractionModule>>(NullLogger<InteractionModule>.Instance)
+                .BuildServiceProvider();
+
+            var client = new DiscordSocketClient(new DiscordSocketConfig
+            {
+                GatewayIntents = GatewayIntents.None
+            });
+            var interactionService = new InteractionService(client, new InteractionServiceConfig());
+
+            return new InteractionModuleHarness(
+                database,
+                providerMock,
+                interactionMock,
+                module,
+                services,
+                client,
+                interactionService);
+        }
+
+        private static void SetModuleContext(InteractionModule module, IInteractionContext context)
+        {
+            var contextProperty = typeof(InteractionModuleBase<IInteractionContext>).GetProperty(
+                "Context",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.NotNull(contextProperty);
+            contextProperty!.SetValue(module, context);
+        }
+
+        private sealed class InteractionModuleHarness : IDisposable
+        {
+            public InteractionModuleHarness(
+                TemporarySqliteDatabase database,
+                Mock<ITranslationProvider> providerMock,
+                Mock<IDiscordInteraction> interactionMock,
+                InteractionModule module,
+                ServiceProvider services,
+                DiscordSocketClient client,
+                InteractionService interactionService)
+            {
+                Database = database;
+                ProviderMock = providerMock;
+                InteractionMock = interactionMock;
+                Module = module;
+                Services = services;
+                Client = client;
+                InteractionService = interactionService;
+            }
+
+            public TemporarySqliteDatabase Database { get; }
+
+            public Mock<ITranslationProvider> ProviderMock { get; }
+
+            public Mock<IDiscordInteraction> InteractionMock { get; }
+
+            public InteractionModule Module { get; }
+
+            public ServiceProvider Services { get; }
+
+            public DiscordSocketClient Client { get; }
+
+            public InteractionService InteractionService { get; }
+
+            public void Dispose()
+            {
+                InteractionService.Dispose();
+                Client.Dispose();
+                Services.Dispose();
+                Database.Dispose();
+            }
+        }
+    }
+}
