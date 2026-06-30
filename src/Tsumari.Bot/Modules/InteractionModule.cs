@@ -252,6 +252,10 @@ namespace Tsumari.Bot.Modules
 
             try
             {
+                var contextChannel = Context.Channel;
+                var currentChannelLanguageCode = contextChannel != null
+                    ? await _dbService.GetTargetLanguageCodeAsync(contextChannel.Id)
+                    : null;
                 LanguageAnalysisResult? analysis = null;
                 SourceLanguageInfo? sourceLanguageInfo = null;
                 string? translationSourceLanguageCode = null;
@@ -262,7 +266,7 @@ namespace Tsumari.Bot.Modules
                 try
                 {
                     analysis = await _translationService.AnalyzeLanguageAsync(text);
-                    sourceLanguageInfo = LanguageCodeService.ResolveSourceLanguageInfo(analysis, currentChannelLanguageCode: null);
+                    sourceLanguageInfo = LanguageCodeService.ResolveSourceLanguageInfo(analysis, currentChannelLanguageCode);
                     translationSourceLanguageCode = analysis.HasClearDominantLanguage != false
                         ? sourceLanguageInfo.PrimaryLanguageCode
                         : null;
@@ -313,6 +317,37 @@ namespace Tsumari.Bot.Modules
                 await Context.Interaction.FollowupAsync(
                     BuildFailureResponse("Translation failed"),
                     ephemeral: true);
+            }
+        }
+
+        [SlashCommand("status", "Shows the current bot/database status counts.")]
+        [CommandContextType(InteractionContextType.Guild)]
+        public async Task StatusAsync()
+        {
+            if (!await EnsureGuildContextAsync())
+            {
+                return;
+            }
+
+            try
+            {
+                var status = await _dbService.GetDatabaseStatusSnapshotAsync();
+                _logger.LogBotStatusReported(
+                    Context.User.Username,
+                    status.ConfiguredChannelCount,
+                    status.LinkedMessageFamilyCount,
+                    status.LinkedBotMessageCount);
+                await RespondAsync(
+                    BuildStatusResponse(
+                        status,
+                        _translationService.IsActive,
+                        _translationService.UsesCharacterQuota),
+                    ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogBotStatusReportFailed(ex, Context.User.Username);
+                await RespondAsync(BuildFailureResponse("Status lookup failed"), ephemeral: true);
             }
         }
 
@@ -378,6 +413,33 @@ namespace Tsumari.Bot.Modules
             return TruncateForDiscord($"❌ {prefix}. Check the bot logs for details.");
         }
 
+        private static string BuildStatusResponse(
+            DatabaseStatusSnapshot status,
+            bool isTranslationProviderActive,
+            bool usesCharacterQuota)
+        {
+            var quotaUsageLine = usesCharacterQuota
+                ? $"**Quota-tracked characters this month:** {status.CurrentMonthCharacterCount}"
+                : "**Quota-tracked characters this month:** N/A for the current provider";
+            var lines = new[]
+            {
+                $"**Translation provider active:** {FormatNullableBoolean(isTranslationProviderActive)}",
+                $"**Master channels:** {status.MasterChannelCount}",
+                $"**Localized channels:** {status.LocalizedChannelCount}",
+                $"**Configured channels:** {status.ConfiguredChannelCount}",
+                $"**Linked message families:** {status.LinkedMessageFamilyCount}",
+                $"**Linked bot messages:** {status.LinkedBotMessageCount}",
+                $"**Localized message links:** {status.LocalizedMessageLinkCount}",
+                quotaUsageLine,
+                $"**Database main file size:** {status.DatabaseFileSizeBytes} bytes",
+                $"**Database WAL size:** {status.DatabaseWalFileSizeBytes} bytes",
+                $"**Database storage size:** {status.DatabaseStorageSizeBytes} bytes",
+                $"**DB last activity (UTC):** {FormatUtcTimestamp(status.DatabaseLastActivityUtc)}"
+            };
+
+            return TruncateForDiscord(string.Join("\n", lines));
+        }
+
         private async Task<bool> EnsureGuildContextAsync()
         {
             // Discord applies DM availability at the grouped command level, so we still guard
@@ -389,6 +451,13 @@ namespace Tsumari.Bot.Modules
 
             await RespondAsync("❌ Error: This command can only be used inside a guild channel.", ephemeral: true);
             return false;
+        }
+
+        private static string FormatUtcTimestamp(DateTime? value)
+        {
+            return value.HasValue
+                ? value.Value.ToString("u", CultureInfo.InvariantCulture)
+                : "unknown";
         }
 
         private static string FormatDetectedLanguages(IReadOnlyList<DetectedLanguage> detectedLanguages)

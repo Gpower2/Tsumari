@@ -32,6 +32,8 @@ namespace Tsumari.Bot.Services
 
         public bool IsActive => _translationProvider.IsActive;
 
+        public bool UsesCharacterQuota => _translationProvider.UsesCharacterQuota;
+
         public async Task<bool> CanTranslateAsync(int characterCount)
         {
             if (_translationProvider.UsesCharacterQuota)

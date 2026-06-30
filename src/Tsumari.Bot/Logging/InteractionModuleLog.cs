@@ -80,5 +80,19 @@ namespace Tsumari.Bot.Logging
             Message = "Manual translation failed for user {Username} while targeting {TargetLanguageCode}."
         )]
         public static partial void LogManualTranslationFailed(this ILogger logger, Exception exception, string username, string targetLanguageCode);
+
+        [LoggerMessage(
+            EventId = 1811,
+            Level = LogLevel.Information,
+            Message = "Reported bot status to user {Username}. Configured channels: {ConfiguredChannelCount}. Linked message families: {LinkedMessageFamilyCount}. Linked bot messages: {LinkedBotMessageCount}."
+        )]
+        public static partial void LogBotStatusReported(this ILogger logger, string username, long configuredChannelCount, long linkedMessageFamilyCount, long linkedBotMessageCount);
+
+        [LoggerMessage(
+            EventId = 1812,
+            Level = LogLevel.Error,
+            Message = "Failed to report bot status to user {Username}."
+        )]
+        public static partial void LogBotStatusReportFailed(this ILogger logger, Exception exception, string username);
     }
 }

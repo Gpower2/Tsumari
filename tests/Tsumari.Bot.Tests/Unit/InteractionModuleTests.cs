@@ -127,6 +127,9 @@ namespace Tsumari.Bot.Tests.Unit
             var unregisterCommand = Assert.Single(
                 harness.InteractionService.SlashCommands,
                 command => command.Name == "unregister");
+            var statusCommand = Assert.Single(
+                harness.InteractionService.SlashCommands,
+                command => command.Name == "status");
             var detectLanguageCommand = Assert.Single(
                 harness.InteractionService.SlashCommands,
                 command => command.Name == "detect-language");
@@ -137,6 +140,7 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Equal([InteractionContextType.Guild], addMasterCommand.ContextTypes);
             Assert.Equal([InteractionContextType.Guild], registerLocalCommand.ContextTypes);
             Assert.Equal([InteractionContextType.Guild], unregisterCommand.ContextTypes);
+            Assert.Equal([InteractionContextType.Guild], statusCommand.ContextTypes);
             Assert.True(detectLanguageCommand.IsEnabledInDm);
             Assert.True(translateCommand.IsEnabledInDm);
         }
@@ -174,6 +178,88 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task TranslateAsync_UsesCurrentChannelLocaleWhenDecidingSkipBehavior()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL, contextChannelId: 222UL);
+            await harness.DatabaseService.AddMasterChannelAsync(111UL);
+            await harness.DatabaseService.RegisterLocalChannelAsync(222UL, 111UL, "pt-br");
+            harness.ProviderMock
+                .Setup(provider => provider.AnalyzeLanguageAsync("Ola pessoal"))
+                .ReturnsAsync(LanguageAnalysisResult.SingleLanguage("PT"));
+
+            await harness.Module.TranslateAsync("pt-br", "Ola pessoal");
+
+            harness.ProviderMock.Verify(
+                provider => provider.TranslateTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()),
+                Times.Never);
+
+            var response = GetLatestFollowupText(harness.InteractionMock);
+            Assert.Contains("**Translation skipped:** source already matches target", response, StringComparison.Ordinal);
+            Assert.Contains("**Output** (PT-BR):", response, StringComparison.Ordinal);
+            Assert.Contains("Ola pessoal", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task TranslateAsync_AnalysisFailureStillAttemptsTranslationWithoutHint()
+        {
+            using var harness = await CreateHarnessAsync();
+            harness.ProviderMock
+                .Setup(provider => provider.AnalyzeLanguageAsync("No analysis available"))
+                .ThrowsAsync(new InvalidOperationException("analysis failed"));
+            harness.ProviderMock
+                .Setup(provider => provider.TranslateTextAsync("No analysis available", "en", null))
+                .ReturnsAsync("Translated anyway");
+
+            await harness.Module.TranslateAsync("en", "No analysis available");
+
+            harness.ProviderMock.Verify(
+                provider => provider.TranslateTextAsync("No analysis available", "en", null),
+                Times.Once);
+
+            var response = GetLatestFollowupText(harness.InteractionMock);
+            Assert.Contains("**Detected:** unavailable", response, StringComparison.Ordinal);
+            Assert.Contains("**Hint used:** none (analysis failed)", response, StringComparison.Ordinal);
+            Assert.Contains("**Translation** (to EN):", response, StringComparison.Ordinal);
+            Assert.Contains("Translated anyway", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task StatusAsync_RespondsWithDatabaseCounts()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL, usesCharacterQuota: true);
+            await harness.DatabaseService.AddMasterChannelAsync(111UL);
+            await harness.DatabaseService.RegisterLocalChannelAsync(222UL, 111UL, "de");
+            await harness.DatabaseService.LinkMessagesAsync(9000UL, 111UL, 9001UL, 111UL, "master");
+            await harness.DatabaseService.LinkMessagesAsync(9000UL, 111UL, 9002UL, 222UL, "de");
+            await harness.DatabaseService.IncrementUsageAsync(350);
+
+            await harness.Module.StatusAsync();
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("**Translation provider active:** yes", response, StringComparison.Ordinal);
+            Assert.Contains("**Master channels:** 1", response, StringComparison.Ordinal);
+            Assert.Contains("**Localized channels:** 1", response, StringComparison.Ordinal);
+            Assert.Contains("**Configured channels:** 2", response, StringComparison.Ordinal);
+            Assert.Contains("**Linked message families:** 1", response, StringComparison.Ordinal);
+            Assert.Contains("**Linked bot messages:** 2", response, StringComparison.Ordinal);
+            Assert.Contains("**Localized message links:** 1", response, StringComparison.Ordinal);
+            Assert.Contains("**Quota-tracked characters this month:** 350", response, StringComparison.Ordinal);
+            Assert.Contains("**Database storage size:**", response, StringComparison.Ordinal);
+            Assert.Contains("**DB last activity (UTC):**", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task StatusAsync_RejectsDmContext()
+        {
+            using var harness = await CreateHarnessAsync();
+
+            await harness.Module.StatusAsync();
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("only be used inside a guild channel", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public async Task DetectLanguageAsync_DoesNotExposeRawProviderErrors()
         {
             using var harness = await CreateHarnessAsync();
@@ -200,7 +286,10 @@ namespace Tsumari.Bot.Tests.Unit
             return Assert.IsType<string>(invocation.Arguments[0]);
         }
 
-        private static async Task<InteractionModuleHarness> CreateHarnessAsync()
+        private static async Task<InteractionModuleHarness> CreateHarnessAsync(
+            ulong? guildId = null,
+            ulong contextChannelId = 555UL,
+            bool usesCharacterQuota = false)
         {
             var database = new TemporarySqliteDatabase("interaction-module");
             var dbService = database.CreateDatabaseService(NullLogger<DatabaseService>.Instance);
@@ -208,7 +297,7 @@ namespace Tsumari.Bot.Tests.Unit
 
             var providerMock = new Mock<ITranslationProvider>();
             providerMock.SetupGet(provider => provider.IsActive).Returns(true);
-            providerMock.SetupGet(provider => provider.UsesCharacterQuota).Returns(false);
+            providerMock.SetupGet(provider => provider.UsesCharacterQuota).Returns(usesCharacterQuota);
             var translationService = new TranslationService(
                 dbService,
                 providerMock.Object,
@@ -252,7 +341,12 @@ namespace Tsumari.Bot.Tests.Unit
             var userMock = new Mock<IUser>();
             userMock.SetupGet(user => user.Username).Returns("tester");
 
+            IGuild? guild = guildId.HasValue ? Mock.Of<IGuild>() : null;
+            var channelMock = new Mock<IMessageChannel>();
+            channelMock.SetupGet(channel => channel.Id).Returns(contextChannelId);
             var contextMock = new Mock<IInteractionContext>();
+            contextMock.SetupGet(context => context.Guild).Returns(guild!);
+            contextMock.SetupGet(context => context.Channel).Returns(channelMock.Object);
             contextMock.SetupGet(context => context.User).Returns(userMock.Object);
             contextMock.SetupGet(context => context.Interaction).Returns(interactionMock.Object);
 
@@ -277,6 +371,7 @@ namespace Tsumari.Bot.Tests.Unit
 
             return new InteractionModuleHarness(
                 database,
+                dbService,
                 providerMock,
                 interactionMock,
                 module,
@@ -298,6 +393,7 @@ namespace Tsumari.Bot.Tests.Unit
         {
             public InteractionModuleHarness(
                 TemporarySqliteDatabase database,
+                DatabaseService databaseService,
                 Mock<ITranslationProvider> providerMock,
                 Mock<IDiscordInteraction> interactionMock,
                 InteractionModule module,
@@ -306,6 +402,7 @@ namespace Tsumari.Bot.Tests.Unit
                 InteractionService interactionService)
             {
                 Database = database;
+                DatabaseService = databaseService;
                 ProviderMock = providerMock;
                 InteractionMock = interactionMock;
                 Module = module;
@@ -315,6 +412,8 @@ namespace Tsumari.Bot.Tests.Unit
             }
 
             public TemporarySqliteDatabase Database { get; }
+
+            public DatabaseService DatabaseService { get; }
 
             public Mock<ITranslationProvider> ProviderMock { get; }
 

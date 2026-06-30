@@ -70,14 +70,14 @@ namespace Tsumari.Bot.Logging
         [LoggerMessage(
             EventId = 1009,
             Level = LogLevel.Information,
-            Message = "Database file ready at {DatabaseFilePath}. Size: {DatabaseFileSizeBytes} bytes. Last write (UTC): {DatabaseFileLastWriteUtc}."
+            Message = "Database file ready at {DatabaseFilePath}. Main size: {DatabaseFileSizeBytes} bytes. WAL size: {DatabaseWalFileSizeBytes} bytes. Last activity (UTC): {DatabaseLastActivityUtc}."
         )]
-        public static partial void LogDatabaseFileStatus(this ILogger logger, string databaseFilePath, long databaseFileSizeBytes, string databaseFileLastWriteUtc);
+        public static partial void LogDatabaseFileStatus(this ILogger logger, string databaseFilePath, long databaseFileSizeBytes, long databaseWalFileSizeBytes, string databaseLastActivityUtc);
 
         [LoggerMessage(
             EventId = 1010,
             Level = LogLevel.Information,
-            Message = "Database status: {MasterChannelCount} master channels, {LocalizedChannelCount} localized channels, {ConfiguredChannelCount} configured channels, {LinkedMessageFamilyCount} linked message families, {MirroredMessageCount} mirrored message links, {LocalizedMessageLinkCount} localized message links, {CurrentMonthCharacterCount} provider characters this month."
+            Message = "Database status: {MasterChannelCount} master channels, {LocalizedChannelCount} localized channels, {ConfiguredChannelCount} configured channels, {LinkedMessageFamilyCount} linked message families, {LinkedBotMessageCount} linked bot messages, {LocalizedMessageLinkCount} localized message links, {CurrentMonthCharacterCount} quota-tracked characters this month."
         )]
         public static partial void LogDatabaseContentStatus(
             this ILogger logger,
@@ -85,7 +85,7 @@ namespace Tsumari.Bot.Logging
             long localizedChannelCount,
             long configuredChannelCount,
             long linkedMessageFamilyCount,
-            long mirroredMessageCount,
+            long linkedBotMessageCount,
             long localizedMessageLinkCount,
             long currentMonthCharacterCount);
 

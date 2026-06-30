@@ -241,14 +241,44 @@ namespace Tsumari.Bot.Tests.Component
             var contentStatusLog = logger.Entries.Single(entry => entry.EventId.Id == 1010);
 
             Assert.Contains(Path.GetFullPath(_database.DatabasePath), fileStatusLog.Message, StringComparison.Ordinal);
-            Assert.Contains("Last write (UTC):", fileStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("WAL size:", fileStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("Last activity (UTC):", fileStatusLog.Message, StringComparison.Ordinal);
             Assert.Contains("2 master channels", contentStatusLog.Message, StringComparison.Ordinal);
             Assert.Contains("2 localized channels", contentStatusLog.Message, StringComparison.Ordinal);
             Assert.Contains("4 configured channels", contentStatusLog.Message, StringComparison.Ordinal);
             Assert.Contains("2 linked message families", contentStatusLog.Message, StringComparison.Ordinal);
-            Assert.Contains("3 mirrored message links", contentStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("3 linked bot messages", contentStatusLog.Message, StringComparison.Ordinal);
             Assert.Contains("2 localized message links", contentStatusLog.Message, StringComparison.Ordinal);
-            Assert.Contains("350 provider characters this month", contentStatusLog.Message, StringComparison.Ordinal);
+            Assert.Contains("350 quota-tracked characters this month", contentStatusLog.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task GetDatabaseStatusSnapshotAsync_ReturnsExpectedCounts()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(111UL);
+            await _dbService.AddMasterChannelAsync(222UL);
+            await _dbService.RegisterLocalChannelAsync(333UL, 111UL, "de");
+            await _dbService.RegisterLocalChannelAsync(444UL, 111UL, "el");
+            await _dbService.LinkMessagesAsync(9000UL, 111UL, 9001UL, 111UL, "master");
+            await _dbService.LinkMessagesAsync(9000UL, 111UL, 9002UL, 333UL, "de");
+            await _dbService.LinkMessagesAsync(9003UL, 222UL, 9004UL, 444UL, "el");
+            await _dbService.IncrementUsageAsync(100);
+            await _dbService.IncrementUsageAsync(250);
+
+            var status = await _dbService.GetDatabaseStatusSnapshotAsync();
+
+            Assert.Equal(Path.GetFullPath(_database.DatabasePath), status.DatabaseFilePath);
+            Assert.True(status.DatabaseFileSizeBytes > 0);
+            Assert.True(status.DatabaseLastActivityUtc.HasValue);
+            Assert.True(status.DatabaseStorageSizeBytes >= status.DatabaseFileSizeBytes);
+            Assert.Equal(2, status.MasterChannelCount);
+            Assert.Equal(2, status.LocalizedChannelCount);
+            Assert.Equal(4, status.ConfiguredChannelCount);
+            Assert.Equal(2, status.LinkedMessageFamilyCount);
+            Assert.Equal(3, status.LinkedBotMessageCount);
+            Assert.Equal(2, status.LocalizedMessageLinkCount);
+            Assert.Equal(350, status.CurrentMonthCharacterCount);
         }
 
         [Fact]

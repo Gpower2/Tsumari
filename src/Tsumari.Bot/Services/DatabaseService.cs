@@ -162,6 +162,30 @@ namespace Tsumari.Bot.Services
 
         private async Task LogDatabaseStatusAsync(SqliteConnection connection)
         {
+            var status = await ReadDatabaseStatusSnapshotAsync(connection);
+            _logger.LogDatabaseFileStatus(
+                status.DatabaseFilePath,
+                status.DatabaseFileSizeBytes,
+                status.DatabaseWalFileSizeBytes,
+                status.DatabaseLastActivityUtc?.ToString("O") ?? "unknown");
+            _logger.LogDatabaseContentStatus(
+                status.MasterChannelCount,
+                status.LocalizedChannelCount,
+                status.ConfiguredChannelCount,
+                status.LinkedMessageFamilyCount,
+                status.LinkedBotMessageCount,
+                status.LocalizedMessageLinkCount,
+                status.CurrentMonthCharacterCount);
+        }
+
+        public async Task<DatabaseStatusSnapshot> GetDatabaseStatusSnapshotAsync()
+        {
+            using var connection = await GetConnectionAsync();
+            return await ReadDatabaseStatusSnapshotAsync(connection);
+        }
+
+        private async Task<DatabaseStatusSnapshot> ReadDatabaseStatusSnapshotAsync(SqliteConnection connection)
+        {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
                 SELECT
@@ -179,7 +203,7 @@ namespace Tsumari.Bot.Services
             var masterChannelCount = reader.GetInt64(0);
             var localizedChannelCount = reader.GetInt64(1);
             var linkedMessageFamilyCount = reader.GetInt64(2);
-            var mirroredMessageCount = reader.GetInt64(3);
+            var linkedBotMessageCount = reader.GetInt64(3);
             var localizedMessageLinkCount = reader.GetInt64(4);
             var currentMonthCharacterCount = reader.GetInt64(5);
             var configuredChannelCount = masterChannelCount + localizedChannelCount;
@@ -187,18 +211,25 @@ namespace Tsumari.Bot.Services
             // We only log metrics that are stored explicitly. The schema does not currently
             // distinguish true translations from same-language localized pass-through mirrors.
             var databaseFileInfo = new FileInfo(_databaseFilePath);
-            var databaseFileSizeBytes = databaseFileInfo.Exists ? databaseFileInfo.Length : 0;
-            var databaseFileLastWriteUtc = databaseFileInfo.Exists
-                ? databaseFileInfo.LastWriteTimeUtc.ToString("O")
-                : "unknown";
-
-            _logger.LogDatabaseFileStatus(_databaseFilePath, databaseFileSizeBytes, databaseFileLastWriteUtc);
-            _logger.LogDatabaseContentStatus(
+            var databaseWalFileInfo = new FileInfo($"{_databaseFilePath}-wal");
+            var databaseFileLastWriteUtc = databaseFileInfo.Exists ? databaseFileInfo.LastWriteTimeUtc : (DateTime?)null;
+            var databaseWalLastWriteUtc = databaseWalFileInfo.Exists ? databaseWalFileInfo.LastWriteTimeUtc : (DateTime?)null;
+            var databaseLastActivityUtc = databaseFileLastWriteUtc;
+            if (!databaseLastActivityUtc.HasValue
+                || (databaseWalLastWriteUtc.HasValue && databaseWalLastWriteUtc.Value > databaseLastActivityUtc.Value))
+            {
+                databaseLastActivityUtc = databaseWalLastWriteUtc;
+            }
+            return new DatabaseStatusSnapshot(
+                _databaseFilePath,
+                databaseFileInfo.Exists ? databaseFileInfo.Length : 0,
+                databaseWalFileInfo.Exists ? databaseWalFileInfo.Length : 0,
+                databaseLastActivityUtc,
                 masterChannelCount,
                 localizedChannelCount,
                 configuredChannelCount,
                 linkedMessageFamilyCount,
-                mirroredMessageCount,
+                linkedBotMessageCount,
                 localizedMessageLinkCount,
                 currentMonthCharacterCount);
         }
