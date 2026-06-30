@@ -9,6 +9,8 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
 
         bool UsesCharacterQuota { get; }
 
+        TranslationProviderConfigurationReport GetConfigurationReport();
+
         Task<LanguageAnalysisResult> AnalyzeLanguageAsync(string text);
 
         Task<string> TranslateTextAsync(string text, string targetLanguageCode, string? sourceLanguageCode = null);

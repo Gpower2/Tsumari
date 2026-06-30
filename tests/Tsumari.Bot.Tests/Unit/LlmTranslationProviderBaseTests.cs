@@ -139,6 +139,12 @@ namespace Tsumari.Bot.Tests.Unit
                 _response = response;
             }
 
+            protected override string ProviderName => "TestLlm";
+
+            protected override string? ConfiguredEndpoint => "http://localhost/test";
+
+            protected override string? ConfiguredModel => "test-model";
+
             public override bool IsActive => true;
 
             public string CapturedSystemPrompt { get; private set; } = string.Empty;

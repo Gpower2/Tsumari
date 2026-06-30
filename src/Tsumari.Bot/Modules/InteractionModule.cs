@@ -332,6 +332,7 @@ namespace Tsumari.Bot.Modules
             try
             {
                 var status = await _dbService.GetDatabaseStatusSnapshotAsync();
+                var providerReport = _translationService.GetProviderConfigurationReport();
                 _logger.LogBotStatusReported(
                     Context.User.Username,
                     status.ConfiguredChannelCount,
@@ -340,8 +341,7 @@ namespace Tsumari.Bot.Modules
                 await RespondAsync(
                     BuildStatusResponse(
                         status,
-                        _translationService.IsActive,
-                        _translationService.UsesCharacterQuota),
+                        providerReport),
                     ephemeral: true);
             }
             catch (Exception ex)
@@ -415,15 +415,24 @@ namespace Tsumari.Bot.Modules
 
         private static string BuildStatusResponse(
             DatabaseStatusSnapshot status,
-            bool isTranslationProviderActive,
-            bool usesCharacterQuota)
+            TranslationProviderConfigurationReport providerReport)
         {
-            var quotaUsageLine = usesCharacterQuota
+            var quotaUsageLine = providerReport.UsesCharacterQuota
                 ? $"**Quota-tracked characters this month:** {status.CurrentMonthCharacterCount}"
                 : "**Quota-tracked characters this month:** N/A for the current provider";
-            var lines = new[]
+            var lines = new List<string>
             {
-                $"**Translation provider active:** {FormatNullableBoolean(isTranslationProviderActive)}",
+                $"**Translation provider:** {providerReport.ProviderName}",
+                $"**Translation provider active:** {FormatNullableBoolean(providerReport.IsActive)}",
+            };
+
+            foreach (var detail in providerReport.Details)
+            {
+                lines.Add($"**Provider {detail.Label}:** {detail.Value}");
+            }
+
+            lines.AddRange(
+            [
                 $"**Master channels:** {status.MasterChannelCount}",
                 $"**Localized channels:** {status.LocalizedChannelCount}",
                 $"**Configured channels:** {status.ConfiguredChannelCount}",
@@ -435,7 +444,7 @@ namespace Tsumari.Bot.Modules
                 $"**Database WAL size:** {status.DatabaseWalFileSizeBytes} bytes",
                 $"**Database storage size:** {status.DatabaseStorageSizeBytes} bytes",
                 $"**DB last activity (UTC):** {FormatUtcTimestamp(status.DatabaseLastActivityUtc)}"
-            };
+            ]);
 
             return TruncateForDiscord(string.Join("\n", lines));
         }

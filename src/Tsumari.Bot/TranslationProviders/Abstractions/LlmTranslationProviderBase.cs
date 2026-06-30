@@ -17,6 +17,20 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
 
         public bool UsesCharacterQuota => false;
 
+        public TranslationProviderConfigurationReport GetConfigurationReport()
+        {
+            return new TranslationProviderConfigurationReport(
+                ProviderName,
+                GetType().Name,
+                IsActive,
+                UsesCharacterQuota,
+                [
+                    new("Endpoint", FormatConfiguredValue(ConfiguredEndpoint)),
+                    new("Model", FormatConfiguredValue(ConfiguredModel)),
+                    new("Capabilities", "Mixed-language analysis and translation")
+                ]);
+        }
+
         public async Task<LanguageAnalysisResult> AnalyzeLanguageAsync(string text)
         {
             if (!IsActive)
@@ -101,7 +115,20 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
             return NormalizeTranslationResult(result);
         }
 
+        protected abstract string ProviderName { get; }
+
+        protected abstract string? ConfiguredEndpoint { get; }
+
+        protected abstract string? ConfiguredModel { get; }
+
         protected abstract Task<string> CallModelAsync(string systemPrompt, string userPrompt);
+
+        private static string FormatConfiguredValue(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? "not configured"
+                : value;
+        }
 
         private static LanguageAnalysisResult ParseLanguageAnalysisResult(string rawResult)
         {

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tsumari.Bot.Models;
 using Tsumari.Bot.Services;
 using Xunit;
 
@@ -91,6 +92,18 @@ namespace Tsumari.Bot.Tests.Unit
 
             Assert.Contains(new string('x', 1024) + "...", exception.Message);
             Assert.DoesNotContain("TAIL", exception.Message);
+        }
+
+        [Fact]
+        public void GetConfigurationReport_ReturnsConfiguredModelAndEndpoint()
+        {
+            var provider = CreateProvider("""{ "choices": [ { "message": { "content": "\"Bonjour\"" } } ] }""");
+
+            var report = provider.GetConfigurationReport();
+
+            Assert.Equal("OpenAI", report.ProviderName);
+            Assert.Contains(report.Details, detail => detail is TranslationProviderConfigurationItem { Label: "Model", Value: "mistral-7b" });
+            Assert.Contains(report.Details, detail => detail is TranslationProviderConfigurationItem { Label: "Endpoint", Value: "http://localhost:8080/v1/chat/completions" });
         }
 
         private static OpenAITranslationProvider CreateProvider(string responseBody)

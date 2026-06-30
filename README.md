@@ -81,7 +81,8 @@ E:\Development\Tsumari\
 │       │   ├── LinkedMessageFamily.cs
 │       │   ├── MediaAsset.cs
 │       │   ├── ReplyMirroringContext.cs
-│       │   └── TranslationProvider.cs
+│       │   ├── TranslationProvider.cs
+│       │   └── TranslationProviderConfigurationReport.cs
 │       ├── Modules/
 │       │   └── InteractionModule.cs
 │       ├── Properties/
@@ -192,6 +193,7 @@ E:\Development\Tsumari\
 - `DeepL.ApiKey` is only required when `Translation.Provider` is `DeepL`.
 - If a DeepL key ends with `:fx`, Tsumari routes requests to `https://api-free.deepl.com`.
 - If `Translation.Provider` is missing or invalid, startup falls back to **Ollama** instead of defaulting to paid DeepL, and that fallback is logged explicitly.
+- During bootstrap, Tsumari logs the selected provider's active state and provider-specific configuration details (for example model + endpoint for LLM providers, or free/paid routing for DeepL).
 - DeepL target language handling is provider-specific: `DeepLLanguageService` queries DeepL's `GET /v3/languages?resource=translate_text` metadata and only falls back to legacy aliases when the provider metadata cannot be used.
 - Translation providers are separated behind `ITranslationProvider`, and all `IHttpClientFactory` usage now goes through named clients.
 
@@ -231,7 +233,7 @@ All `/tsumari` commands require **Administrator** permissions in guilds. The two
 
 `register-local` stores language codes in normalized lowercase form (`pt_BR` becomes `pt-br`), and re-registering an existing localized channel updates its mapping because the database operation uses `INSERT OR REPLACE`.
 
-`status` responds **ephemerally** with the current bot/database counts (registered master/localized/configured channels, linked message families, linked bot messages, localized message links, quota-tracked current-month character usage when applicable, and DB file/WAL activity metadata). The two language-probe commands also respond **ephemerally** so they do not clutter the channel. `detect-language` runs the provider-backed analysis directly, and `translate` intentionally uses the same analysis + trusted source-hint flow as live message routing when analysis succeeds, while still attempting a translation without a hint if analysis itself fails. Both commands count against the same provider usage/quota rules as normal translation work.
+`status` responds **ephemerally** with the current bot/database counts plus the selected translation provider's active/configuration details (such as provider name, model/endpoint, or DeepL free/paid routing). The two language-probe commands also respond **ephemerally** so they do not clutter the channel. `detect-language` runs the provider-backed analysis directly, and `translate` intentionally uses the same analysis + trusted source-hint flow as live message routing when analysis succeeds, while still attempting a translation without a hint if analysis itself fails. Both commands count against the same provider usage/quota rules as normal translation work.
 
 ## Build, Test, and Publish
 

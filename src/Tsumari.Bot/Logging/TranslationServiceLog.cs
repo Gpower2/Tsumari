@@ -31,5 +31,12 @@ namespace Tsumari.Bot.Logging
             Message = "Translation request blocked! Monthly translation limit of {MonthlyCharacterLimit} characters exceeded."
         )]
         public static partial void LogTranslationRequestBlockedByQuota(this ILogger logger, int monthlyCharacterLimit);
+
+        [LoggerMessage(
+            EventId = 1404,
+            Level = LogLevel.Information,
+            Message = "Selected translation provider status: Name={ProviderName}, Implementation={ImplementationName}, Active={IsActive}, UsesCharacterQuota={UsesCharacterQuota}, Details={Details}"
+        )]
+        public static partial void LogProviderConfigurationReport(this ILogger logger, string providerName, string implementationName, bool isActive, bool usesCharacterQuota, string details);
     }
 }

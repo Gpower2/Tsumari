@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tsumari.Bot.Models;
 using Tsumari.Bot.Services;
 using Xunit;
 
@@ -60,6 +61,26 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Equal(2, result.DetectedLanguages.Count);
             Assert.Equal("EN", result.DetectedLanguages[0].LanguageCode);
             Assert.Equal("IT", result.DetectedLanguages[1].LanguageCode);
+        }
+
+        [Fact]
+        public void GetConfigurationReport_ReturnsConfiguredModelAndEndpoint()
+        {
+            var configMock = new Mock<IConfiguration>();
+            configMock.Setup(c => c["Translation:Ollama:ApiUrl"]).Returns("http://localhost:11434/api/generate");
+            configMock.Setup(c => c["Translation:Ollama:Model"]).Returns("translategemma:12b");
+
+            var httpClientFactory = new Mock<IHttpClientFactory>();
+            var provider = new OllamaTranslationProvider(
+                configMock.Object,
+                httpClientFactory.Object,
+                NullLogger<OllamaTranslationProvider>.Instance);
+
+            var report = provider.GetConfigurationReport();
+
+            Assert.Equal("Ollama", report.ProviderName);
+            Assert.Contains(report.Details, detail => detail is TranslationProviderConfigurationItem { Label: "Model", Value: "translategemma:12b" });
+            Assert.Contains(report.Details, detail => detail is TranslationProviderConfigurationItem { Label: "Endpoint", Value: "http://localhost:11434/api/generate" });
         }
 
         private sealed class StubHttpMessageHandler : HttpMessageHandler

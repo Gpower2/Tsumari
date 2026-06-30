@@ -236,7 +236,10 @@ namespace Tsumari.Bot.Tests.Unit
             await harness.Module.StatusAsync();
 
             var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("**Translation provider:** TestProvider", response, StringComparison.Ordinal);
             Assert.Contains("**Translation provider active:** yes", response, StringComparison.Ordinal);
+            Assert.Contains("**Provider Model:** test-model", response, StringComparison.Ordinal);
+            Assert.Contains("**Provider Endpoint:** http://localhost:1234", response, StringComparison.Ordinal);
             Assert.Contains("**Master channels:** 1", response, StringComparison.Ordinal);
             Assert.Contains("**Localized channels:** 1", response, StringComparison.Ordinal);
             Assert.Contains("**Configured channels:** 2", response, StringComparison.Ordinal);
@@ -298,6 +301,18 @@ namespace Tsumari.Bot.Tests.Unit
             var providerMock = new Mock<ITranslationProvider>();
             providerMock.SetupGet(provider => provider.IsActive).Returns(true);
             providerMock.SetupGet(provider => provider.UsesCharacterQuota).Returns(usesCharacterQuota);
+            providerMock
+                .Setup(provider => provider.GetConfigurationReport())
+                .Returns(new TranslationProviderConfigurationReport(
+                    "TestProvider",
+                    "MockTranslationProvider",
+                    IsActive: true,
+                    UsesCharacterQuota: usesCharacterQuota,
+                    [
+                        new TranslationProviderConfigurationItem("Endpoint", "http://localhost:1234"),
+                        new TranslationProviderConfigurationItem("Model", "test-model"),
+                        new TranslationProviderConfigurationItem("Capabilities", "Mixed-language analysis and translation")
+                    ]));
             var translationService = new TranslationService(
                 dbService,
                 providerMock.Object,

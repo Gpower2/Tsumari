@@ -24,6 +24,12 @@ namespace Tsumari.Bot.TranslationProviders
             _model = configuration["Translation:Ollama:Model"] ?? "aya:8b";
         }
 
+        protected override string ProviderName => "Ollama";
+
+        protected override string? ConfiguredEndpoint => _apiUrl;
+
+        protected override string? ConfiguredModel => _model;
+
         public override bool IsActive => !string.IsNullOrWhiteSpace(_apiUrl) && !string.IsNullOrWhiteSpace(_model);
 
         protected override async Task<string> CallModelAsync(string systemPrompt, string userPrompt)

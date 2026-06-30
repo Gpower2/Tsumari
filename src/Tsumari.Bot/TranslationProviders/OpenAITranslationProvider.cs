@@ -28,6 +28,12 @@ namespace Tsumari.Bot.TranslationProviders
             _apiKey = configuration["Translation:OpenAI:ApiKey"] ?? "dummy";
         }
 
+        protected override string ProviderName => "OpenAI";
+
+        protected override string? ConfiguredEndpoint => _apiUrl;
+
+        protected override string? ConfiguredModel => _model;
+
         public override bool IsActive => !string.IsNullOrWhiteSpace(_apiUrl) && !string.IsNullOrWhiteSpace(_model);
 
         protected override async Task<string> CallModelAsync(string systemPrompt, string userPrompt)

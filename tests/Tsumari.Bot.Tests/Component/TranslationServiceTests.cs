@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tsumari.Bot.Models;
 using Tsumari.Bot.Services;
 using Xunit;
 
@@ -150,6 +151,40 @@ namespace Tsumari.Bot.Tests.Component
                     && entry.Message.Contains("primary 'EN'")
                     && entry.Message.Contains("123456789012345")
                     && !entry.Message.Contains("1234567890123456"));
+        }
+
+        [Fact]
+        public void LogProviderConfiguration_LogsProviderReportDetails()
+        {
+            var dbMock = new Mock<DatabaseService>(new Mock<IConfiguration>().Object, NullLogger<DatabaseService>.Instance);
+            var transLogger = new Tsumari.Bot.Tests.ListLogger<TranslationService>();
+            var loggerFactory = new NullLoggerFactory();
+            var providerMock = new Mock<ITranslationProvider>();
+            providerMock.SetupGet(p => p.IsActive).Returns(true);
+            providerMock.SetupGet(p => p.UsesCharacterQuota).Returns(false);
+            providerMock
+                .Setup(p => p.GetConfigurationReport())
+                .Returns(new TranslationProviderConfigurationReport(
+                    "Ollama",
+                    "OllamaTranslationProvider",
+                    IsActive: true,
+                    UsesCharacterQuota: false,
+                    [
+                        new TranslationProviderConfigurationItem("Endpoint", "http://localhost:11434/api/generate"),
+                        new TranslationProviderConfigurationItem("Model", "translategemma:12b"),
+                        new TranslationProviderConfigurationItem("Capabilities", "Mixed-language analysis and translation")
+                    ]));
+
+            var transService = new TranslationService(dbMock.Object, providerMock.Object, transLogger, loggerFactory);
+
+            transService.LogProviderConfiguration();
+
+            Assert.Contains(
+                transLogger.Entries,
+                entry => entry.EventId.Id == 1404
+                    && entry.Message.Contains("Name=Ollama", StringComparison.Ordinal)
+                    && entry.Message.Contains("Model=translategemma:12b", StringComparison.Ordinal)
+                    && entry.Message.Contains("Endpoint=http://localhost:11434/api/generate", StringComparison.Ordinal));
         }
 
         private sealed class ListLogger<T> : ILogger<T>

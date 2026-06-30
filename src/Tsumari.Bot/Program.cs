@@ -96,6 +96,7 @@ namespace Tsumari.Bot
             builder.Services.AddHostedService<DiscordGatewayHostedService>();
 
             var host = builder.Build();
+            host.Services.GetRequiredService<TranslationService>().LogProviderConfiguration();
             host.Run();
         }
     }

@@ -34,6 +34,22 @@ namespace Tsumari.Bot.Services
 
         public bool UsesCharacterQuota => _translationProvider.UsesCharacterQuota;
 
+        public TranslationProviderConfigurationReport GetProviderConfigurationReport()
+        {
+            return _translationProvider.GetConfigurationReport();
+        }
+
+        public void LogProviderConfiguration()
+        {
+            var report = GetProviderConfigurationReport();
+            _logger.LogProviderConfigurationReport(
+                report.ProviderName,
+                report.ImplementationName,
+                report.IsActive,
+                report.UsesCharacterQuota,
+                FormatProviderDetails(report.Details));
+        }
+
         public async Task<bool> CanTranslateAsync(int characterCount)
         {
             if (_translationProvider.UsesCharacterQuota)
@@ -128,6 +144,16 @@ namespace Tsumari.Bot.Services
             return text.Length <= MaxLoggedTextPreviewLength
                 ? text
                 : new string(text.AsSpan(0, MaxLoggedTextPreviewLength));
+        }
+
+        private static string FormatProviderDetails(IReadOnlyList<TranslationProviderConfigurationItem> details)
+        {
+            if (details.Count == 0)
+            {
+                return "none";
+            }
+
+            return string.Join("; ", details.Select(detail => $"{detail.Label}={detail.Value}"));
         }
     }
 }
