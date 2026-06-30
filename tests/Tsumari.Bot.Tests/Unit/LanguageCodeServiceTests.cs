@@ -75,7 +75,7 @@ namespace Tsumari.Bot.Tests.Unit
                 "EN",
                 [
                     new DetectedLanguage("EN", 0.88),
-                    new DetectedLanguage("IT", 0.12)
+                    new DetectedLanguage("IT", 0.20)
                 ],
                 isMixed: true,
                 hasClearDominantLanguage: true);

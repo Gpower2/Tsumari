@@ -8,8 +8,9 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Bi-directional flows:** supports master-to-localized routing plus localized match/mismatch routing.
 - **Pluggable translation backends:** `DeepL`, `Ollama`, and `OpenAI` (OpenAI-compatible chat-completions endpoint).
 - **Best-effort language analysis:** every text message is analyzed before routing decisions are made, including mixed-language/code-switched messages when the selected provider can infer them.
+- **Conservative mixed-language labels:** tiny secondary-language traces are collapsed back to the dominant language so isolated loanwords, slang, or names do not usually produce `XX,YY => ZZ` headers on their own.
 - **Separate locale targets:** locale tags such as `pt` and `pt-br` are preserved as distinct translation targets and are not collapsed together during fan-out.
-- **Clear translated headers:** single-language translations keep `XX to YY`, while mixed-language translations surface the detected source list as `XX,YY => ZZ`.
+- **Clear translated headers:** both single-language and mixed-language translations use `=>`, with mixed-language sources surfacing the detected source list as `XX,YY => ZZ`.
 - **Jump-link buttons:** generated bot messages are edited after send so they can include `Original` plus language-code buttons for other generated copies.
 - **Reply mirroring:** when a user replies to a tracked message, mirrored bot messages reply to the corresponding linked message in each destination channel.
 - **Edited-message synchronization:** when a user edits a text message, mirrored bot messages are updated in place.

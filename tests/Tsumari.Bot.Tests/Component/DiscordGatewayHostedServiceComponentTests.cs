@@ -63,12 +63,12 @@ namespace Tsumari.Bot.Tests.Component
             await hostedService.HandleMessageReceivedAsync(message.Object);
 
             Assert.Single(germanChannel.SentMessages);
-            Assert.Equal("**Alice** (EN to DE):\nHallo Welt", germanChannel.SentMessages[0].Content);
+            Assert.Equal("**Alice** (EN => DE):\nHallo Welt", germanChannel.SentMessages[0].Content);
             Assert.Null(germanChannel.SentMessages[0].ReplyReference);
             Assert.Equal(1, germanChannel.SentMessages[0].ModifyCallCount);
 
             Assert.Single(italianChannel.SentMessages);
-            Assert.Equal("**Alice** (EN to IT):\nCiao mondo", italianChannel.SentMessages[0].Content);
+            Assert.Equal("**Alice** (EN => IT):\nCiao mondo", italianChannel.SentMessages[0].Content);
             Assert.Null(italianChannel.SentMessages[0].ReplyReference);
             Assert.Equal(1, italianChannel.SentMessages[0].ModifyCallCount);
 
@@ -216,7 +216,7 @@ namespace Tsumari.Bot.Tests.Component
             await hostedService.HandleMessageReceivedAsync(message.Object);
 
             Assert.Single(germanChannel.SentMessages);
-            Assert.Equal("*(EN to DE):* Hallo aus Deutschland", germanChannel.SentMessages[0].Content);
+            Assert.Equal("*(EN => DE):* Hallo aus Deutschland", germanChannel.SentMessages[0].Content);
             Assert.NotNull(germanChannel.SentMessages[0].ReplyReference);
             Assert.Equal(520UL, germanChannel.SentMessages[0].ReplyReference!.MessageId.Value);
 
@@ -226,7 +226,7 @@ namespace Tsumari.Bot.Tests.Component
             Assert.Equal(500UL, masterChannel.SentMessages[0].ReplyReference!.MessageId.Value);
 
             Assert.Single(italianChannel.SentMessages);
-            Assert.Equal("**Alice** (EN to IT):\nCiao dalla Germania", italianChannel.SentMessages[0].Content);
+            Assert.Equal("**Alice** (EN => IT):\nCiao dalla Germania", italianChannel.SentMessages[0].Content);
             Assert.NotNull(italianChannel.SentMessages[0].ReplyReference);
             Assert.Equal(530UL, italianChannel.SentMessages[0].ReplyReference!.MessageId.Value);
 
@@ -318,11 +318,11 @@ namespace Tsumari.Bot.Tests.Component
             await hostedService.HandleMessageReceivedAsync(message.Object);
 
             Assert.Single(germanChannel.SentMessages);
-            Assert.Equal("*(EN to DE):* Hallo aus Deutschland", germanChannel.SentMessages[0].Content);
+            Assert.Equal("*(EN => DE):* Hallo aus Deutschland", germanChannel.SentMessages[0].Content);
             Assert.Single(masterChannel.SentMessages);
             Assert.Equal("**Alice**:\nHello from Germany", masterChannel.SentMessages[0].Content);
             Assert.Single(italianChannel.SentMessages);
-            Assert.Equal("**Alice** (EN to IT):\nCiao dalla Germania", italianChannel.SentMessages[0].Content);
+            Assert.Equal("**Alice** (EN => IT):\nCiao dalla Germania", italianChannel.SentMessages[0].Content);
             translationProvider.Verify(provider =>
                 provider.TranslateTextAsync(
                     "Hello from Germany",
@@ -432,11 +432,11 @@ namespace Tsumari.Bot.Tests.Component
             await hostedService.HandleMessageReceivedAsync(message.Object);
 
             Assert.Single(italianChannel.SentMessages);
-            Assert.Equal("*(EN,IT => IT):* Grazie fratello! 🤗\nLe cose si stanno gia scaldando, stanno scommettendo come matti 😅", italianChannel.SentMessages[0].Content);
+            Assert.Equal("*(EN => IT):* Grazie fratello! 🤗\nLe cose si stanno gia scaldando, stanno scommettendo come matti 😅", italianChannel.SentMessages[0].Content);
             Assert.Single(masterChannel.SentMessages);
             Assert.Equal($"**Alice**:\n{content}", masterChannel.SentMessages[0].Content);
             Assert.Single(germanChannel.SentMessages);
-            Assert.Equal("**Alice** (EN,IT => DE):\nDanke Bruder! 🤗\nDie Lage heizt sich schon auf, sie wetten wie verrueckt 😅", germanChannel.SentMessages[0].Content);
+            Assert.Equal("**Alice** (EN => DE):\nDanke Bruder! 🤗\nDie Lage heizt sich schon auf, sie wetten wie verrueckt 😅", germanChannel.SentMessages[0].Content);
         }
 
         [Fact]
@@ -509,7 +509,7 @@ namespace Tsumari.Bot.Tests.Component
             var discordMessageService = new ComponentDiscordMessageService();
             var masterChannel = new ChannelCapture(10UL, 1UL, "general");
             var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
-            var mirroredMessage = germanChannel.RegisterExistingMessage(720UL, "**Alice** (EN to DE):\nOld text");
+            var mirroredMessage = germanChannel.RegisterExistingMessage(720UL, "**Alice** (EN => DE):\nOld text");
             discordMessageService.RegisterChannel(masterChannel);
             discordMessageService.RegisterChannel(germanChannel);
 
@@ -519,7 +519,7 @@ namespace Tsumari.Bot.Tests.Component
 
             await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
 
-            Assert.Equal("**Alice** (EN to DE):\nAktualisierter Text", mirroredMessage.Content);
+            Assert.Equal("**Alice** (EN => DE):\nAktualisierter Text", mirroredMessage.Content);
             Assert.Equal(1, mirroredMessage.ModifyCallCount);
             Assert.Empty(germanChannel.SentMessages);
 
@@ -551,7 +551,7 @@ namespace Tsumari.Bot.Tests.Component
             var germanChannel = new ChannelCapture(20UL, 1UL, "general-de", maxUploadLimit: 10UL);
             var mirroredMessage = germanChannel.RegisterExistingMessage(
                 724UL,
-                "**Alice** (EN to DE):\nOld text\n*(Anhang zu gross zum Spiegeln - nutze Original.)*");
+                "**Alice** (EN => DE):\nOld text\n*(Anhang zu gross zum Spiegeln - nutze Original.)*");
             discordMessageService.RegisterChannel(masterChannel);
             discordMessageService.RegisterChannel(germanChannel);
 
@@ -570,7 +570,7 @@ namespace Tsumari.Bot.Tests.Component
             await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
 
             Assert.Equal(
-                "**Alice** (EN to DE):\nAktualisierter Text\n*(Anhang zu gross zum Spiegeln - nutze Original.)*",
+                "**Alice** (EN => DE):\nAktualisierter Text\n*(Anhang zu gross zum Spiegeln - nutze Original.)*",
                 mirroredMessage.Content);
             Assert.Equal(1, mirroredMessage.ModifyCallCount);
         }
@@ -604,7 +604,7 @@ namespace Tsumari.Bot.Tests.Component
             var discordMessageService = new ComponentDiscordMessageService();
             var masterChannel = new ChannelCapture(10UL, 1UL, "general");
             var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
-            var mirroredMessage = germanChannel.RegisterExistingMessage(721UL, "**Alice** (EN to DE):\nOld text");
+            var mirroredMessage = germanChannel.RegisterExistingMessage(721UL, "**Alice** (EN => DE):\nOld text");
             discordMessageService.RegisterChannel(masterChannel);
             discordMessageService.RegisterChannel(germanChannel);
 
@@ -614,7 +614,7 @@ namespace Tsumari.Bot.Tests.Component
 
             await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
 
-            Assert.Equal("**Alice** (EN,IT => DE):\nDanke Bruder! 🤗\nDie Lage heizt sich schon auf, sie wetten wie verrueckt 😅", mirroredMessage.Content);
+            Assert.Equal("**Alice** (EN => DE):\nDanke Bruder! 🤗\nDie Lage heizt sich schon auf, sie wetten wie verrueckt 😅", mirroredMessage.Content);
             Assert.Equal(1, mirroredMessage.ModifyCallCount);
         }
 
@@ -647,7 +647,7 @@ namespace Tsumari.Bot.Tests.Component
             var discordMessageService = new ComponentDiscordMessageService();
             var masterChannel = new ChannelCapture(10UL, 1UL, "general");
             var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
-            var mirroredMessage = germanChannel.RegisterExistingMessage(723UL, "**Alice** (EN to DE):\nOld text");
+            var mirroredMessage = germanChannel.RegisterExistingMessage(723UL, "**Alice** (EN => DE):\nOld text");
             discordMessageService.RegisterChannel(masterChannel);
             discordMessageService.RegisterChannel(germanChannel);
 
@@ -702,8 +702,8 @@ namespace Tsumari.Bot.Tests.Component
             var italianChannel = new ChannelCapture(30UL, 1UL, "general-it");
             var englishChannel = new ChannelCapture(40UL, 1UL, "general-en");
             var masterMirror = masterChannel.RegisterExistingMessage(710UL, "**Alice**:\nOld text");
-            var germanReply = germanChannel.RegisterExistingMessage(720UL, "*(EN to DE):* Alter Text");
-            var italianMirror = italianChannel.RegisterExistingMessage(730UL, "**Alice** (EN to IT):\nVecchio testo");
+            var germanReply = germanChannel.RegisterExistingMessage(720UL, "*(EN => DE):* Alter Text");
+            var italianMirror = italianChannel.RegisterExistingMessage(730UL, "**Alice** (EN => IT):\nVecchio testo");
             var englishMirror = englishChannel.RegisterExistingMessage(740UL, "**Alice**:\nOld text");
             discordMessageService.RegisterChannel(masterChannel);
             discordMessageService.RegisterChannel(germanChannel);
@@ -718,9 +718,9 @@ namespace Tsumari.Bot.Tests.Component
 
             Assert.Equal("**Alice**:\nUpdated text", masterMirror.Content);
             Assert.Equal(1, masterMirror.ModifyCallCount);
-            Assert.Equal("*(EN to DE):* Aktualisierter Text", germanReply.Content);
+            Assert.Equal("*(EN => DE):* Aktualisierter Text", germanReply.Content);
             Assert.Equal(1, germanReply.ModifyCallCount);
-            Assert.Equal("**Alice** (EN to IT):\nTesto aggiornato", italianMirror.Content);
+            Assert.Equal("**Alice** (EN => IT):\nTesto aggiornato", italianMirror.Content);
             Assert.Equal(1, italianMirror.ModifyCallCount);
             Assert.Equal("**Alice**:\nUpdated text", englishMirror.Content);
             Assert.Equal(1, englishMirror.ModifyCallCount);
@@ -756,8 +756,8 @@ namespace Tsumari.Bot.Tests.Component
             var italianChannel = new ChannelCapture(30UL, 1UL, "general-it");
             var englishChannel = new ChannelCapture(40UL, 1UL, "general-en");
             var masterMirror = masterChannel.RegisterExistingMessage(712UL, "**Alice**:\nOld text");
-            var germanReply = germanChannel.RegisterExistingMessage(722UL, "*(EN to DE):* Alter Text");
-            var italianMirror = italianChannel.RegisterExistingMessage(732UL, "**Alice** (EN to IT):\nVecchio testo");
+            var germanReply = germanChannel.RegisterExistingMessage(722UL, "*(EN => DE):* Alter Text");
+            var italianMirror = italianChannel.RegisterExistingMessage(732UL, "**Alice** (EN => IT):\nVecchio testo");
             var englishMirror = englishChannel.RegisterExistingMessage(742UL, "**Alice**:\nOld text");
             discordMessageService.RegisterChannel(masterChannel);
             discordMessageService.RegisterChannel(germanChannel);
@@ -771,8 +771,8 @@ namespace Tsumari.Bot.Tests.Component
             await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
 
             Assert.Equal("**Alice**:\nUpdated text", masterMirror.Content);
-            Assert.Equal("*(EN to DE):* Aktualisierter Text", germanReply.Content);
-            Assert.Equal("**Alice** (EN to IT):\nTesto aggiornato", italianMirror.Content);
+            Assert.Equal("*(EN => DE):* Aktualisierter Text", germanReply.Content);
+            Assert.Equal("**Alice** (EN => IT):\nTesto aggiornato", italianMirror.Content);
             Assert.Equal("**Alice**:\nUpdated text", englishMirror.Content);
             translationProvider.Verify(provider =>
                 provider.TranslateTextAsync(
@@ -814,8 +814,8 @@ namespace Tsumari.Bot.Tests.Component
             var germanChannel = new ChannelCapture(20UL, 1UL, "general-de");
             var italianChannel = new ChannelCapture(30UL, 1UL, "general-it");
             var masterMirror = masterChannel.RegisterExistingMessage(710UL, "**Alice**:\nOld text");
-            var germanReply = germanChannel.RegisterExistingMessage(720UL, "*(EN to DE):* Alter Text");
-            var italianMirror = italianChannel.RegisterExistingMessage(730UL, "**Alice** (EN to IT):\nVecchio testo");
+            var germanReply = germanChannel.RegisterExistingMessage(720UL, "*(EN => DE):* Alter Text");
+            var italianMirror = italianChannel.RegisterExistingMessage(730UL, "**Alice** (EN => IT):\nVecchio testo");
             discordMessageService.RegisterChannel(masterChannel);
             discordMessageService.RegisterChannel(germanChannel);
             discordMessageService.RegisterChannel(italianChannel);
@@ -828,7 +828,7 @@ namespace Tsumari.Bot.Tests.Component
 
             Assert.Equal("**Alice**:\nUpdated text", masterMirror.Content);
             Assert.Equal(1, masterMirror.ModifyCallCount);
-            Assert.Equal("*(EN to DE):* Aktualisierter Text", germanReply.Content);
+            Assert.Equal("*(EN => DE):* Aktualisierter Text", germanReply.Content);
             Assert.Equal(1, germanReply.ModifyCallCount);
             Assert.Equal("**Alice**:\nUpdated text *(Translation Failed)*", italianMirror.Content);
             Assert.Equal(1, italianMirror.ModifyCallCount);
@@ -869,7 +869,7 @@ namespace Tsumari.Bot.Tests.Component
             var originalChannel = new ChannelCapture(10UL, 1UL, "general");
             var mirrorChannel = new ChannelCapture(20UL, 1UL, "general-de");
             var originalMessage = originalChannel.RegisterExistingMessage(900UL, "**Alice**:\nHello");
-            var mirrorMessage = mirrorChannel.RegisterExistingMessage(920UL, "**Alice** (EN to DE):\nHallo");
+            var mirrorMessage = mirrorChannel.RegisterExistingMessage(920UL, "**Alice** (EN => DE):\nHallo");
             originalMessage.SetReaction(new Emoji("👍"), normalCount: 1, isMe: false);
             discordMessageService.SetReactionUsers(originalMessage.Message, new Emoji("👍"), [CreateUser(isBot: false)]);
             discordMessageService.RegisterChannel(originalChannel);

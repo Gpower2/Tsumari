@@ -59,6 +59,8 @@ For a new message, the routing pipeline:
 5. Stores generated message IDs in `MessageLinks`.
 6. Edits generated bot messages to add the final jump-button set.
 
+Minor secondary-language traces can be collapsed back to a single-language result when they only account for a very small share of the message, so isolated loanwords, slang, or names do not automatically trigger mixed-language headers.
+
 If language analysis fails, the pipeline falls back to `EN`.
 
 ## Branch A: Message Received in a Master Channel
@@ -69,7 +71,7 @@ When a user posts in a master channel:
 2. Tsumari queries every localized child channel for that master.
 3. For each child:
    - If the resolved dominant source language does not match `child.TargetLanguageCode` and the message has text, Tsumari translates the content and sends:
-     - `**Author** (SRC to TARGET):` for single-language sources
+     - `**Author** (SRC => TARGET):` for single-language sources
      - `**Author** (SRC1,SRC2 => TARGET):` for mixed-language sources
    - Otherwise, it sends the raw content:
      - `**Author**:`
@@ -112,7 +114,7 @@ If the resolved dominant source language does **not** match the localized channe
 
 1. The original localized message stays untouched.
 2. Tsumari posts a translated reply in the same localized channel:
-   - `*(SRC to LOCAL):* translated text` for single-language sources
+   - `*(SRC => LOCAL):* translated text` for single-language sources
    - `*(SRC1,SRC2 => LOCAL):* translated text` for mixed-language sources
 3. Tsumari sends the raw message to the parent master channel.
 4. Tsumari sends the raw message to the sibling localized channel whose target language exactly matches the resolved dominant source locale, if one exists.
@@ -178,8 +180,8 @@ When a user edits a message, `OnMessageUpdatedAsync` runs.
    - If the destination channel's target language exactly matches the resolved dominant source locale, rewrite it as raw:
      - `**Author**:`
    - Otherwise translate it and rewrite it as:
-     - `*(SRC to TARGET):* translated text` / `*(SRC1,SRC2 => TARGET):* translated text` for the same-channel translated reply created by localized mismatch flow
-     - `**Author** (SRC to TARGET):` / `**Author** (SRC1,SRC2 => TARGET):` for cross-channel translated mirrors
+     - `*(SRC => TARGET):* translated text` / `*(SRC1,SRC2 => TARGET):* translated text` for the same-channel translated reply created by localized mismatch flow
+     - `**Author** (SRC => TARGET):` / `**Author** (SRC1,SRC2 => TARGET):` for cross-channel translated mirrors
 6. Update the mirrored message content in place with `ModifyAsync`.
 
 ### What Stays the Same During Edit Sync

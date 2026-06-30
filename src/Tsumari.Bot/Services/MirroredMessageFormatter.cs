@@ -18,7 +18,7 @@ namespace Tsumari.Bot.Services
         {
             sourceLang = LanguageCodeService.NormalizeLanguageCode(sourceLang);
             targetLang = LanguageCodeService.NormalizeLanguageCode(targetLang);
-            return $"({sourceLang} to {targetLang})";
+            return $"({sourceLang} => {targetLang})";
         }
 
         public static string FormatLanguagePair(SourceLanguageInfo sourceLanguageInfo, string targetLang)
@@ -28,7 +28,7 @@ namespace Tsumari.Bot.Services
             targetLang = LanguageCodeService.NormalizeLanguageCode(targetLang);
             if (sourceLanguageInfo.LabelLanguageCodes.Count <= 1)
             {
-                return $"({sourceLanguageInfo.PrimaryLanguageCode} to {targetLang})";
+                return $"({sourceLanguageInfo.PrimaryLanguageCode} => {targetLang})";
             }
 
             return $"({string.Join(",", sourceLanguageInfo.LabelLanguageCodes)} => {targetLang})";

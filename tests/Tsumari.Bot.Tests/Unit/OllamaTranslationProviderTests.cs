@@ -48,7 +48,7 @@ namespace Tsumari.Bot.Tests.Unit
             var httpClientFactory = new Mock<IHttpClientFactory>();
             httpClientFactory
                 .Setup(f => f.CreateClient(HttpClientNames.OllamaTranslation))
-                .Returns(new HttpClient(new StubHttpMessageHandler("""{ "response": "```json\n{ \"dominantLanguageCode\": \"en\", \"languages\": [{ \"languageCode\": \"it\", \"share\": 0.12 }, { \"languageCode\": \"en\", \"share\": 0.88 }], \"isMixed\": true, \"hasClearDominantLanguage\": true }\n```" }""")));
+                .Returns(new HttpClient(new StubHttpMessageHandler("""{ "response": "```json\n{ \"dominantLanguageCode\": \"en\", \"languages\": [{ \"languageCode\": \"it\", \"share\": 0.20 }, { \"languageCode\": \"en\", \"share\": 0.80 }], \"isMixed\": true, \"hasClearDominantLanguage\": true }\n```" }""")));
 
             var provider = new OllamaTranslationProvider(
                 configMock.Object,

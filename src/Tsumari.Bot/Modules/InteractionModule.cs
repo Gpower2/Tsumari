@@ -402,7 +402,7 @@ namespace Tsumari.Bot.Modules
                     ? $"**Output** ({normalizedTargetLanguageCode}):"
                     : sourceLanguageInfo != null
                     ? $"**Translation** {MirroredMessageFormatter.FormatLanguagePair(sourceLanguageInfo, normalizedTargetLanguageCode)}:"
-                    : $"**Translation** (to {normalizedTargetLanguageCode}):");
+                    : $"**Translation** (?? => {normalizedTargetLanguageCode}):");
             lines.Add(translatedText);
 
             return TruncateForDiscord(string.Join("\n", lines));

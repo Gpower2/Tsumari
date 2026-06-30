@@ -15,6 +15,9 @@ namespace Tsumari.Bot.Models
 
     public sealed class LanguageAnalysisResult
     {
+        private const double MinimalSecondaryLanguageShareThreshold = 0.15;
+        private const double StrongPrimaryLanguageShareThreshold = 0.85;
+
         public LanguageAnalysisResult(
             string? primaryLanguageCode,
             IReadOnlyCollection<DetectedLanguage>? detectedLanguages = null,
@@ -31,8 +34,10 @@ namespace Tsumari.Bot.Models
             }
 
             PrimaryLanguageCode = normalizedPrimaryLanguageCode;
-            DetectedLanguages = BuildDetectedLanguages(normalizedPrimaryLanguageCode, normalizedDetectedLanguages);
-            IsMixed = isMixed;
+            DetectedLanguages = CollapseMinimalSecondaryLanguages(
+                normalizedPrimaryLanguageCode,
+                BuildDetectedLanguages(normalizedPrimaryLanguageCode, normalizedDetectedLanguages));
+            IsMixed = DetectedLanguages.Count <= 1 ? false : isMixed;
             HasClearDominantLanguage = hasClearDominantLanguage;
         }
 
@@ -115,6 +120,28 @@ namespace Tsumari.Bot.Models
 
             orderedLanguages.Insert(0, new DetectedLanguage(primaryLanguageCode));
             return orderedLanguages;
+        }
+
+        private static IReadOnlyList<DetectedLanguage> CollapseMinimalSecondaryLanguages(
+            string primaryLanguageCode,
+            IReadOnlyList<DetectedLanguage> detectedLanguages)
+        {
+            if (detectedLanguages.Count != 2)
+            {
+                return detectedLanguages;
+            }
+
+            var primaryLanguage = detectedLanguages[0];
+            var secondaryLanguage = detectedLanguages[1];
+            if (!primaryLanguage.Share.HasValue
+                || !secondaryLanguage.Share.HasValue
+                || primaryLanguage.Share.Value < StrongPrimaryLanguageShareThreshold
+                || secondaryLanguage.Share.Value > MinimalSecondaryLanguageShareThreshold)
+            {
+                return detectedLanguages;
+            }
+
+            return [new DetectedLanguage(primaryLanguageCode, 1.0)];
         }
 
         private static double? NormalizeShare(double? share)

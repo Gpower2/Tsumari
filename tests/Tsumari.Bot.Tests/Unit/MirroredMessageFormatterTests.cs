@@ -11,11 +11,11 @@ namespace Tsumari.Bot.Tests.Unit
         public void FormatLanguagePair_Returns_Correct_Format()
         {
             var result = MirroredMessageFormatter.FormatLanguagePair("en", "de");
-            Assert.Equal("(EN to DE)", result);
+            Assert.Equal("(EN => DE)", result);
             result = MirroredMessageFormatter.FormatLanguagePair("EN-US", "el");
-            Assert.Equal("(EN-US to EL)", result);
+            Assert.Equal("(EN-US => EL)", result);
             result = MirroredMessageFormatter.FormatLanguagePair("pt_br", "en-us");
-            Assert.Equal("(PT-BR to EN-US)", result);
+            Assert.Equal("(PT-BR => EN-US)", result);
         }
 
         [Fact]
@@ -77,7 +77,7 @@ namespace Tsumari.Bot.Tests.Unit
         {
             var result = MirroredMessageFormatter.FormatTranslatedReplyText("en", "de", "Hallo");
 
-            Assert.Equal("*(EN to DE):* Hallo", result);
+            Assert.Equal("*(EN => DE):* Hallo", result);
         }
 
         [Fact]
@@ -127,7 +127,7 @@ namespace Tsumari.Bot.Tests.Unit
         {
             var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 20, "Alice", "en", "de", "Hallo");
 
-            Assert.Equal("**Alice** (EN to DE):\nHallo", result);
+            Assert.Equal("**Alice** (EN => DE):\nHallo", result);
         }
 
         [Fact]
@@ -135,7 +135,7 @@ namespace Tsumari.Bot.Tests.Unit
         {
             var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 10, "Alice", "en", "de", "Hallo");
 
-            Assert.Equal("*(EN to DE):* Hallo", result);
+            Assert.Equal("*(EN => DE):* Hallo", result);
         }
 
         [Fact]
@@ -169,7 +169,7 @@ namespace Tsumari.Bot.Tests.Unit
         {
             var result = MirroredMessageFormatter.FormatTranslationFailureText(10, 10, "Alice", "en", "de", "Hello");
 
-            Assert.Equal("*(EN to DE):* Hello *(Translation Failed)*", result);
+            Assert.Equal("*(EN => DE):* Hello *(Translation Failed)*", result);
         }
     }
 }

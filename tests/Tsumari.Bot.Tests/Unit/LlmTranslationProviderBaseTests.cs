@@ -23,6 +23,7 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Contains("opening unaccented \"si\" can still mean affirmative sì", provider.CapturedSystemPrompt);
             Assert.Contains("\"caralho, this is getting wild already\" -> dominantLanguageCode EN", provider.CapturedSystemPrompt);
             Assert.Contains("\"μαλακα, how are you doing tonight?\" -> dominantLanguageCode EN", provider.CapturedSystemPrompt);
+            Assert.Contains("\"Thank you fratello! Things are already heating up\" -> dominantLanguageCode EN", provider.CapturedSystemPrompt);
             Assert.Contains("Return ONLY strict JSON", provider.CapturedSystemPrompt);
             Assert.Contains(input, provider.CapturedUserPrompt);
         }

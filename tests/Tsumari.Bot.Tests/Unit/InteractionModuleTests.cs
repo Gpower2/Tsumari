@@ -27,8 +27,8 @@ namespace Tsumari.Bot.Tests.Unit
                 .ReturnsAsync(new LanguageAnalysisResult(
                     "EN",
                     [
-                        new DetectedLanguage("EN", 0.85),
-                        new DetectedLanguage("IT", 0.15)
+                        new DetectedLanguage("EN", 0.80),
+                        new DetectedLanguage("IT", 0.20)
                     ],
                     isMixed: true,
                     hasClearDominantLanguage: true));
@@ -54,7 +54,7 @@ namespace Tsumari.Bot.Tests.Unit
 
             var response = GetLatestFollowupText(harness.InteractionMock);
             Assert.Contains("**Dominant:** EN", response, StringComparison.Ordinal);
-            Assert.Contains("**Detected:** EN (85%), IT (15%)", response, StringComparison.Ordinal);
+            Assert.Contains("**Detected:** EN (80%), IT (20%)", response, StringComparison.Ordinal);
             Assert.Contains("**Mixed:** yes", response, StringComparison.Ordinal);
             Assert.Contains("**Clear dominant:** yes", response, StringComparison.Ordinal);
         }
@@ -78,7 +78,7 @@ namespace Tsumari.Bot.Tests.Unit
 
             var response = GetLatestFollowupText(harness.InteractionMock);
             Assert.Contains("**Hint used:** IT", response, StringComparison.Ordinal);
-            Assert.Contains("**Translation** (IT to EN):", response, StringComparison.Ordinal);
+            Assert.Contains("**Translation** (IT => EN):", response, StringComparison.Ordinal);
             Assert.Contains("Yes, Tasos, they can be fun.", response, StringComparison.Ordinal);
         }
 
@@ -219,7 +219,7 @@ namespace Tsumari.Bot.Tests.Unit
             var response = GetLatestFollowupText(harness.InteractionMock);
             Assert.Contains("**Detected:** unavailable", response, StringComparison.Ordinal);
             Assert.Contains("**Hint used:** none (analysis failed)", response, StringComparison.Ordinal);
-            Assert.Contains("**Translation** (to EN):", response, StringComparison.Ordinal);
+            Assert.Contains("**Translation** (?? => EN):", response, StringComparison.Ordinal);
             Assert.Contains("Translated anyway", response, StringComparison.Ordinal);
         }
 

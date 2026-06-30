@@ -14,14 +14,14 @@ message text
 ### Translated Copies
 
 ```text
-**Author** (XX to YY):
+**Author** (XX => YY):
 translated text
 ```
 
 ### Initial Mismatch Reply in a Localized Channel
 
 ```text
-*(XX to YY):* translated text
+*(XX => YY):* translated text
 ```
 
 ### Buttons
@@ -46,14 +46,14 @@ Assume `#general` is the master channel and it has localized children `#general-
 
 ### Mirrored Message in `#general-greek`
 
-> **gpowe** (EN to EL):
+> **gpowe** (EN => EL):
 > Ας εξετάσουμε το πρόγραμμα ανάπτυξης για απόψε.
 >
 > `[Buttons: Original | EL | IT]`
 
 ### Mirrored Message in `#general-italian`
 
-> **gpowe** (EN to IT):
+> **gpowe** (EN => IT):
 > Rivediamo il programma di distribuzione per questa sera.
 >
 > `[Buttons: Original | EL | IT]`
@@ -84,14 +84,14 @@ The user writes Greek in `#general-greek`.
 
 ### Mirrored Translation in `#general-english`
 
-> **nikos** (EL to EN):
+> **nikos** (EL => EN):
 > The test completed successfully!
 >
 > `[Buttons: Original | EN | IT]`
 
 ### Mirrored Translation in `#general-italian`
 
-> **nikos** (EL to IT):
+> **nikos** (EL => IT):
 > Il test è stato completato con successo!
 >
 > `[Buttons: Original | EN | IT]`
@@ -111,7 +111,7 @@ The user writes English in `#general-greek`.
 
 ### In-Channel Translated Reply in `#general-greek`
 
-> ↳ 🤖 **Tsumari** (Bot): *(EN to EL):* Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα;
+> ↳ 🤖 **Tsumari** (Bot): *(EN => EL):* Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα;
 >
 > `[Buttons: Original | EL | EN | IT]`
 
@@ -131,7 +131,7 @@ The user writes English in `#general-greek`.
 
 ### Mirrored Translation in `#general-italian`
 
-> **gpowe** (EN to IT):
+> **gpowe** (EN => IT):
 > Possiamo definire i parametri del database prima di pranzo?
 >
 > `[Buttons: Original | EL | EN | IT]`
@@ -155,13 +155,13 @@ Starting from Scenario 3, the user edits the original message to:
 
 After edit sync, the reply remains a Discord reply message and keeps the compact same-channel translated-reply format:
 
-> ↳ 🤖 **Tsumari** (Bot): *(EN to EL):* Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα και να τις κοινοποιήσουμε στο νήμα της έκδοσης;
+> ↳ 🤖 **Tsumari** (Bot): *(EN => EL):* Μπορούμε να οριστικοποιήσουμε τις παραμέτρους της βάσης δεδομένων πριν από το μεσημεριανό γεύμα και να τις κοινοποιήσουμε στο νήμα της έκδοσης;
 >
 > `[Buttons: Original | EL | EN | IT]`
 
 ### Updated Translation in `#general-italian`
 
-> **gpowe** (EN to IT):
+> **gpowe** (EN => IT):
 > Possiamo definire i parametri del database prima di pranzo e condividerli nel thread della release?
 >
 > `[Buttons: Original | EL | EN | IT]`
