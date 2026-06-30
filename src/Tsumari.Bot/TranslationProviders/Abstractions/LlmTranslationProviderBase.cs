@@ -17,7 +17,7 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
 
         public bool UsesCharacterQuota => false;
 
-        public TranslationProviderConfigurationReport GetConfigurationReport()
+        public virtual TranslationProviderConfigurationReport GetConfigurationReport()
         {
             return new TranslationProviderConfigurationReport(
                 ProviderName,
@@ -62,7 +62,7 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
                 "Analyze the isolated text below as a single message and return ONLY the JSON object.\n\n" +
                 $"<text>\n{text}\n</text>";
 
-            var rawResult = await CallModelAsync(systemPrompt, userPrompt);
+            var rawResult = await CallLanguageAnalysisModelAsync(systemPrompt, userPrompt);
             return ParseLanguageAnalysisResult(rawResult);
         }
 
@@ -120,6 +120,11 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
         protected abstract string? ConfiguredEndpoint { get; }
 
         protected abstract string? ConfiguredModel { get; }
+
+        protected virtual Task<string> CallLanguageAnalysisModelAsync(string systemPrompt, string userPrompt)
+        {
+            return CallModelAsync(systemPrompt, userPrompt);
+        }
 
         protected abstract Task<string> CallModelAsync(string systemPrompt, string userPrompt);
 

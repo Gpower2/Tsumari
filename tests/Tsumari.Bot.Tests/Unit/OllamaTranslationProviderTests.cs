@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -20,11 +21,13 @@ namespace Tsumari.Bot.Tests.Unit
             var configMock = new Mock<IConfiguration>();
             configMock.Setup(c => c["Translation:Ollama:ApiUrl"]).Returns("http://localhost:11434/api/generate");
             configMock.Setup(c => c["Translation:Ollama:Model"]).Returns("aya:8b");
+            configMock.Setup(c => c["Translation:Ollama:KeepAlive"]).Returns("15m");
 
+            var handler = new StubHttpMessageHandler("""{ "response": "{ \"dominantLanguageCode\": \"EN\", \"languages\": [\"EN\"], \"isMixed\": false, \"hasClearDominantLanguage\": true }" }""");
             var httpClientFactory = new Mock<IHttpClientFactory>();
             httpClientFactory
                 .Setup(f => f.CreateClient(HttpClientNames.OllamaTranslation))
-                .Returns(new HttpClient(new StubHttpMessageHandler("""{ "response": "{ \"dominantLanguageCode\": \"EN\", \"languages\": [\"EN\"], \"isMixed\": false, \"hasClearDominantLanguage\": true }" }""")));
+                .Returns(new HttpClient(handler));
 
             var provider = new OllamaTranslationProvider(
                 configMock.Object,
@@ -36,6 +39,10 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Equal("EN", result.PrimaryLanguageCode);
             Assert.Single(result.DetectedLanguages);
             Assert.Equal("EN", result.DetectedLanguages[0].LanguageCode);
+
+            using var jsonDoc = JsonDocument.Parse(handler.LastRequestBody!);
+            Assert.Equal("json", jsonDoc.RootElement.GetProperty("format").GetString());
+            Assert.Equal("15m", jsonDoc.RootElement.GetProperty("keep_alive").GetString());
         }
 
         [Fact]
@@ -64,11 +71,40 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
-        public void GetConfigurationReport_ReturnsConfiguredModelAndEndpoint()
+        public async Task TranslateTextAsync_DoesNotForceJsonResponseFormat()
+        {
+            var configMock = new Mock<IConfiguration>();
+            configMock.Setup(c => c["Translation:Ollama:ApiUrl"]).Returns("http://localhost:11434/api/generate");
+            configMock.Setup(c => c["Translation:Ollama:Model"]).Returns("aya:8b");
+            configMock.Setup(c => c["Translation:Ollama:KeepAlive"]).Returns("15m");
+
+            var handler = new StubHttpMessageHandler("""{ "response": "Hallo" }""");
+            var httpClientFactory = new Mock<IHttpClientFactory>();
+            httpClientFactory
+                .Setup(f => f.CreateClient(HttpClientNames.OllamaTranslation))
+                .Returns(new HttpClient(handler));
+
+            var provider = new OllamaTranslationProvider(
+                configMock.Object,
+                httpClientFactory.Object,
+                NullLogger<OllamaTranslationProvider>.Instance);
+
+            var result = await provider.TranslateTextAsync("hello", "de");
+
+            Assert.Equal("Hallo", result);
+
+            using var jsonDoc = JsonDocument.Parse(handler.LastRequestBody!);
+            Assert.False(jsonDoc.RootElement.TryGetProperty("format", out _));
+            Assert.Equal("15m", jsonDoc.RootElement.GetProperty("keep_alive").GetString());
+        }
+
+        [Fact]
+        public void GetConfigurationReport_ReturnsConfiguredModelEndpointAndKeepAlive()
         {
             var configMock = new Mock<IConfiguration>();
             configMock.Setup(c => c["Translation:Ollama:ApiUrl"]).Returns("http://localhost:11434/api/generate");
             configMock.Setup(c => c["Translation:Ollama:Model"]).Returns("translategemma:12b");
+            configMock.Setup(c => c["Translation:Ollama:KeepAlive"]).Returns("15m");
 
             var httpClientFactory = new Mock<IHttpClientFactory>();
             var provider = new OllamaTranslationProvider(
@@ -81,6 +117,7 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Equal("Ollama", report.ProviderName);
             Assert.Contains(report.Details, detail => detail is TranslationProviderConfigurationItem { Label: "Model", Value: "translategemma:12b" });
             Assert.Contains(report.Details, detail => detail is TranslationProviderConfigurationItem { Label: "Endpoint", Value: "http://localhost:11434/api/generate" });
+            Assert.Contains(report.Details, detail => detail is TranslationProviderConfigurationItem { Label: "KeepAlive", Value: "15m" });
         }
 
         private sealed class StubHttpMessageHandler : HttpMessageHandler
@@ -92,8 +129,11 @@ namespace Tsumari.Bot.Tests.Unit
                 _responseBody = responseBody;
             }
 
+            public string? LastRequestBody { get; private set; }
+
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
+                LastRequestBody = request.Content?.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult();
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(_responseBody, Encoding.UTF8, "application/json")

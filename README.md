@@ -164,7 +164,8 @@ E:\Development\Tsumari\
     "Provider": "Ollama",
     "Ollama": {
       "ApiUrl": "http://localhost:11434/api/generate",
-      "Model": "translategemma:12b"
+      "Model": "translategemma:12b",
+      "KeepAlive": "15m"
     },
     "OpenAI": {
       "ApiUrl": "http://localhost:8080/v1/chat/completions",
@@ -191,6 +192,7 @@ E:\Development\Tsumari\
 
 - `Translation.Provider` accepts `DeepL`, `Ollama`, or `OpenAI`.
 - The checked-in default configuration currently uses **Ollama** with `translategemma:12b`.
+- `Translation.Ollama.KeepAlive` controls how long Ollama keeps the selected model resident between requests. The checked-in `15m` value reduces cold-start latency after short idle periods at the cost of holding model RAM longer.
 - `DeepL.ApiKey` is only required when `Translation.Provider` is `DeepL`.
 - If a DeepL key ends with `:fx`, Tsumari routes requests to `https://api-free.deepl.com`.
 - If `Translation.Provider` is missing or invalid, startup falls back to **Ollama** instead of defaulting to paid DeepL, and that fallback is logged explicitly.
