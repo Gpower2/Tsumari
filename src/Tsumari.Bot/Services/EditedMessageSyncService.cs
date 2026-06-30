@@ -102,6 +102,7 @@ namespace Tsumari.Bot.Services
                 }
 
                 var authorName = MirroredMessageFormatter.ResolveAuthorDisplayName(message.Author);
+                var attachmentPlan = AttachmentMirroringPlanner.CreatePlan(message);
                 var sourceLanguageInfo = LanguageCodeService.ResolveSourceLanguageInfo(languageAnalysis, sourceChannelLang);
                 var translationSourceLanguageCode = isTranslationSourceLanguageHintTrusted
                     ? sourceLanguageInfo.PrimaryLanguageCode
@@ -161,6 +162,13 @@ namespace Tsumari.Bot.Services
                                     afterContent);
                             }
                         }
+
+                        // Edit sync does not re-upload attachments, so preserve the warning when the
+                        // source message still contains files above the guild upload limit.
+                        newText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
+                            newText,
+                            targetLang ?? sourceLanguageInfo.PrimaryLanguageCode,
+                            attachmentPlan.HasOversizedAttachments);
 
                         var modified = await _discordMessagePublisherService.TryModifyMessageContentAsync(channel, mirroredMessageId, newText);
                         if (!modified)

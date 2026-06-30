@@ -187,6 +187,7 @@ When a user edits a message, `OnMessageUpdatedAsync` runs.
 - Existing jump buttons remain on the mirrored messages.
 - Existing reply linkage remains on reply messages that were originally sent with a Discord `MessageReference`.
 - Attachments are not re-downloaded or replaced.
+- Existing oversized-attachment notices are preserved when the edited source message still contains files above the guild upload limit.
 - Edits only apply to already-linked messages; the edit path never creates new messages.
 
 ### Current Limitations

@@ -26,6 +26,7 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - The canonical end-to-end routing, edit-sync, reply, reaction, and delete behavior lives in `docs/routing.md`. The notes below are the short operational summary.
 - **Edit sync is text-only.** The `MessageUpdated` flow compares message content and only rewrites mirrored message text; attachment-only edits are not re-mirrored.
 - **Edit sync uses cache when available.** The Discord client keeps `MessageCacheSize = 50` messages cached so unchanged edits can be skipped cheaply, but cache misses are still re-synchronized instead of being ignored.
+- **Oversized attachment warnings survive text edits.** If a mirrored message had to warn about files above the guild upload limit, later text edits keep that warning while the oversized attachment still exists on the source message.
 - **Reaction mirroring currently tracks standard reactions only.** Burst reactions are ignored because the bot can only mirror normal reactions reliably.
 - **Gateway work is ordered per linked group.** Events for the same linked channel cluster are processed sequentially, while unrelated clusters can continue in parallel.
 - **Language buttons only exist for bot-generated copies.** The source user-authored message is always reached through the `Original` button.
@@ -104,6 +105,7 @@ E:\Development\Tsumari\
 │           ├── DiscordMessageService.cs
 │           ├── DiscordGatewayEventDispatcherService.cs
 │           ├── DiscordGatewayEventProcessorService.cs
+│           ├── AttachmentMirroringPlanner.cs
 │           ├── DatabaseService.cs
 │           ├── EditedMessageSyncService.cs
 │           ├── GatewayEventGroupResolver.cs

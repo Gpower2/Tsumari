@@ -53,7 +53,7 @@ namespace Tsumari.Bot.Services
 
             try
             {
-                await RouteMessageAsync(message, hasAttachments);
+                await RouteMessageAsync(message);
             }
             catch (Exception ex)
             {
@@ -61,7 +61,7 @@ namespace Tsumari.Bot.Services
             }
         }
 
-        private async Task RouteMessageAsync(IUserMessage message, bool hasAttachments)
+        private async Task RouteMessageAsync(IUserMessage message)
         {
             var channelRoutingContext = await _dbService.GetChannelRoutingContextAsync(message.Channel.Id);
             var isMaster = channelRoutingContext.IsMaster;
@@ -85,7 +85,7 @@ namespace Tsumari.Bot.Services
             var analysisContext = await AnalyzeLanguageAsync(content, channelRoutingContext.TargetLanguageCode);
             var replyContext = await _replyMirroringService.ResolveReplyContextAsync(message.Channel.Id, message.Reference);
             var authorName = MirroredMessageFormatter.ResolveAuthorDisplayName(message.Author);
-            var attachmentPlan = BuildAttachmentMirroringPlan(message, hasAttachments);
+            var attachmentPlan = BuildAttachmentMirroringPlan(message);
             var mediaAssets = attachmentPlan.AttachmentsToDownload.Count > 0
                 ? await _discordMessagePublisherService.DownloadMediaAssetsAsync(attachmentPlan.AttachmentsToDownload)
                 : [];
@@ -584,49 +584,19 @@ namespace Tsumari.Bot.Services
             }
         }
 
-        private AttachmentMirroringPlan BuildAttachmentMirroringPlan(IUserMessage message, bool hasAttachments)
+        private AttachmentMirroringPlanner.AttachmentMirroringPlan BuildAttachmentMirroringPlan(IUserMessage message)
         {
-            if (!hasAttachments || message.Attachments == null || message.Attachments.Count == 0)
-            {
-                return AttachmentMirroringPlan.Empty;
-            }
-
-            if (message.Channel is not IGuildChannel guildChannel || guildChannel.Guild.MaxUploadLimit == 0)
-            {
-                return new AttachmentMirroringPlan(message.Attachments, HasOversizedAttachments: false);
-            }
-
-            var mirrorableAttachments = new List<IAttachment>(message.Attachments.Count);
-            var oversizedFilenames = new List<string>();
-
-            foreach (var attachment in message.Attachments)
-            {
-                if ((ulong)attachment.Size > guildChannel.Guild.MaxUploadLimit)
-                {
-                    oversizedFilenames.Add(attachment.Filename);
-                    continue;
-                }
-
-                mirrorableAttachments.Add(attachment);
-            }
-
-            if (oversizedFilenames.Count > 0)
+            var attachmentPlan = AttachmentMirroringPlanner.CreatePlan(message);
+            if (attachmentPlan.HasOversizedAttachments && message.Channel is IGuildChannel guildChannel)
             {
                 _logger.LogOversizedAttachmentsSkipped(
                     message.Id,
                     message.Channel.Id,
                     guildChannel.Guild.MaxUploadLimit,
-                    string.Join(", ", oversizedFilenames));
+                    string.Join(", ", attachmentPlan.OversizedFilenames));
             }
 
-            return new AttachmentMirroringPlan(mirrorableAttachments, oversizedFilenames.Count > 0);
-        }
-
-        private readonly record struct AttachmentMirroringPlan(
-            IReadOnlyCollection<IAttachment> AttachmentsToDownload,
-            bool HasOversizedAttachments)
-        {
-            public static AttachmentMirroringPlan Empty { get; } = new([], false);
+            return attachmentPlan;
         }
 
         private readonly record struct LanguageAnalysisContext(

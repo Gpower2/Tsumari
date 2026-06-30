@@ -529,6 +529,53 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
+        public async Task HandleMessageUpdatedAsync_PreservesOversizedAttachmentNotice_WhenSourceStillHasOversizedAttachments()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(10UL);
+            await _dbService.RegisterLocalChannelAsync(20UL, 10UL, "de");
+            await _dbService.LinkMessagesAsync(704UL, 10UL, 724UL, 20UL, "de");
+
+            var translationProvider = CreateTranslationProvider(
+                detections: new Dictionary<string, string>
+                {
+                    ["Updated text"] = "EN"
+                },
+                translations: new Dictionary<(string Text, string TargetLanguage), string>
+                {
+                    [("Updated text", "DE")] = "Aktualisierter Text"
+                });
+
+            var discordMessageService = new ComponentDiscordMessageService();
+            var masterChannel = new ChannelCapture(10UL, 1UL, "general", maxUploadLimit: 10UL);
+            var germanChannel = new ChannelCapture(20UL, 1UL, "general-de", maxUploadLimit: 10UL);
+            var mirroredMessage = germanChannel.RegisterExistingMessage(
+                724UL,
+                "**Alice** (EN to DE):\nOld text\n*(Anhang zu gross zum Spiegeln - nutze Original.)*");
+            discordMessageService.RegisterChannel(masterChannel);
+            discordMessageService.RegisterChannel(germanChannel);
+
+            var hostedService = CreateHostedService(discordMessageService, translationProvider.Object);
+            var author = CreateGuildUser("alice", nickname: "Alice");
+            var attachmentMock = new Mock<IAttachment>();
+            attachmentMock.SetupGet(attachment => attachment.Filename).Returns("large-file.mp4");
+            attachmentMock.SetupGet(attachment => attachment.Size).Returns(11);
+            var editedMessage = CreateIncomingMessage(
+                704UL,
+                masterChannel.Channel,
+                author,
+                "Updated text",
+                attachments: [attachmentMock.Object]);
+
+            await hostedService.HandleMessageUpdatedAsync(hadCachedSnapshot: true, beforeContent: "Old text", editedMessage.Object);
+
+            Assert.Equal(
+                "**Alice** (EN to DE):\nAktualisierter Text\n*(Anhang zu gross zum Spiegeln - nutze Original.)*",
+                mirroredMessage.Content);
+            Assert.Equal(1, mirroredMessage.ModifyCallCount);
+        }
+
+        [Fact]
         public async Task HandleMessageUpdatedAsync_UsesMixedLanguageLabelForEditedMasterMessage()
         {
             await _dbService.InitializeDatabaseAsync();
