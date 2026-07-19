@@ -73,6 +73,97 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task ResolveAuthorDisplayNameAsync_PrefersNickname_WhenAuthorIsGuildUser()
+        {
+            var guildUserMock = new Mock<IGuildUser>();
+            guildUserMock.SetupGet(user => user.Username).Returns("alice");
+            guildUserMock.SetupGet(user => user.Nickname).Returns("Alice");
+            guildUserMock.SetupGet(user => user.GlobalName).Returns((string)null!);
+
+            var messageMock = CreateMessageMock(guildUserMock.Object, CreateNonGuildChannelMock().Object);
+
+            var result = await MirroredMessageFormatter.ResolveAuthorDisplayNameAsync(messageMock.Object);
+
+            Assert.Equal("Alice", result);
+        }
+
+        [Fact]
+        public async Task ResolveAuthorDisplayNameAsync_FetchesGuildUser_WhenAuthorIsNotGuildUser()
+        {
+            var userMock = new Mock<IUser>();
+            userMock.SetupGet(user => user.Id).Returns(123UL);
+            userMock.SetupGet(user => user.Username).Returns("alice");
+
+            var guildUserMock = new Mock<IGuildUser>();
+            guildUserMock.SetupGet(user => user.Username).Returns("alice");
+            guildUserMock.SetupGet(user => user.Nickname).Returns("Alice");
+            guildUserMock.SetupGet(user => user.GlobalName).Returns((string)null!);
+
+            var channelMock = CreateGuildChannelMock(guildUserMock.Object);
+            var messageMock = CreateMessageMock(userMock.Object, channelMock.Object);
+
+            var result = await MirroredMessageFormatter.ResolveAuthorDisplayNameAsync(messageMock.Object);
+
+            Assert.Equal("Alice", result);
+        }
+
+        [Fact]
+        public async Task ResolveAuthorDisplayNameAsync_FallsBackToUsername_WhenGuildUserNotFound()
+        {
+            var userMock = new Mock<IUser>();
+            userMock.SetupGet(user => user.Id).Returns(123UL);
+            userMock.SetupGet(user => user.Username).Returns("alice");
+
+            var channelMock = CreateGuildChannelMock(guildUser: null);
+            var messageMock = CreateMessageMock(userMock.Object, channelMock.Object);
+
+            var result = await MirroredMessageFormatter.ResolveAuthorDisplayNameAsync(messageMock.Object);
+
+            Assert.Equal("alice", result);
+        }
+
+        [Fact]
+        public async Task ResolveAuthorDisplayNameAsync_FallsBackToUsername_WhenChannelIsNotGuildChannel()
+        {
+            var userMock = new Mock<IUser>();
+            userMock.SetupGet(user => user.Username).Returns("alice");
+
+            var messageMock = CreateMessageMock(userMock.Object, CreateNonGuildChannelMock().Object);
+
+            var result = await MirroredMessageFormatter.ResolveAuthorDisplayNameAsync(messageMock.Object);
+
+            Assert.Equal("alice", result);
+        }
+
+        private static Mock<IUserMessage> CreateMessageMock(IUser author, IMessageChannel channel)
+        {
+            var messageMock = new Mock<IUserMessage>();
+            messageMock.SetupGet(message => message.Author).Returns(author);
+            messageMock.SetupGet(message => message.Channel).Returns(channel);
+            return messageMock;
+        }
+
+        private static Mock<IMessageChannel> CreateNonGuildChannelMock()
+        {
+            var channelMock = new Mock<IMessageChannel>();
+            channelMock.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(1UL);
+            return channelMock;
+        }
+
+        private static Mock<IMessageChannel> CreateGuildChannelMock(IGuildUser? guildUser)
+        {
+            var guildMock = new Mock<IGuild>();
+            guildMock
+                .Setup(guild => guild.GetUserAsync(It.IsAny<ulong>(), It.IsAny<CacheMode>(), It.IsAny<RequestOptions>()))
+                .ReturnsAsync(guildUser);
+
+            var channelMock = new Mock<IMessageChannel>();
+            channelMock.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(1UL);
+            channelMock.As<IGuildChannel>().SetupGet(channel => channel.Guild).Returns(guildMock.Object);
+            return channelMock;
+        }
+
+        [Fact]
         public void FormatTranslatedReplyText_ReturnsCompactReplyFormat()
         {
             var result = MirroredMessageFormatter.FormatTranslatedReplyText("en", "de", "Hallo");

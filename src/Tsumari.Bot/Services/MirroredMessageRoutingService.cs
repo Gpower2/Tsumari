@@ -117,7 +117,7 @@ namespace Tsumari.Bot.Services
             var content = message.Content ?? string.Empty;
             var analysisContext = await AnalyzeLanguageAsync(content, channelRoutingContext.TargetLanguageCode);
             var replyContext = await _replyMirroringService.ResolveReplyContextAsync(message.Channel.Id, message.Reference);
-            var authorName = MirroredMessageFormatter.ResolveAuthorDisplayName(message.Author);
+            var authorName = await MirroredMessageFormatter.ResolveAuthorDisplayNameAsync(message);
             var attachmentPlan = BuildAttachmentMirroringPlan(message);
             var mediaAssets = attachmentPlan.AttachmentsToDownload.Count > 0
                 ? await _discordMessagePublisherService.DownloadMediaAssetsAsync(attachmentPlan.AttachmentsToDownload)

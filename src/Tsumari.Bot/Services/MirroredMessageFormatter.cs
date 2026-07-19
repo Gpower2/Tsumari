@@ -14,6 +14,25 @@ namespace Tsumari.Bot.Services
                 : author.Username;
         }
 
+        /// <summary>
+        /// Resolves the display name for a message author, falling back to the guild member
+        /// nickname when the author is not already provided as an <see cref="IGuildUser"/>
+        /// (for example, messages fetched via REST during historical sync).
+        /// </summary>
+        public static async Task<string> ResolveAuthorDisplayNameAsync(IUserMessage message)
+        {
+            ArgumentNullException.ThrowIfNull(message);
+
+            var author = message.Author;
+            if (author is IGuildUser || message.Channel is not IGuildChannel guildChannel)
+            {
+                return ResolveAuthorDisplayName(author);
+            }
+
+            var guildUser = await guildChannel.Guild.GetUserAsync(author.Id);
+            return ResolveAuthorDisplayName(guildUser ?? author);
+        }
+
         public static string BuildTimestampPrefix(DateTimeOffset? originalTimestamp)
         {
             if (!originalTimestamp.HasValue)
