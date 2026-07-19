@@ -369,7 +369,7 @@ namespace Tsumari.Bot.Modules
 
         private const int MaxSyncHours = 168;
 
-        [SlashCommand("sync", "Synchronizes unprocessed messages from the last N hours across a Master channel and its localized channels.")]
+        [SlashCommand("sync", "Synchronizes recent unprocessed messages across a master channel and its localized channels.")]
         public async Task SyncAsync(
             [Summary("master-channel", "The Master channel to synchronize")] IChannel masterChannel,
             [Summary("hours", "How many hours back to sync (1-168)")] int hours)

@@ -432,6 +432,45 @@ namespace Tsumari.Bot.Tests.Unit
             Assert.Contains("Language detection failed. Check the bot logs for details.", response, StringComparison.Ordinal);
         }
 
+        [Fact]
+        public void SlashCommandDescriptions_AreWithinDiscordLimits()
+        {
+            const int maxDescriptionLength = 100;
+            var moduleType = typeof(InteractionModule);
+
+            var groupAttribute = moduleType.GetCustomAttribute<GroupAttribute>();
+            Assert.NotNull(groupAttribute);
+            Assert.True(
+                groupAttribute!.Description.Length <= maxDescriptionLength,
+                $"Group description '{groupAttribute.Description}' exceeds {maxDescriptionLength} characters.");
+
+            foreach (var method in moduleType.GetMethods(BindingFlags.Public | BindingFlags.Instance))
+            {
+                var slashCommand = method.GetCustomAttribute<SlashCommandAttribute>();
+                if (slashCommand is null)
+                {
+                    continue;
+                }
+
+                Assert.True(
+                    slashCommand.Description.Length <= maxDescriptionLength,
+                    $"Command '{slashCommand.Name}' description exceeds {maxDescriptionLength} characters.");
+
+                foreach (var parameter in method.GetParameters())
+                {
+                    var summary = parameter.GetCustomAttribute<SummaryAttribute>();
+                    if (summary is null)
+                    {
+                        continue;
+                    }
+
+                    Assert.True(
+                        summary.Description.Length <= maxDescriptionLength,
+                        $"Option '{summary.Name}' on command '{slashCommand.Name}' exceeds {maxDescriptionLength} characters.");
+                }
+            }
+        }
+
         private static string GetLatestFollowupText(Mock<IDiscordInteraction> interactionMock)
         {
             return GetLatestInteractionText(interactionMock, nameof(IDiscordInteraction.FollowupAsync));
