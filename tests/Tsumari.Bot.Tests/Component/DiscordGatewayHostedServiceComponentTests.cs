@@ -1117,6 +1117,16 @@ namespace Tsumari.Bot.Tests.Component
                 return Task.FromResult(channel);
             }
 
+            public Task<IUserMessage?> SendMessageAsync(ulong channelId, string message)
+            {
+                throw new NotSupportedException("SendMessageAsync is not used by gateway hosted service component tests.");
+            }
+
+            public Task<DateTimeOffset?> GetMessageTimestampAsync(ulong channelId, ulong messageId)
+            {
+                throw new NotSupportedException("GetMessageTimestampAsync is not used by gateway hosted service component tests.");
+            }
+
             public Task<bool> DeleteMessageAsync(ulong channelId, ulong messageId)
             {
                 DeletedMessages.Add((channelId, messageId));

@@ -94,5 +94,19 @@ namespace Tsumari.Bot.Logging
             Message = "Failed to report bot status to user {Username}."
         )]
         public static partial void LogBotStatusReportFailed(this ILogger logger, Exception exception, string username);
+
+        [LoggerMessage(
+            EventId = 1813,
+            Level = LogLevel.Information,
+            Message = "User {Username} completed /tsumari sync for master {MasterChannelId} ({Hours}h). Processed: {ProcessedCount}, failed: {FailedCount}, skipped: {SkippedCount}."
+        )]
+        public static partial void LogTsumariSyncCommandCompleted(this ILogger logger, string username, ulong masterChannelId, int hours, int processedCount, int failedCount, int skippedCount);
+
+        [LoggerMessage(
+            EventId = 1814,
+            Level = LogLevel.Error,
+            Message = "User {Username} /tsumari sync failed for master {MasterChannelId} ({Hours}h)."
+        )]
+        public static partial void LogTsumariSyncCommandFailed(this ILogger logger, Exception exception, string username, ulong masterChannelId, int hours);
     }
 }

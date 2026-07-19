@@ -282,6 +282,144 @@ namespace Tsumari.Bot.Tests.Component
         }
 
         [Fact]
+        public async Task IsOriginalMessageTrackedAsync_ReturnsTrueForLinkedOriginalAndFalseOtherwise()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.LinkMessagesAsync(10001UL, 111UL, 20001UL, 222UL, "de");
+
+            var tracked = await _dbService.IsOriginalMessageTrackedAsync(10001UL);
+            var notTracked = await _dbService.IsOriginalMessageTrackedAsync(10002UL);
+
+            Assert.True(tracked);
+            Assert.False(notTracked);
+        }
+
+        [Fact]
+        public async Task LinkMessagesAsync_StoresNullTimestamp_WhenTimestampNotProvided()
+        {
+            await _dbService.InitializeDatabaseAsync();
+
+            await _dbService.LinkMessagesAsync(10001UL, 111UL, 20001UL, 111UL, "master");
+
+            var lastTimestamp = await _dbService.GetLastTrackedMessageTimestampAsync(111UL);
+            Assert.Null(lastTimestamp);
+        }
+
+        [Fact]
+        public async Task LinkMessagesAsync_StoresOriginalMessageTimestamp()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            var timestamp = new DateTimeOffset(2026, 7, 19, 12, 0, 0, TimeSpan.Zero);
+
+            await _dbService.LinkMessagesAsync(10001UL, 111UL, 20001UL, 111UL, "master", timestamp);
+
+            var lastTimestamp = await _dbService.GetLastTrackedMessageTimestampAsync(111UL);
+            Assert.Equal(timestamp, lastTimestamp);
+        }
+
+        [Fact]
+        public async Task GetLastTrackedMessageTimestampAsync_ReturnsMaxTimestamp()
+        {
+            await _dbService.InitializeDatabaseAsync();
+
+            await _dbService.LinkMessagesAsync(10001UL, 111UL, 20001UL, 111UL, "master", new DateTimeOffset(2026, 7, 19, 10, 0, 0, TimeSpan.Zero));
+            await _dbService.LinkMessagesAsync(10002UL, 111UL, 20002UL, 111UL, "master", new DateTimeOffset(2026, 7, 19, 12, 0, 0, TimeSpan.Zero));
+            await _dbService.LinkMessagesAsync(10003UL, 111UL, 20003UL, 111UL, "master", new DateTimeOffset(2026, 7, 19, 11, 0, 0, TimeSpan.Zero));
+
+            var lastTimestamp = await _dbService.GetLastTrackedMessageTimestampAsync(111UL);
+            Assert.Equal(new DateTimeOffset(2026, 7, 19, 12, 0, 0, TimeSpan.Zero), lastTimestamp);
+        }
+
+        [Fact]
+        public async Task GetLastTrackedMessageTimestampAsync_ReturnsNullWhenNoMessages()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(111UL);
+
+            var lastTimestamp = await _dbService.GetLastTrackedMessageTimestampAsync(111UL);
+
+            Assert.Null(lastTimestamp);
+        }
+
+        [Fact]
+        public async Task GetAllMasterChannelIdsAsync_ReturnsAllMasterChannels()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            await _dbService.AddMasterChannelAsync(111UL);
+            await _dbService.AddMasterChannelAsync(222UL);
+
+            var masterChannelIds = await _dbService.GetAllMasterChannelIdsAsync();
+
+            Assert.Equal(2, masterChannelIds.Count);
+            Assert.Contains(111UL, masterChannelIds);
+            Assert.Contains(222UL, masterChannelIds);
+        }
+
+        [Fact]
+        public async Task GetLastTrackedOriginalMessageIdAsync_ReturnsNewestOriginalMessageId()
+        {
+            await _dbService.InitializeDatabaseAsync();
+
+            await _dbService.LinkMessagesAsync(10001UL, 111UL, 20001UL, 111UL, "master");
+            await _dbService.LinkMessagesAsync(10003UL, 111UL, 20003UL, 111UL, "master");
+            await _dbService.LinkMessagesAsync(10002UL, 111UL, 20002UL, 111UL, "master");
+
+            var lastMessageId = await _dbService.GetLastTrackedOriginalMessageIdAsync(111UL);
+
+            Assert.Equal(10003UL, lastMessageId);
+        }
+
+        [Fact]
+        public async Task GetLastTrackedOriginalMessageIdAsync_OrdersLargeUnsignedSnowflakesCorrectly()
+        {
+            await _dbService.InitializeDatabaseAsync();
+
+            // IDs around and above 2^63-1 to verify that CAST to INTEGER would overflow.
+            var smallerLargeId = 9223372036854775806UL; // 2^63-2
+            var largerLargeId = 18446744073709551614UL; // 2^64-2
+
+            await _dbService.LinkMessagesAsync(smallerLargeId, 111UL, 20001UL, 111UL, "master");
+            await _dbService.LinkMessagesAsync(largerLargeId, 111UL, 20002UL, 111UL, "master");
+
+            var lastMessageId = await _dbService.GetLastTrackedOriginalMessageIdAsync(111UL);
+
+            Assert.Equal(largerLargeId, lastMessageId);
+        }
+
+        [Fact]
+        public async Task GetTrackedOriginalMessageIdsAsync_ReturnsTrackedIdsInBatch()
+        {
+            await _dbService.InitializeDatabaseAsync();
+
+            await _dbService.LinkMessagesAsync(1UL, 111UL, 10UL, 111UL, "master");
+            await _dbService.LinkMessagesAsync(2UL, 111UL, 20UL, 111UL, "master");
+            await _dbService.LinkMessagesAsync(3UL, 111UL, 30UL, 222UL, "de");
+
+            var trackedIds = await _dbService.GetTrackedOriginalMessageIdsAsync(new[] { 1UL, 2UL, 4UL });
+
+            Assert.Equal(2, trackedIds.Count);
+            Assert.Contains(1UL, trackedIds);
+            Assert.Contains(2UL, trackedIds);
+            Assert.DoesNotContain(4UL, trackedIds);
+            Assert.DoesNotContain(3UL, trackedIds);
+        }
+
+        [Fact]
+        public async Task SetOriginalMessageTimestampAsync_UpdatesTimestampForAllLinksOfOriginalMessage()
+        {
+            await _dbService.InitializeDatabaseAsync();
+            var timestamp = new DateTimeOffset(2026, 7, 19, 12, 0, 0, TimeSpan.Zero);
+
+            await _dbService.LinkMessagesAsync(10001UL, 111UL, 20001UL, 111UL, "master");
+            await _dbService.LinkMessagesAsync(10001UL, 111UL, 20002UL, 222UL, "de");
+
+            await _dbService.SetOriginalMessageTimestampAsync(10001UL, timestamp);
+
+            var lastTimestamp = await _dbService.GetLastTrackedMessageTimestampAsync(111UL);
+            Assert.Equal(timestamp, lastTimestamp);
+        }
+
+        [Fact]
         public async Task MessageLinks_CanLinkAndQueryCorrectly()
         {
             // Arrange
@@ -457,5 +595,6 @@ namespace Tsumari.Bot.Tests.Component
 
             await cmd.ExecuteNonQueryAsync();
         }
+
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Interactions;
@@ -22,12 +23,18 @@ namespace Tsumari.Bot.Modules
 
         private readonly DatabaseService _dbService;
         private readonly TranslationService _translationService;
+        private readonly IHistoricalMessageSyncService _historicalMessageSyncService;
         private readonly ILogger<InteractionModule> _logger;
 
-        public InteractionModule(DatabaseService dbService, TranslationService translationService, ILogger<InteractionModule> logger)
+        public InteractionModule(
+            DatabaseService dbService,
+            TranslationService translationService,
+            IHistoricalMessageSyncService historicalMessageSyncService,
+            ILogger<InteractionModule> logger)
         {
             _dbService = dbService;
             _translationService = translationService;
+            _historicalMessageSyncService = historicalMessageSyncService;
             _logger = logger;
         }
 
@@ -357,6 +364,83 @@ namespace Tsumari.Bot.Modules
             {
                 _logger.LogBotStatusReportFailed(ex, Context.User.Username);
                 await RespondAsync(BuildFailureResponse("Status lookup failed"), ephemeral: true);
+            }
+        }
+
+        private const int MaxSyncHours = 168;
+
+        [SlashCommand("sync", "Synchronizes unprocessed messages from the last N hours across a Master channel and its localized channels.")]
+        public async Task SyncAsync(
+            [Summary("master-channel", "The Master channel to synchronize")] IChannel masterChannel,
+            [Summary("hours", "How many hours back to sync (1-168)")] int hours)
+        {
+            if (!await EnsureGuildAdministratorAsync())
+            {
+                return;
+            }
+
+            if (masterChannel is not ITextChannel)
+            {
+                await RespondAsync("❌ Error: The channel must be a standard Guild Text Channel.", ephemeral: true);
+                return;
+            }
+
+            if (!await _dbService.IsMasterChannelAsync(masterChannel.Id))
+            {
+                await RespondAsync("❌ Error: The channel is not registered as a Master channel.", ephemeral: true);
+                return;
+            }
+
+            if (hours < 1 || hours > MaxSyncHours)
+            {
+                await RespondAsync($"❌ Error: Hours must be between 1 and {MaxSyncHours}.", ephemeral: true);
+                return;
+            }
+
+            if (!_translationService.IsActive)
+            {
+                await RespondAsync("❌ Error: Translation provider is not active.", ephemeral: true);
+                return;
+            }
+
+            await Context.Interaction.DeferAsync(ephemeral: true);
+
+            try
+            {
+                var result = await _historicalMessageSyncService.SyncMasterChannelAsync(
+                    masterChannel.Id,
+                    TimeSpan.FromHours(hours),
+                    CancellationToken.None);
+
+                if (!result.Success)
+                {
+                    await Context.Interaction.FollowupAsync(
+                        $"❌ {result.ErrorMessage ?? "Sync failed"}. Check the bot logs for details.",
+                        ephemeral: true);
+                    return;
+                }
+
+                _logger.LogTsumariSyncCommandCompleted(
+                    Context.User.Username,
+                    masterChannel.Id,
+                    hours,
+                    result.ProcessedCount,
+                    result.FailedCount,
+                    result.SkippedCount);
+
+                var response = $"✅ Sync completed for <#{masterChannel.Id}> ({hours} hours).\n" +
+                               $"Processed: **{result.ProcessedCount}**\n" +
+                               $"Skipped (already tracked): **{result.SkippedCount}**\n" +
+                               $"Failed: **{result.FailedCount}**";
+
+                await Context.Interaction.FollowupAsync(response, ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogTsumariSyncCommandFailed(ex, Context.User.Username, masterChannel.Id, hours);
+                await Context.Interaction.FollowupAsync(
+                    "❌ Sync failed. Check the bot logs for details.",
+                    ephemeral: true);
             }
         }
 

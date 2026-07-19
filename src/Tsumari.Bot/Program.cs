@@ -80,6 +80,10 @@ namespace Tsumari.Bot
                 provider.GetRequiredService<TranslationProviderResolver>().Resolve());
             builder.Services.AddSingleton<TranslationService>();
             builder.Services.AddSingleton<MirroredMessageRoutingService>();
+            builder.Services.AddSingleton<IMirroredMessageRoutingService>(provider =>
+                provider.GetRequiredService<MirroredMessageRoutingService>());
+            builder.Services.AddSingleton<IHistoricalMessageSyncService, HistoricalMessageSyncService>();
+            builder.Services.AddSingleton<IStartupMessageSyncService, StartupMessageSyncService>();
             builder.Services.AddSingleton<EditedMessageSyncService>();
             builder.Services.AddSingleton<LinkedMessageDeletionService>();
             builder.Services.AddSingleton<ReplyMirroringService>();
@@ -94,6 +98,7 @@ namespace Tsumari.Bot
             builder.Services.AddHostedService(provider =>
                 provider.GetRequiredService<DiscordGatewayEventDispatcherService>());
             builder.Services.AddHostedService<DiscordGatewayHostedService>();
+            builder.Services.AddHostedService<StartupMessageSyncHostedService>();
 
             var host = builder.Build();
             host.Services.GetRequiredService<TranslationService>().LogProviderConfiguration();

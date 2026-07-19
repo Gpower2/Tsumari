@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Discord;
 using Microsoft.Extensions.Logging;
@@ -5,8 +6,12 @@ using Tsumari.Bot.Models;
 
 namespace Tsumari.Bot.Services
 {
-    public class MirroredMessageRoutingService
+    public class MirroredMessageRoutingService : IMirroredMessageRoutingService
     {
+        // Guards against concurrent routing of the same message by live gateway events and
+        // historical sync, which could otherwise produce duplicate mirrored posts.
+        private readonly ConcurrentDictionary<ulong, byte> _messagesBeingRouted = new();
+
         private readonly DatabaseService _dbService;
         private readonly TranslationService _translationService;
         private readonly ReplyMirroringService _replyMirroringService;
@@ -51,6 +56,12 @@ namespace Tsumari.Bot.Services
                 return;
             }
 
+            if (!_messagesBeingRouted.TryAdd(message.Id, 0))
+            {
+                _logger.LogSkippingConcurrentRouting(message.Id);
+                return;
+            }
+
             try
             {
                 await RouteMessageAsync(message);
@@ -59,9 +70,31 @@ namespace Tsumari.Bot.Services
             {
                 _logger.LogRoutingPipelineFailed(ex, message.Id);
             }
+            finally
+            {
+                _messagesBeingRouted.TryRemove(message.Id, out _);
+            }
         }
 
-        private async Task RouteMessageAsync(IUserMessage message)
+        public async Task RouteHistoricalMessageAsync(IUserMessage message, DateTimeOffset originalTimestamp)
+        {
+            if (!_messagesBeingRouted.TryAdd(message.Id, 0))
+            {
+                _logger.LogSkippingConcurrentRouting(message.Id);
+                return;
+            }
+
+            try
+            {
+                await RouteMessageAsync(message, originalTimestamp);
+            }
+            finally
+            {
+                _messagesBeingRouted.TryRemove(message.Id, out _);
+            }
+        }
+
+        private async Task RouteMessageAsync(IUserMessage message, DateTimeOffset? originalTimestamp = null)
         {
             var channelRoutingContext = await _dbService.GetChannelRoutingContextAsync(message.Channel.Id);
             var isMaster = channelRoutingContext.IsMaster;
@@ -101,7 +134,8 @@ namespace Tsumari.Bot.Services
                     replyContext,
                     mediaAssets,
                     attachmentPlan.HasOversizedAttachments,
-                    analysisContext.IsTranslationSourceLanguageHintTrusted ? sourceLanguageInfo.PrimaryLanguageCode : null);
+                    analysisContext.IsTranslationSourceLanguageHintTrusted ? sourceLanguageInfo.PrimaryLanguageCode : null,
+                    originalTimestamp);
                 return;
             }
 
@@ -114,7 +148,8 @@ namespace Tsumari.Bot.Services
                 replyContext,
                 mediaAssets,
                 attachmentPlan.HasOversizedAttachments,
-                channelRoutingContext);
+                channelRoutingContext,
+                originalTimestamp);
         }
 
         private async Task<LanguageAnalysisContext> AnalyzeLanguageAsync(string content, string? localizedChannelLanguageCode)
@@ -162,7 +197,8 @@ namespace Tsumari.Bot.Services
             ReplyMirroringContext? replyContext,
             IReadOnlyCollection<MediaAsset> mediaAssets,
             bool hasOversizedAttachments,
-            string? translationSourceLanguageCode)
+            string? translationSourceLanguageCode,
+            DateTimeOffset? originalTimestamp = null)
         {
             var channelId = message.Channel.Id;
             var localizedChannels = await _dbService.GetLocalizedChannelsForMasterAsync(channelId);
@@ -197,7 +233,8 @@ namespace Tsumari.Bot.Services
                     translationSourceLanguageCode,
                     localizedChannel.TargetLanguageCode,
                     content,
-                    ex => _logger.LogMasterTranslationFailedForwardingRaw(ex, message.Id, localizedChannel.TargetLanguageCode));
+                    ex => _logger.LogMasterTranslationFailedForwardingRaw(ex, message.Id, localizedChannel.TargetLanguageCode),
+                    originalTimestamp);
 
                 textToSend = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
                     textToSend,
@@ -230,7 +267,8 @@ namespace Tsumari.Bot.Services
             ReplyMirroringContext? replyContext,
             IReadOnlyCollection<MediaAsset> mediaAssets,
             bool hasOversizedAttachments,
-            ChannelRoutingContext channelRoutingContext)
+            ChannelRoutingContext channelRoutingContext,
+            DateTimeOffset? originalTimestamp = null)
         {
             var channelId = message.Channel.Id;
             var parentMasterId = channelRoutingContext.ParentMasterChannelId;
@@ -278,7 +316,8 @@ namespace Tsumari.Bot.Services
                     parentChannel,
                     sentMessages,
                     targets,
-                    initialComponents);
+                    initialComponents,
+                    originalTimestamp);
                 return;
             }
 
@@ -295,7 +334,8 @@ namespace Tsumari.Bot.Services
                 parentChannel,
                 sentMessages,
                 targets,
-                initialComponents);
+                initialComponents,
+                originalTimestamp);
         }
 
         private async Task RouteLocalizedMatchFlowAsync(
@@ -310,7 +350,8 @@ namespace Tsumari.Bot.Services
             IMessageChannel parentChannel,
             Dictionary<ulong, IUserMessage> sentMessages,
             List<JumpLinkTarget> targets,
-            MessageComponent initialComponents)
+            MessageComponent initialComponents,
+            DateTimeOffset? originalTimestamp = null)
         {
             var parentReplyReference = ReplyMirroringService.CreateReplyReference(replyContext, parentChannel.Id);
             var parentText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
@@ -320,7 +361,8 @@ namespace Tsumari.Bot.Services
                     authorName,
                     sourceLanguageInfo,
                     targetLang: null,
-                    content),
+                    content,
+                    originalTimestamp),
                 sourceLanguageInfo.PrimaryLanguageCode,
                 hasOversizedAttachments);
             await SendAndTrackMirrorAsync(
@@ -354,7 +396,8 @@ namespace Tsumari.Bot.Services
                     translationSourceLanguageCode,
                     sibling.TargetLanguageCode,
                     content,
-                    ex => _logger.LogMatchFlowSiblingTranslationFailed(ex, sibling.TargetLanguageCode));
+                    ex => _logger.LogMatchFlowSiblingTranslationFailed(ex, sibling.TargetLanguageCode),
+                    originalTimestamp);
 
                 siblingText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
                     siblingText,
@@ -391,7 +434,8 @@ namespace Tsumari.Bot.Services
             IMessageChannel parentChannel,
             Dictionary<ulong, IUserMessage> sentMessages,
             List<JumpLinkTarget> targets,
-            MessageComponent initialComponents)
+            MessageComponent initialComponents,
+            DateTimeOffset? originalTimestamp = null)
         {
             if (!string.IsNullOrWhiteSpace(content))
             {
@@ -406,7 +450,8 @@ namespace Tsumari.Bot.Services
                             authorName,
                             sourceLanguageInfo,
                             targetLang,
-                            nativeTranslation),
+                            nativeTranslation,
+                            originalTimestamp),
                         targetLang,
                         hasOversizedAttachments);
                     await SendAndTrackMirrorAsync(
@@ -435,7 +480,8 @@ namespace Tsumari.Bot.Services
                     authorName,
                     sourceLanguageInfo,
                     targetLang: null,
-                    content),
+                    content,
+                    originalTimestamp),
                 sourceLanguageInfo.PrimaryLanguageCode,
                 hasOversizedAttachments);
             await SendAndTrackMirrorAsync(
@@ -469,7 +515,8 @@ namespace Tsumari.Bot.Services
                     translationSourceLanguageCode,
                     sibling.TargetLanguageCode,
                     content,
-                    ex => _logger.LogMismatchFlowSiblingTranslationFailed(ex, sibling.TargetLanguageCode));
+                    ex => _logger.LogMismatchFlowSiblingTranslationFailed(ex, sibling.TargetLanguageCode),
+                    originalTimestamp);
 
                 siblingText = MirroredMessageFormatter.AppendAttachmentMirrorNotice(
                     siblingText,
@@ -508,7 +555,8 @@ namespace Tsumari.Bot.Services
             string? translationSourceLanguageCode,
             string? targetLang,
             string content,
-            Action<Exception> logTranslationFailure)
+            Action<Exception> logTranslationFailure,
+            DateTimeOffset? originalTimestamp = null)
         {
             if (!MirroredMessageFormatter.ShouldTranslateLinkedMessage(sourceLanguageInfo.PrimaryLanguageCode, targetLang) || string.IsNullOrWhiteSpace(content))
             {
@@ -518,7 +566,8 @@ namespace Tsumari.Bot.Services
                     authorName,
                     sourceLanguageInfo,
                     targetLang,
-                    content);
+                    content,
+                    originalTimestamp);
             }
 
             var translationTargetLanguage = targetLang!;
@@ -531,7 +580,8 @@ namespace Tsumari.Bot.Services
                     authorName,
                     sourceLanguageInfo,
                     translationTargetLanguage,
-                    translatedText);
+                    translatedText,
+                    originalTimestamp);
             }
             catch (Exception ex)
             {
@@ -542,7 +592,8 @@ namespace Tsumari.Bot.Services
                     authorName,
                     sourceLanguageInfo,
                     translationTargetLanguage,
-                    content);
+                    content,
+                    originalTimestamp);
             }
         }
 
@@ -572,7 +623,7 @@ namespace Tsumari.Bot.Services
             }
 
             sentMessages[destinationChannel.Id] = sentMessage;
-            await _dbService.LinkMessagesAsync(sourceMessage.Id, originalChannelId, sentMessage.Id, destinationChannel.Id, languageCode);
+            await _dbService.LinkMessagesAsync(sourceMessage.Id, originalChannelId, sentMessage.Id, destinationChannel.Id, languageCode, sourceMessage.Timestamp);
 
             if (!string.IsNullOrWhiteSpace(jumpLanguageLabel))
             {

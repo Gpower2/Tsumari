@@ -23,6 +23,17 @@ namespace Tsumari.Bot.Services
             return await _client.GetChannelAsync(channelId) as IMessageChannel;
         }
 
+        public async Task<IUserMessage?> SendMessageAsync(ulong channelId, string message)
+        {
+            var channel = await GetChannelAsync(channelId);
+            if (channel == null)
+            {
+                return null;
+            }
+
+            return await channel.SendMessageAsync(message);
+        }
+
         public async Task<bool> DeleteMessageAsync(ulong channelId, ulong messageId)
         {
             var channel = await GetChannelAsync(channelId);
@@ -66,6 +77,18 @@ namespace Tsumari.Bot.Services
                 RestMessage restMessage => restMessage.GetReactionUsersAsync(emote, limit, null, ReactionType.Normal),
                 _ => throw new InvalidOperationException($"Message type '{message.GetType().FullName}' does not support reaction mirroring.")
             };
+        }
+
+        public async Task<DateTimeOffset?> GetMessageTimestampAsync(ulong channelId, ulong messageId)
+        {
+            var channel = await GetChannelAsync(channelId);
+            if (channel == null)
+            {
+                return null;
+            }
+
+            var message = await channel.GetMessageAsync(messageId);
+            return message?.Timestamp;
         }
     }
 }

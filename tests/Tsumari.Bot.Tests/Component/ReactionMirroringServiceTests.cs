@@ -567,6 +567,16 @@ namespace Tsumari.Bot.Tests.Component
                 return Task.FromResult(channel);
             }
 
+            public Task<IUserMessage?> SendMessageAsync(ulong channelId, string message)
+            {
+                throw new NotSupportedException("SendMessageAsync is not used by reaction mirroring tests.");
+            }
+
+            public Task<DateTimeOffset?> GetMessageTimestampAsync(ulong channelId, ulong messageId)
+            {
+                throw new NotSupportedException("GetMessageTimestampAsync is not used by reaction mirroring tests.");
+            }
+
             public Task AddReactionAsync(IMessage message, IEmote emote)
             {
                 AddedReactions.Add(new ReactionOperation(message, ReactionMirroringService.GetReactionKey(emote)));

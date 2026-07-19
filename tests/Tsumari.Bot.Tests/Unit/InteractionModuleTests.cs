@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Interactions;
@@ -12,6 +13,7 @@ using Moq;
 using Tsumari.Bot.Models;
 using Tsumari.Bot.Modules;
 using Tsumari.Bot.Services;
+using Tsumari.Bot.Services.Abstractions;
 using Xunit;
 
 namespace Tsumari.Bot.Tests.Unit
@@ -290,6 +292,131 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task SyncAsync_RejectsDmContext()
+        {
+            using var harness = await CreateHarnessAsync();
+
+            var textChannel = new Mock<IChannel>();
+            textChannel.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(777UL);
+            textChannel.As<ITextChannel>().SetupGet(channel => channel.Id).Returns(777UL);
+
+            await harness.Module.SyncAsync(textChannel.Object, 24);
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("only be used inside a guild channel", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task SyncAsync_RejectsNonAdministrator()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL, guildAdministrator: false);
+
+            var textChannel = new Mock<IChannel>();
+            textChannel.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(777UL);
+            textChannel.As<ITextChannel>().SetupGet(channel => channel.Id).Returns(777UL);
+
+            await harness.Module.SyncAsync(textChannel.Object, 24);
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("requires Administrator permissions", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task SyncAsync_RejectsNonTextChannel()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL);
+            var nonTextChannel = new Mock<IChannel>();
+            nonTextChannel.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(999UL);
+
+            await harness.Module.SyncAsync(nonTextChannel.Object, 24);
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("must be a standard Guild Text Channel", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task SyncAsync_RejectsUnregisteredChannel()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL);
+            var textChannel = new Mock<IChannel>();
+            textChannel.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(888UL);
+            textChannel.As<ITextChannel>().SetupGet(channel => channel.Id).Returns(888UL);
+
+            await harness.Module.SyncAsync(textChannel.Object, 24);
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("not registered as a Master channel", response, StringComparison.Ordinal);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [InlineData(169)]
+        public async Task SyncAsync_RejectsInvalidHours(int hours)
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL);
+            var masterChannelId = 777UL;
+            var textChannel = new Mock<IChannel>();
+            textChannel.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(masterChannelId);
+            textChannel.As<ITextChannel>().SetupGet(channel => channel.Id).Returns(masterChannelId);
+            await harness.DatabaseService.AddMasterChannelAsync(masterChannelId);
+
+            await harness.Module.SyncAsync(textChannel.Object, hours);
+
+            var response = GetLatestInteractionText(harness.InteractionMock, nameof(IDiscordInteraction.RespondAsync));
+            Assert.Contains("Hours must be between", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task SyncAsync_ReportsServiceResult()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL);
+            var masterChannelId = 777UL;
+            var textChannel = new Mock<IChannel>();
+            textChannel.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(masterChannelId);
+            textChannel.As<ITextChannel>().SetupGet(channel => channel.Id).Returns(masterChannelId);
+            await harness.DatabaseService.AddMasterChannelAsync(masterChannelId);
+
+            harness.HistoricalSyncMock
+                .Setup(service => service.SyncMasterChannelAsync(masterChannelId, TimeSpan.FromHours(24), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new HistoricalSyncResult
+                {
+                    Success = true,
+                    ProcessedCount = 5,
+                    FailedCount = 1,
+                    SkippedCount = 2
+                });
+
+            await harness.Module.SyncAsync(textChannel.Object, 24);
+
+            var response = GetLatestFollowupText(harness.InteractionMock);
+            Assert.Contains("Sync completed", response, StringComparison.Ordinal);
+            Assert.Contains("Processed: **5**", response, StringComparison.Ordinal);
+            Assert.Contains("Failed: **1**", response, StringComparison.Ordinal);
+            Assert.Contains("Skipped", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task SyncAsync_ReportsServiceFailure()
+        {
+            using var harness = await CreateHarnessAsync(guildId: 12345UL);
+            var masterChannelId = 777UL;
+            var textChannel = new Mock<IChannel>();
+            textChannel.As<ISnowflakeEntity>().SetupGet(channel => channel.Id).Returns(masterChannelId);
+            textChannel.As<ITextChannel>().SetupGet(channel => channel.Id).Returns(masterChannelId);
+            await harness.DatabaseService.AddMasterChannelAsync(masterChannelId);
+
+            harness.HistoricalSyncMock
+                .Setup(service => service.SyncMasterChannelAsync(masterChannelId, TimeSpan.FromHours(24), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(HistoricalSyncResult.Failure("Channel resolution failed"));
+
+            await harness.Module.SyncAsync(textChannel.Object, 24);
+
+            var response = GetLatestFollowupText(harness.InteractionMock);
+            Assert.Contains("Channel resolution failed", response, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public async Task DetectLanguageAsync_DoesNotExposeRawProviderErrors()
         {
             using var harness = await CreateHarnessAsync();
@@ -404,9 +531,12 @@ namespace Tsumari.Bot.Tests.Unit
             contextMock.SetupGet(context => context.User).Returns(userMock.Object);
             contextMock.SetupGet(context => context.Interaction).Returns(interactionMock.Object);
 
+            var historicalSyncMock = new Mock<IHistoricalMessageSyncService>();
+
             var module = new InteractionModule(
                 dbService,
                 translationService,
+                historicalSyncMock.Object,
                 NullLogger<InteractionModule>.Instance);
             SetModuleContext(module, contextMock.Object);
 
@@ -414,6 +544,7 @@ namespace Tsumari.Bot.Tests.Unit
                 .AddSingleton(dbService)
                 .AddSingleton(translationService)
                 .AddSingleton(providerMock.Object)
+                .AddSingleton(historicalSyncMock.Object)
                 .AddSingleton<ILogger<InteractionModule>>(NullLogger<InteractionModule>.Instance)
                 .BuildServiceProvider();
 
@@ -428,6 +559,7 @@ namespace Tsumari.Bot.Tests.Unit
                 dbService,
                 providerMock,
                 interactionMock,
+                historicalSyncMock,
                 module,
                 services,
                 client,
@@ -450,6 +582,7 @@ namespace Tsumari.Bot.Tests.Unit
                 DatabaseService databaseService,
                 Mock<ITranslationProvider> providerMock,
                 Mock<IDiscordInteraction> interactionMock,
+                Mock<IHistoricalMessageSyncService> historicalSyncMock,
                 InteractionModule module,
                 ServiceProvider services,
                 DiscordSocketClient client,
@@ -459,6 +592,7 @@ namespace Tsumari.Bot.Tests.Unit
                 DatabaseService = databaseService;
                 ProviderMock = providerMock;
                 InteractionMock = interactionMock;
+                HistoricalSyncMock = historicalSyncMock;
                 Module = module;
                 Services = services;
                 Client = client;
@@ -472,6 +606,8 @@ namespace Tsumari.Bot.Tests.Unit
             public Mock<ITranslationProvider> ProviderMock { get; }
 
             public Mock<IDiscordInteraction> InteractionMock { get; }
+
+            public Mock<IHistoricalMessageSyncService> HistoricalSyncMock { get; }
 
             public InteractionModule Module { get; }
 

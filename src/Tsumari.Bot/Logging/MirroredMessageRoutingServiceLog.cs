@@ -123,5 +123,12 @@ namespace Tsumari.Bot.Logging
             Message = "Message {MessageId} in channel {ChannelId} has attachments that exceed the guild upload limit of {MaxUploadLimitBytes} bytes and will not be mirrored: {Filenames}"
         )]
         public static partial void LogOversizedAttachmentsSkipped(this ILogger logger, ulong messageId, ulong channelId, ulong maxUploadLimitBytes, string filenames);
+
+        [LoggerMessage(
+            EventId = 1117,
+            Level = LogLevel.Debug,
+            Message = "Skipping routing for message {MessageId} because it is already being routed by another operation."
+        )]
+        public static partial void LogSkippingConcurrentRouting(this ILogger logger, ulong messageId);
     }
 }

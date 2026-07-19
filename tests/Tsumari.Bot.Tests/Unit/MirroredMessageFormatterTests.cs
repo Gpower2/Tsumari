@@ -171,5 +171,53 @@ namespace Tsumari.Bot.Tests.Unit
 
             Assert.Equal("*(EN => DE):* Hello *(Translation Failed)*", result);
         }
+
+        [Fact]
+        public void BuildTimestampPrefix_ReturnsDiscordDynamicTimestamp()
+        {
+            var timestamp = new DateTimeOffset(2026, 7, 19, 12, 34, 56, TimeSpan.Zero);
+
+            var result = MirroredMessageFormatter.BuildTimestampPrefix(timestamp);
+
+            Assert.Equal("<t:1784464496:f> ", result);
+        }
+
+        [Fact]
+        public void BuildTimestampPrefix_ReturnsEmpty_WhenTimestampIsNull()
+        {
+            var result = MirroredMessageFormatter.BuildTimestampPrefix(null);
+
+            Assert.Equal(string.Empty, result);
+        }
+
+        [Fact]
+        public void FormatMirroredAuthorText_PrependsTimestamp_WhenProvided()
+        {
+            var timestamp = new DateTimeOffset(2026, 7, 19, 12, 34, 56, TimeSpan.Zero);
+
+            var result = MirroredMessageFormatter.FormatMirroredAuthorText("Alice", "Hello", timestamp);
+
+            Assert.Equal("<t:1784464496:f> **Alice**:\nHello", result);
+        }
+
+        [Fact]
+        public void FormatLinkedMessageText_PrependsTimestamp_ForTranslatedCrossChannelMessage()
+        {
+            var timestamp = new DateTimeOffset(2026, 7, 19, 12, 34, 56, TimeSpan.Zero);
+
+            var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 20, "Alice", "en", "de", "Hallo", timestamp);
+
+            Assert.Equal("<t:1784464496:f> **Alice** (EN => DE):\nHallo", result);
+        }
+
+        [Fact]
+        public void FormatLinkedMessageText_PrependsTimestamp_ForTranslatedReplyMessage()
+        {
+            var timestamp = new DateTimeOffset(2026, 7, 19, 12, 34, 56, TimeSpan.Zero);
+
+            var result = MirroredMessageFormatter.FormatLinkedMessageText(10, 10, "Alice", "en", "de", "Hallo", timestamp);
+
+            Assert.Equal("<t:1784464496:f> *(EN => DE):* Hallo", result);
+        }
     }
 }

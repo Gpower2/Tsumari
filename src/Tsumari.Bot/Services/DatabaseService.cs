@@ -69,6 +69,7 @@ namespace Tsumari.Bot.Services
                     MirroredMessageId TEXT NOT NULL,
                     ChannelId TEXT NOT NULL,
                     LanguageCode TEXT NOT NULL,
+                    OriginalMessageTimestamp INTEGER NULL,
                     PRIMARY KEY (OriginalMessageId, ChannelId)
                 );";
 
@@ -105,6 +106,14 @@ namespace Tsumari.Bot.Services
                     using var alterMessageLinksCmd = connection.CreateCommand();
                     alterMessageLinksCmd.Transaction = transaction;
                     alterMessageLinksCmd.CommandText = "ALTER TABLE MessageLinks ADD COLUMN OriginalChannelId TEXT;";
+                    await alterMessageLinksCmd.ExecuteNonQueryAsync();
+                }
+
+                if (!await ColumnExistsAsync(connection, transaction, "MessageLinks", "OriginalMessageTimestamp"))
+                {
+                    using var alterMessageLinksCmd = connection.CreateCommand();
+                    alterMessageLinksCmd.Transaction = transaction;
+                    alterMessageLinksCmd.CommandText = "ALTER TABLE MessageLinks ADD COLUMN OriginalMessageTimestamp INTEGER NULL;";
                     await alterMessageLinksCmd.ExecuteNonQueryAsync();
                 }
 
@@ -259,6 +268,25 @@ namespace Tsumari.Bot.Services
             
             var result = await cmd.ExecuteScalarAsync();
             return result != null;
+        }
+
+        public async Task<List<ulong>> GetAllMasterChannelIdsAsync()
+        {
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT MasterChannelId FROM MasterChannels ORDER BY MasterChannelId;";
+
+            var masterChannelIds = new List<ulong>();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (ulong.TryParse(reader.GetString(0), out var masterChannelId))
+                {
+                    masterChannelIds.Add(masterChannelId);
+                }
+            }
+
+            return masterChannelIds;
         }
 
         // ==========================================
@@ -453,19 +481,30 @@ namespace Tsumari.Bot.Services
         // MESSAGE LINKS LOGGING
         // ==========================================
 
-        public async Task LinkMessagesAsync(ulong originalMessageId, ulong originalChannelId, ulong mirroredMessageId, ulong channelId, string languageCode)
+        public async Task LinkMessagesAsync(
+            ulong originalMessageId,
+            ulong originalChannelId,
+            ulong mirroredMessageId,
+            ulong channelId,
+            string languageCode,
+            DateTimeOffset? originalTimestamp = null)
         {
             using var connection = await GetConnectionAsync();
             using var cmd = connection.CreateCommand();
+            // INSERT OR IGNORE prevents duplicate-key crashes when a live gateway event and a
+            // sync operation race to store the same original message. The primary key is
+            // (OriginalMessageId, ChannelId), so attempts to link the same mirror twice are
+            // idempotent.
             cmd.CommandText = @"
-                INSERT INTO MessageLinks (OriginalMessageId, OriginalChannelId, MirroredMessageId, ChannelId, LanguageCode) 
-                VALUES ($orig, $origChan, $mirror, $chan, $lang);";
-             
+                INSERT OR IGNORE INTO MessageLinks (OriginalMessageId, OriginalChannelId, MirroredMessageId, ChannelId, LanguageCode, OriginalMessageTimestamp) 
+                VALUES ($orig, $origChan, $mirror, $chan, $lang, $timestamp);";
+
             cmd.Parameters.AddWithValue("$orig", originalMessageId.ToString());
             cmd.Parameters.AddWithValue("$origChan", originalChannelId.ToString());
             cmd.Parameters.AddWithValue("$mirror", mirroredMessageId.ToString());
             cmd.Parameters.AddWithValue("$chan", channelId.ToString());
             cmd.Parameters.AddWithValue("$lang", LanguageCodeService.NormalizeStoredLanguageCode(languageCode));
+            cmd.Parameters.AddWithValue("$timestamp", originalTimestamp?.ToUnixTimeMilliseconds() ?? (object)DBNull.Value);
 
             await cmd.ExecuteNonQueryAsync();
         }
@@ -612,6 +651,115 @@ namespace Tsumari.Bot.Services
 
             var groupKey = await GetLinkedGroupKeyForChannelAsync(family.OriginalChannelId);
             return groupKey ?? family.OriginalChannelId;
+        }
+
+        public async Task<bool> IsOriginalMessageTrackedAsync(ulong messageId)
+        {
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM MessageLinks WHERE OriginalMessageId = $id LIMIT 1;";
+            cmd.Parameters.AddWithValue("$id", messageId.ToString());
+
+            var result = await cmd.ExecuteScalarAsync();
+            return result != null;
+        }
+
+        public async Task<HashSet<ulong>> GetTrackedOriginalMessageIdsAsync(IReadOnlyCollection<ulong> messageIds)
+        {
+            var trackedIds = new HashSet<ulong>();
+            if (messageIds.Count == 0)
+            {
+                return trackedIds;
+            }
+
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            var parameters = new List<string>(messageIds.Count);
+            var index = 0;
+            foreach (var messageId in messageIds)
+            {
+                var paramName = $"$id{index}";
+                parameters.Add(paramName);
+                cmd.Parameters.AddWithValue(paramName, messageId.ToString());
+                index++;
+            }
+
+            cmd.CommandText = $@"
+                SELECT DISTINCT OriginalMessageId
+                FROM MessageLinks
+                WHERE OriginalMessageId IN ({string.Join(",", parameters)});";
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var idStr = reader.GetString(0);
+                if (ulong.TryParse(idStr, out var id))
+                {
+                    trackedIds.Add(id);
+                }
+            }
+
+            return trackedIds;
+        }
+
+        public async Task<DateTimeOffset?> GetLastTrackedMessageTimestampAsync(ulong masterChannelId)
+        {
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT MAX(OriginalMessageTimestamp)
+                FROM MessageLinks
+                WHERE ChannelId = $channelId
+                  AND UPPER(LanguageCode) = 'MASTER';";
+            cmd.Parameters.AddWithValue("$channelId", masterChannelId.ToString());
+
+            var result = await cmd.ExecuteScalarAsync();
+            if (result == null || result == DBNull.Value)
+            {
+                return null;
+            }
+
+            var milliseconds = Convert.ToInt64(result);
+            return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds);
+        }
+
+        public async Task<ulong?> GetLastTrackedOriginalMessageIdAsync(ulong masterChannelId)
+        {
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            // Order by length first (longer decimal string = larger number), then lexicographically,
+            // because OriginalMessageId is stored as TEXT but represents an unsigned 64-bit snowflake.
+            // CAST to INTEGER would overflow for IDs above 2^63-1.
+            cmd.CommandText = @"
+                SELECT OriginalMessageId
+                FROM MessageLinks
+                WHERE ChannelId = $channelId
+                  AND UPPER(LanguageCode) = 'MASTER'
+                ORDER BY LENGTH(OriginalMessageId) DESC, OriginalMessageId DESC
+                LIMIT 1;";
+            cmd.Parameters.AddWithValue("$channelId", masterChannelId.ToString());
+
+            var result = await cmd.ExecuteScalarAsync() as string;
+            if (string.IsNullOrEmpty(result) || !ulong.TryParse(result, out var originalMessageId))
+            {
+                return null;
+            }
+
+            return originalMessageId;
+        }
+
+        public async Task SetOriginalMessageTimestampAsync(ulong originalMessageId, DateTimeOffset timestamp)
+        {
+            using var connection = await GetConnectionAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE MessageLinks
+                SET OriginalMessageTimestamp = $timestamp
+                WHERE OriginalMessageId = $orig;";
+            cmd.Parameters.AddWithValue("$orig", originalMessageId.ToString());
+            cmd.Parameters.AddWithValue("$timestamp", timestamp.ToUnixTimeMilliseconds());
+
+            await cmd.ExecuteNonQueryAsync();
         }
 
         // ==========================================

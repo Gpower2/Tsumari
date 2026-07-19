@@ -41,7 +41,20 @@ namespace Tsumari.Bot.Tests
 
         public void Dispose()
         {
-            SqliteConnection.ClearAllPools();
+            // Clear only this database's connection pool. Using ClearAllPools can race with
+            // other parallel tests that are actively opening connections to their own databases.
+            using (var connection = new SqliteConnection($"Data Source={DatabasePath}"))
+            {
+                try
+                {
+                    connection.Open();
+                    SqliteConnection.ClearPool(connection);
+                }
+                catch (SqliteException)
+                {
+                    // The database may not exist if initialization failed; ignore.
+                }
+            }
 
             for (var attempt = 0; attempt < 5; attempt++)
             {

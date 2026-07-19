@@ -14,6 +14,16 @@ namespace Tsumari.Bot.Services
                 : author.Username;
         }
 
+        public static string BuildTimestampPrefix(DateTimeOffset? originalTimestamp)
+        {
+            if (!originalTimestamp.HasValue)
+            {
+                return string.Empty;
+            }
+
+            return $"<t:{originalTimestamp.Value.ToUnixTimeSeconds()}:f> ";
+        }
+
         public static string FormatLanguagePair(string sourceLang, string targetLang)
         {
             sourceLang = LanguageCodeService.NormalizeLanguageCode(sourceLang);
@@ -44,27 +54,29 @@ namespace Tsumari.Bot.Services
                 : $"https://discord.com/channels/@me/{message.Channel.Id}/{message.Id}";
         }
 
-        public static string FormatTranslatedReplyText(string sourceLang, string targetLang, string translatedText)
+        public static string FormatTranslatedReplyText(string sourceLang, string targetLang, string translatedText, DateTimeOffset? originalTimestamp = null)
         {
             var sourceLanguageInfo = new SourceLanguageInfo(
                 LanguageCodeService.NormalizeLanguageCode(sourceLang),
                 [LanguageCodeService.NormalizeLanguageCode(sourceLang)]);
-            return FormatTranslatedReplyText(sourceLanguageInfo, targetLang, translatedText);
+            return FormatTranslatedReplyText(sourceLanguageInfo, targetLang, translatedText, originalTimestamp);
         }
 
-        public static string FormatTranslatedReplyText(SourceLanguageInfo sourceLanguageInfo, string targetLang, string translatedText)
+        public static string FormatTranslatedReplyText(SourceLanguageInfo sourceLanguageInfo, string targetLang, string translatedText, DateTimeOffset? originalTimestamp = null)
         {
             var prefix = $"*{FormatLanguagePair(sourceLanguageInfo, targetLang)}:*";
+            var timestampPrefix = BuildTimestampPrefix(originalTimestamp);
             return string.IsNullOrWhiteSpace(translatedText)
-                ? prefix
-                : $"{prefix} {translatedText}";
+                ? $"{timestampPrefix}{prefix}"
+                : $"{timestampPrefix}{prefix} {translatedText}";
         }
 
-        public static string FormatMirroredAuthorText(string authorName, string content)
+        public static string FormatMirroredAuthorText(string authorName, string content, DateTimeOffset? originalTimestamp = null)
         {
+            var prefix = BuildTimestampPrefix(originalTimestamp);
             return string.IsNullOrWhiteSpace(content)
-                ? $"**{authorName}**:"
-                : $"**{authorName}**:\n{content}";
+                ? $"{prefix}**{authorName}**:"
+                : $"{prefix}**{authorName}**:\n{content}";
         }
 
         public static string AppendAttachmentMirrorNotice(string content, string? languageCode, bool hasOversizedAttachments)
@@ -103,12 +115,13 @@ namespace Tsumari.Bot.Services
             string authorName,
             string sourceLang,
             string? targetLang,
-            string content)
+            string content,
+            DateTimeOffset? originalTimestamp = null)
         {
             var sourceLanguageInfo = new SourceLanguageInfo(
                 LanguageCodeService.NormalizeLanguageCode(sourceLang),
                 [LanguageCodeService.NormalizeLanguageCode(sourceLang)]);
-            return FormatLinkedMessageText(sourceChannelId, linkedChannelId, authorName, sourceLanguageInfo, targetLang, content);
+            return FormatLinkedMessageText(sourceChannelId, linkedChannelId, authorName, sourceLanguageInfo, targetLang, content, originalTimestamp);
         }
 
         public static string FormatLinkedMessageText(
@@ -117,18 +130,19 @@ namespace Tsumari.Bot.Services
             string authorName,
             SourceLanguageInfo sourceLanguageInfo,
             string? targetLang,
-            string content)
+            string content,
+            DateTimeOffset? originalTimestamp = null)
         {
             if (!ShouldTranslateLinkedMessage(sourceLanguageInfo.PrimaryLanguageCode, targetLang))
             {
-                return FormatMirroredAuthorText(authorName, content);
+                return FormatMirroredAuthorText(authorName, content, originalTimestamp);
             }
 
             return sourceChannelId == linkedChannelId
-                ? FormatTranslatedReplyText(sourceLanguageInfo, targetLang!, content)
+                ? FormatTranslatedReplyText(sourceLanguageInfo, targetLang!, content, originalTimestamp)
                 : string.IsNullOrWhiteSpace(content)
-                    ? FormatMirroredAuthorText(authorName, string.Empty)
-                    : $"**{authorName}** {FormatLanguagePair(sourceLanguageInfo, targetLang!)}:\n{content}";
+                    ? FormatMirroredAuthorText(authorName, string.Empty, originalTimestamp)
+                    : $"{BuildTimestampPrefix(originalTimestamp)}**{authorName}** {FormatLanguagePair(sourceLanguageInfo, targetLang!)}:\n{content}";
         }
 
         public static string FormatTranslationFailureText(
@@ -137,7 +151,8 @@ namespace Tsumari.Bot.Services
             string authorName,
             string sourceLang,
             string targetLang,
-            string sourceContent)
+            string sourceContent,
+            DateTimeOffset? originalTimestamp = null)
         {
             var sourceLanguageInfo = new SourceLanguageInfo(
                 LanguageCodeService.NormalizeLanguageCode(sourceLang),
@@ -148,7 +163,8 @@ namespace Tsumari.Bot.Services
                 authorName,
                 sourceLanguageInfo,
                 targetLang,
-                sourceContent);
+                sourceContent,
+                originalTimestamp);
         }
 
         public static string FormatTranslationFailureText(
@@ -157,11 +173,12 @@ namespace Tsumari.Bot.Services
             string authorName,
             SourceLanguageInfo sourceLanguageInfo,
             string targetLang,
-            string sourceContent)
+            string sourceContent,
+            DateTimeOffset? originalTimestamp = null)
         {
             return sourceChannelId == linkedChannelId
-                ? FormatTranslatedReplyText(sourceLanguageInfo, targetLang, $"{sourceContent} *(Translation Failed)*")
-                : FormatMirroredAuthorText(authorName, $"{sourceContent} *(Translation Failed)*");
+                ? FormatTranslatedReplyText(sourceLanguageInfo, targetLang, $"{sourceContent} *(Translation Failed)*", originalTimestamp)
+                : FormatMirroredAuthorText(authorName, $"{sourceContent} *(Translation Failed)*", originalTimestamp);
         }
     }
 }
