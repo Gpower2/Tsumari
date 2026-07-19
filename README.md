@@ -1,3 +1,5 @@
+![Tsumari logo](tsumari_logo2_final.png)
+
 # Tsumari — Discord Cross-Language Translation & Mirroring Bot
 
 Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages across master/localized channel clusters, translates them with a selectable backend, mirrors attachments, and cross-links generated messages with Discord jump buttons.
@@ -17,6 +19,10 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Delete synchronization:** when a source message is deleted, existing linked bot messages are deleted too.
 - **Reaction mirroring:** standard reactions added to one linked message are reconciled across the rest of the linked message family.
 - **Attachment mirroring:** attachments are downloaded once and re-uploaded as native Discord files during initial fan-out.
+- **Historical message sync:** `/tsumari sync [master-channel] [hours]` scans the master channel and its localized channels for unprocessed messages and replays them in chronological order.
+- **Startup message sync:** on each Discord `Ready` event, Tsumari checks every registered master channel for messages missed since the last tracked message and syncs them automatically, announcing progress in the master channel.
+- **Original timestamp preservation:** messages synced from history include the original message timestamp as a Discord dynamic timestamp prefix so recipients see when the source was really posted.
+- **Guild nickname resolution:** synced messages mirror the author's server nickname, falling back to global name or username when a nickname is not available.
 - **Gateway-safe dispatching:** Discord gateway callbacks enqueue work immediately, then a dispatcher routes events into per-linked-group FIFO workers so local-LLM latency does not block the gateway task.
 - **SQLite persistence:** channel mappings, mirrored message IDs, and usage tracking are stored in SQLite.
 - **DeepL quota protection:** the monthly `500,000` character guard is enforced only when `Translation.Provider` is `DeepL`.
@@ -33,6 +39,9 @@ Tsumari is a .NET 10 Discord bot built on **Discord.Net**. It routes messages ac
 - **Language buttons only exist for bot-generated copies.** The source user-authored message is always reached through the `Original` button.
 - **Mismatch replies are tracked too.** When a localized channel receives the wrong language, the bot's in-channel translated reply is stored in `MessageLinks` and participates in cross-link buttons.
 - **Stored locale tags are normalized.** Inputs such as `pt_BR` are normalized to `pt-br` for storage and display, while target-channel routing keeps locale variants separate.
+- **Sync respects chronological order.** Historical and startup sync process oldest messages first so reply chains resolve correctly.
+- **Sync skips already-tracked messages.** Both manual and startup sync use `MessageLinks` to avoid double-posting messages Tsumari has already handled.
+- **Sync uses the author's guild nickname.** Messages replayed from history resolve the author's server nickname via the guild member cache/API.
 
 ## Repository Structure
 
@@ -51,6 +60,7 @@ E:\Development\Tsumari\
 │       ├── Constants/
 │       │   └── HttpClientNames.cs
 │       ├── DiscordGatewayHostedService.cs
+│       ├── StartupMessageSyncHostedService.cs
 │       ├── Extensions/
 │       │   └── HttpResponseExtensions.cs
 │       ├── GlobalUsings.cs
@@ -63,12 +73,15 @@ E:\Development\Tsumari\
 │       │   ├── DiscordMessagePublisherServiceLog.cs
 │       │   ├── EditedMessageSyncServiceLog.cs
 │       │   ├── GatewayEventGroupResolverLog.cs
+│       │   ├── HistoricalMessageSyncServiceLog.cs
 │       │   ├── HttpResponseLog.cs
 │       │   ├── InteractionModuleLog.cs
 │       │   ├── LinkedMessageDeletionServiceLog.cs
 │       │   ├── MirroredMessageRoutingServiceLog.cs
 │       │   ├── ReactionMirroringServiceLog.cs
 │       │   ├── ResiliencyHelperLog.cs
+│       │   ├── StartupMessageSyncHostedServiceLog.cs
+│       │   ├── StartupMessageSyncServiceLog.cs
 │       │   ├── TranslationProviderResolverLog.cs
 │       │   └── TranslationServiceLog.cs
 │       ├── Program.cs
@@ -77,11 +90,13 @@ E:\Development\Tsumari\
 │       │   ├── ChannelRoutingContext.cs
 │       │   ├── DiscordReactionEvent.cs
 │       │   ├── GatewayIngressEvent.cs
+│       │   ├── HistoricalSyncResult.cs
 │       │   ├── JumpLinkTarget.cs
 │       │   ├── LanguageAnalysisResult.cs
 │       │   ├── LinkedMessageFamily.cs
 │       │   ├── MediaAsset.cs
 │       │   ├── ReplyMirroringContext.cs
+│       │   ├── StartupSyncResult.cs
 │       │   ├── TranslationProvider.cs
 │       │   └── TranslationProviderConfigurationReport.cs
 │       ├── Modules/
@@ -102,7 +117,9 @@ E:\Development\Tsumari\
 │           │   ├── IDiscordGatewayEventDispatcher.cs
 │           │   ├── IDiscordGatewayEventProcessor.cs
 │           │   ├── IDiscordMessageService.cs
-│           │   └── IGatewayEventGroupResolver.cs
+│           │   ├── IGatewayEventGroupResolver.cs
+│           │   ├── IHistoricalMessageSyncService.cs
+│           │   └── IStartupMessageSyncService.cs
 │           ├── DiscordMessagePublisherService.cs
 │           ├── DiscordMessageService.cs
 │           ├── DiscordGatewayEventDispatcherService.cs
@@ -111,6 +128,7 @@ E:\Development\Tsumari\
 │           ├── DatabaseService.cs
 │           ├── EditedMessageSyncService.cs
 │           ├── GatewayEventGroupResolver.cs
+│           ├── HistoricalMessageSyncService.cs
 │           ├── LanguageCodeService.cs
 │           ├── LinkedMessageDeletionService.cs
 │           ├── MirroredMessageFormatter.cs
@@ -119,6 +137,7 @@ E:\Development\Tsumari\
 │           ├── ReplyMirroringService.cs
 │           ├── ReactionMirroringService.cs
 │           ├── ResiliencyHelper.cs
+│           ├── StartupMessageSyncService.cs
 │           └── TranslationService.cs
 └── tests/
     └── Tsumari.Bot.Tests/
@@ -142,6 +161,7 @@ E:\Development\Tsumari\
             ├── DiscordGatewayHostedServiceLogTests.cs
             ├── DiscordMessagePublisherServiceTests.cs
             ├── EditedMessageSyncServiceTests.cs
+            ├── HistoricalMessageSyncServiceTests.cs
             ├── HttpResponseExtensionsTests.cs
             ├── LanguageCodeServiceTests.cs
             ├── MirroredMessageFormatterTests.cs
@@ -150,6 +170,8 @@ E:\Development\Tsumari\
             ├── OllamaTranslationProviderTests.cs
             ├── OpenAITranslationProviderTests.cs
             ├── ResiliencyHelperTests.cs
+            ├── StartupMessageSyncHostedServiceTests.cs
+            ├── StartupMessageSyncServiceTests.cs
             └── TranslationProviderResolverTests.cs
 ```
 
@@ -221,6 +243,8 @@ Useful categories when narrowing production diagnostics:
 - `Tsumari.Bot.Services.EditedMessageSyncService` - edit-sync skip decisions
 - `Tsumari.Bot.Services.LinkedMessageDeletionService` - delete-sync skip decisions
 - `Tsumari.Bot.Services.ReactionMirroringService` - reaction-mirroring skip decisions
+- `Tsumari.Bot.Services.HistoricalMessageSyncService` - manual `/tsumari sync` progress and skipped messages
+- `Tsumari.Bot.Services.StartupMessageSyncService` - automatic startup sync progress per master channel
 - The `UsageTracker` quota guard is only enforced for DeepL; local/self-hosted LLM providers do not use the monthly character limit.
 
 ## Administrative Slash Commands
@@ -230,11 +254,14 @@ All `/tsumari` commands require **Administrator** permissions in guilds. The two
 - `/tsumari add-master [channel]`
 - `/tsumari register-local [local-channel] [master-channel] [language-code]`
 - `/tsumari unregister [channel]`
+- `/tsumari sync [master-channel] [hours]`
 - `/tsumari status`
 - `/tsumari detect-language [text]`
 - `/tsumari translate [target-language] [text]`
 
 `register-local` stores language codes in normalized lowercase form (`pt_BR` becomes `pt-br`), and re-registering an existing localized channel updates its mapping because the database operation uses `INSERT OR REPLACE`.
+
+`sync` scans the selected master channel and all of its localized children for unprocessed user messages within the last `hours` (1–168), then replays them through the normal routing pipeline in chronological order. It is useful for backfilling messages that were posted while Tsumari was offline or for seeding a newly configured cluster.
 
 `status` responds **ephemerally** with the current bot/database counts plus the selected translation provider's active/configuration details (such as provider name, model/endpoint, or DeepL free/paid routing). The two language-probe commands also respond **ephemerally** so they do not clutter the channel. `detect-language` runs the provider-backed analysis directly, and `translate` intentionally uses the same analysis + trusted source-hint flow as live message routing when analysis succeeds, while still attempting a translation without a hint if analysis itself fails. Both commands count against the same provider usage/quota rules as normal translation work.
 

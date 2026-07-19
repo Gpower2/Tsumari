@@ -18,6 +18,20 @@ message text
 translated text
 ```
 
+### Copies Replayed from History
+
+When Tsumari syncs older messages, the original post timestamp is prefixed so the mirrored copy shows when the source was really sent:
+
+```text
+<timestamp> **Author**:
+message text
+```
+
+```text
+<timestamp> **Author** (XX => YY):
+translated text
+```
+
 ### Initial Mismatch Reply in a Localized Channel
 
 ```text
@@ -168,3 +182,31 @@ After edit sync, the reply remains a Discord reply message and keeps the compact
 
 > [!NOTE]
 > The canonical edit-sync rules and current limitations live in [`routing.md`](routing.md#edited-message-synchronization).
+
+---
+
+## Scenario 5: Messages Synced from History
+
+Tsumari was offline for a few hours. A user posted in `#general` while it was away.
+
+### Original Message in `#general`
+
+> **gpowe**: We need to update the runbook before the next deployment.
+> *(posted 19 July 2026 at 14:30)*
+
+### Synced Mirror in `#general-greek`
+
+> *19 July 2026 at 14:30* **gpowe** (EN => EL):
+> Πρέπει να ενημερώσουμε το runbook πριν την επόμενη ανάπτυξη.
+>
+> `[Buttons: Original | EL | IT]`
+
+### Synced Mirror in `#general-italian`
+
+> *19 July 2026 at 14:30* **gpowe** (EN => IT):
+> Dobbiamo aggiornare il runbook prima del prossimo deployment.
+>
+> `[Buttons: Original | EL | IT]`
+
+> [!NOTE]
+> The timestamp is rendered by Discord in each reader's local locale. The exact display format depends on the user's Discord language/timezone settings. The canonical sync rules live in [`routing.md`](routing.md#historical-and-startup-message-synchronization).

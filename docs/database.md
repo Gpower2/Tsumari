@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS MessageLinks (
     MirroredMessageId TEXT NOT NULL,
     ChannelId TEXT NOT NULL,
     LanguageCode TEXT NOT NULL,
+    OriginalMessageTimestamp INTEGER NULL,
     PRIMARY KEY (OriginalMessageId, ChannelId)
 );
 
@@ -52,7 +53,9 @@ Notes:
 
 ### `MessageLinks`
 
-Stores one generated/mirrored bot message per `(OriginalMessageId, ChannelId)`, plus the source channel ID for that original message.
+Stores one generated/mirrored bot message per `(OriginalMessageId, ChannelId)`, plus the source channel ID for that original message and the original message timestamp.
+
+`OriginalMessageTimestamp` is stored as Unix milliseconds (INTEGER). It is used by startup sync to find messages that arrived after the last tracked message. It is also prefixed to synced messages so recipients see the original post time. The column is nullable for backwards compatibility with links created before this feature existed; missing timestamps are backfilled from Discord or from the message snowflake ID when needed.
 
 Current uses in code:
 
@@ -62,6 +65,8 @@ Current uses in code:
 - tracking the mismatch-flow translated reply created in the source localized channel
 - deleting linked bot messages when the original source message is deleted
 - resolving a full linked-message family from either an original message ID or a mirrored message ID during reaction mirroring
+- determining the baseline for startup sync via `GetLastTrackedMessageTimestampAsync`
+- backfilling and storing original timestamps via `GetLastTrackedOriginalMessageIdAsync`, `SetOriginalMessageTimestampAsync`, and `ResolveTimestampFromDiscordAsync`
 
 ### `UsageTracker`
 
@@ -81,7 +86,7 @@ Discord Snowflake IDs are 64-bit values. Storing them as `TEXT` avoids cross-lay
 
 ### Startup
 
-`InitializeDatabaseAsync()` creates all four tables if they do not exist.
+`InitializeDatabaseAsync()` creates all four tables if they do not exist. It also runs additive migrations for older databases, adding `OriginalChannelId` and `OriginalMessageTimestamp` columns to `MessageLinks` when they are missing.
 
 ### Channel Registration
 

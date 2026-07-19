@@ -251,6 +251,58 @@ When a standard reaction changes on any message that belongs to a linked message
 - Only **standard reactions** are mirrored. Burst reactions are ignored.
 - If an older mirrored message was created before source-channel IDs were stored in `MessageLinks`, family resolution from that mirrored message may be unavailable until the original message is seen again.
 
+## Historical and Startup Message Synchronization
+
+Tsumari can replay messages it missed while offline. There are two triggers:
+
+1. **Manual:** `/tsumari sync [master-channel] [hours]` scans the master channel and all of its localized children for unprocessed user messages within the last `hours` (1–168) and replays them.
+2. **Automatic:** `StartupMessageSyncHostedService` runs on every Discord `Ready` event, checks every registered master channel for messages posted after the newest tracked message, and syncs them.
+
+### Sync Process
+
+For each candidate message:
+
+1. Tsumari fetches message history from Discord.
+2. It skips messages already tracked in `MessageLinks` and messages outside the sync window.
+3. It orders remaining messages oldest-first so reply chains resolve before any reply that references them.
+4. It routes each message through the same pipeline as live messages.
+
+### Sync-Specific Formatting
+
+Because synced messages may be older than messages Tsumari has already mirrored, each replayed message includes the **original post timestamp** as a Discord dynamic timestamp prefix:
+
+```text
+<timestamp> **Author**:
+message text
+```
+
+This is controlled by `MirroredMessageFormatter.BuildTimestampPrefix`. The timestamp is rendered in each reader's local Discord locale.
+
+### Author Nickname Resolution During Sync
+
+Live gateway messages provide the author as an `IGuildUser` with the server nickname already populated. Messages fetched from history provide the author as `IUser`, so Tsumari resolves the guild member through `IGuild.GetUserAsync` before formatting. If the guild member cannot be resolved, it falls back to global name or username, matching the normal fallback order.
+
+### Startup Sync Announcements
+
+When startup sync finds missed messages in a master channel, it posts:
+
+```text
+I found some messages that I missed... 🫣 Syncing them now! 🙇
+```
+
+After the sync finishes for that channel, it posts:
+
+```text
+Messages synced! 🥳
+```
+
+### Current Limitations
+
+- Sync only processes user-authored text or attachment messages. It ignores system messages, bot messages, and webhook messages.
+- The sync window is capped at 168 hours (7 days) for the manual command; startup sync uses the time since the last tracked message with no fixed cap.
+- Each channel scan fetches at most 5,000 messages as a safety limit.
+- Sync reuses the live translation pipeline, so it is subject to the same provider availability and quota rules.
+
 ## Attachment Handling During New Message Routing
 
 Attachment downloads happen before outbound routing. The same downloaded `byte[]` is reused across destinations, and each send gets its own `MemoryStream`.
