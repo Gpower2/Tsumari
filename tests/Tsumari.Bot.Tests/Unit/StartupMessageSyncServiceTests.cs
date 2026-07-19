@@ -249,6 +249,29 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
+        public async Task RunAsync_InitializesDatabaseSchema_BeforeQuerying()
+        {
+            // Do NOT initialize the database explicitly. RunAsync should do it defensively.
+            var historicalSyncMock = new Mock<IHistoricalMessageSyncService>();
+            historicalSyncMock
+                .Setup(service => service.HasUnprocessedMessagesAsync(It.IsAny<ulong>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            var service = new StartupMessageSyncService(
+                _dbService,
+                Mock.Of<IDiscordMessageService>(),
+                historicalSyncMock.Object,
+                NullLogger<StartupMessageSyncService>.Instance);
+
+            var result = await service.RunAsync(CancellationToken.None);
+
+            Assert.Equal(0, result.ChannelsChecked);
+            historicalSyncMock.Verify(
+                service => service.HasUnprocessedMessagesAsync(It.IsAny<ulong>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()),
+                Times.Never);
+        }
+
+        [Fact]
         public async Task RunAsync_AggregatesResultsAcrossChannels()
         {
             await _dbService.InitializeDatabaseAsync();
