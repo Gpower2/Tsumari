@@ -213,10 +213,9 @@ namespace Tsumari.Bot.Services
                 {
                     if (hasHumanReaction)
                     {
-                        // The trigger message is never a mirror target for ReactionAdded. This keeps
-                        // the bot from racing Discord and adding its own copy of the same emoji back
-                        // onto the message that already emitted the human reaction event.
-                        if (humanReactionKnownPresent && isTriggerMessage)
+                        // The trigger message receives the reaction directly from the user who reacted,
+                        // so Tsumari should only mirror the reaction onto linked messages, not add its own duplicate.
+                        if (isTriggerMessage)
                         {
                             continue;
                         }
