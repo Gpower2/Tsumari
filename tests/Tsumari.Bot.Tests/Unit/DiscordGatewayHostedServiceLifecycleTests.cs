@@ -72,194 +72,46 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
-        public async Task EnsureReadyInitializationAsync_OnlyInitializesDatabaseLoadsModulesAndRegistersCommandsOnce()
+        public async Task EnsureCommandsRegisteredAsync_RegistersCommandsOnlyOnce()
         {
             using var harness = CreateHarness();
-            var initializeDatabaseCallCount = 0;
-            var addModulesCallCount = 0;
             var registerCommandsCallCount = 0;
 
-            await harness.HostedService.EnsureReadyInitializationAsync(
-                () =>
-                {
-                    initializeDatabaseCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    addModulesCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    registerCommandsCallCount++;
-                    return Task.CompletedTask;
-                });
+            await harness.HostedService.EnsureCommandsRegisteredAsync(() =>
+            {
+                registerCommandsCallCount++;
+                return Task.CompletedTask;
+            });
 
-            await harness.HostedService.EnsureReadyInitializationAsync(
-                () =>
-                {
-                    initializeDatabaseCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    addModulesCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    registerCommandsCallCount++;
-                    return Task.CompletedTask;
-                });
+            await harness.HostedService.EnsureCommandsRegisteredAsync(() =>
+            {
+                registerCommandsCallCount++;
+                return Task.CompletedTask;
+            });
 
-            Assert.Equal(1, initializeDatabaseCallCount);
-            Assert.Equal(1, addModulesCallCount);
             Assert.Equal(1, registerCommandsCallCount);
         }
 
         [Fact]
-        public async Task EnsureReadyInitializationAsync_RetriesCommandRegistrationWithoutReloadingModulesOrDatabase()
+        public async Task EnsureCommandsRegisteredAsync_RetriesAfterFailure()
         {
             using var harness = CreateHarness();
-            var initializeDatabaseCallCount = 0;
-            var addModulesCallCount = 0;
             var registerCommandsCallCount = 0;
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                harness.HostedService.EnsureReadyInitializationAsync(
-                    () =>
-                    {
-                        initializeDatabaseCallCount++;
-                        return Task.CompletedTask;
-                    },
-                    () =>
-                    {
-                        addModulesCallCount++;
-                        return Task.CompletedTask;
-                    },
-                    () =>
-                    {
-                        registerCommandsCallCount++;
-                        throw new InvalidOperationException("register failed");
-                    }));
-
-            await harness.HostedService.EnsureReadyInitializationAsync(
-                () =>
-                {
-                    initializeDatabaseCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    addModulesCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
+                harness.HostedService.EnsureCommandsRegisteredAsync(() =>
                 {
                     registerCommandsCallCount++;
-                    return Task.CompletedTask;
-                });
+                    throw new InvalidOperationException("register failed");
+                }));
 
-            Assert.Equal(1, initializeDatabaseCallCount);
-            Assert.Equal(1, addModulesCallCount);
+            await harness.HostedService.EnsureCommandsRegisteredAsync(() =>
+            {
+                registerCommandsCallCount++;
+                return Task.CompletedTask;
+            });
+
             Assert.Equal(2, registerCommandsCallCount);
-        }
-
-        [Fact]
-        public async Task EnsureReadyInitializationAsync_RetriesDatabaseInitializationBeforeLoadingModules()
-        {
-            using var harness = CreateHarness();
-            var initializeDatabaseCallCount = 0;
-            var addModulesCallCount = 0;
-            var registerCommandsCallCount = 0;
-
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                harness.HostedService.EnsureReadyInitializationAsync(
-                    () =>
-                    {
-                        initializeDatabaseCallCount++;
-                        throw new InvalidOperationException("db failed");
-                    },
-                    () =>
-                    {
-                        addModulesCallCount++;
-                        return Task.CompletedTask;
-                    },
-                    () =>
-                    {
-                        registerCommandsCallCount++;
-                        return Task.CompletedTask;
-                    }));
-
-            await harness.HostedService.EnsureReadyInitializationAsync(
-                () =>
-                {
-                    initializeDatabaseCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    addModulesCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    registerCommandsCallCount++;
-                    return Task.CompletedTask;
-                });
-
-            Assert.Equal(2, initializeDatabaseCallCount);
-            Assert.Equal(1, addModulesCallCount);
-            Assert.Equal(1, registerCommandsCallCount);
-        }
-
-        [Fact]
-        public async Task EnsureReadyInitializationAsync_RetriesModuleLoadingWithoutReinitializingDatabaseOrRegisteringCommands()
-        {
-            using var harness = CreateHarness();
-            var initializeDatabaseCallCount = 0;
-            var addModulesCallCount = 0;
-            var registerCommandsCallCount = 0;
-
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                harness.HostedService.EnsureReadyInitializationAsync(
-                    () =>
-                    {
-                        initializeDatabaseCallCount++;
-                        return Task.CompletedTask;
-                    },
-                    () =>
-                    {
-                        addModulesCallCount++;
-                        throw new InvalidOperationException("module load failed");
-                    },
-                    () =>
-                    {
-                        registerCommandsCallCount++;
-                        return Task.CompletedTask;
-                    }));
-
-            await harness.HostedService.EnsureReadyInitializationAsync(
-                () =>
-                {
-                    initializeDatabaseCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    addModulesCallCount++;
-                    return Task.CompletedTask;
-                },
-                () =>
-                {
-                    registerCommandsCallCount++;
-                    return Task.CompletedTask;
-                });
-
-            Assert.Equal(1, initializeDatabaseCallCount);
-            Assert.Equal(2, addModulesCallCount);
-            Assert.Equal(1, registerCommandsCallCount);
         }
 
         [Fact]

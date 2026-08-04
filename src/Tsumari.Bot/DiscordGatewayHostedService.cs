@@ -22,10 +22,8 @@ namespace Tsumari.Bot
         private readonly IConfiguration _configuration;
         private readonly IGatewayReadinessCoordinator _readinessCoordinator;
         private readonly ILogger<DiscordGatewayHostedService> _logger;
-        private readonly SemaphoreSlim _readyInitializationLock = new(1, 1);
+        private readonly SemaphoreSlim _commandRegistrationLock = new(1, 1);
         private bool _eventHandlersRegistered;
-        private bool _databaseInitialized;
-        private bool _interactionModulesLoaded;
         private bool _globalCommandsRegistered;
 
         public DiscordGatewayHostedService(
@@ -69,10 +67,8 @@ namespace Tsumari.Bot
 
                 // Initialize the database schema and interaction modules before opening the gateway.
                 // Command registration must wait for the Discord Ready event, but these steps do not.
-                await EnsureReadyInitializationAsync(
-                    async () => await _dbService.InitializeDatabaseAsync(),
-                    async () => await _interactionService.AddModulesAsync(typeof(Program).Assembly, _serviceProvider),
-                    () => Task.CompletedTask);
+                await _dbService.InitializeDatabaseAsync();
+                await _interactionService.AddModulesAsync(typeof(Program).Assembly, _serviceProvider);
 
                 await _client.StartAsync();
 
@@ -132,14 +128,11 @@ namespace Tsumari.Bot
             {
                 // Global slash commands can only be registered after Discord signals Ready.
                 // The database and modules were already initialized before the gateway started.
-                await EnsureReadyInitializationAsync(
-                    () => Task.CompletedTask,
-                    () => Task.CompletedTask,
-                    async () =>
-                    {
-                        await _interactionService.RegisterCommandsGloballyAsync();
-                        _logger.LogAdministrativeCommandsRegistered();
-                    });
+                await EnsureCommandsRegisteredAsync(async () =>
+                {
+                    await _interactionService.RegisterCommandsGloballyAsync();
+                    _logger.LogAdministrativeCommandsRegistered();
+                });
 
                 // Signal readiness only after commands are registered so downstream services
                 // (startup sync) run against a fully initialized bot.
@@ -151,26 +144,11 @@ namespace Tsumari.Bot
             }
         }
 
-        internal async Task EnsureReadyInitializationAsync(
-            Func<Task> initializeDatabaseAsync,
-            Func<Task> addModulesAsync,
-            Func<Task> registerCommandsAsync)
+        internal async Task EnsureCommandsRegisteredAsync(Func<Task> registerCommandsAsync)
         {
-            await _readyInitializationLock.WaitAsync();
+            await _commandRegistrationLock.WaitAsync();
             try
             {
-                if (!_databaseInitialized)
-                {
-                    await initializeDatabaseAsync();
-                    _databaseInitialized = true;
-                }
-
-                if (!_interactionModulesLoaded)
-                {
-                    await addModulesAsync();
-                    _interactionModulesLoaded = true;
-                }
-
                 if (_globalCommandsRegistered)
                 {
                     return;
@@ -181,7 +159,7 @@ namespace Tsumari.Bot
             }
             finally
             {
-                _readyInitializationLock.Release();
+                _commandRegistrationLock.Release();
             }
         }
 
