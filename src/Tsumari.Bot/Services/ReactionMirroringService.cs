@@ -146,14 +146,7 @@ namespace Tsumari.Bot.Services
             {
                 try
                 {
-                    var channel = await _discordMessageService.GetChannelAsync(entry.ChannelId);
-                    if (channel == null)
-                    {
-                        _logger.LogReactionChannelNotResolved(entry.ChannelId, entry.MessageId);
-                        continue;
-                    }
-
-                    var message = await channel.GetMessageAsync(entry.MessageId);
+                    var message = await _discordMessageService.GetMessageAsync(entry.ChannelId, entry.MessageId);
                     if (message == null)
                     {
                         _logger.LogReactionMessageNotFetched(entry.MessageId, entry.ChannelId);

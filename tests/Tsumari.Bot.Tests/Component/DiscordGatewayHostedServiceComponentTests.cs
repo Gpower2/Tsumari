@@ -6,8 +6,10 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Discord;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Tsumari.Bot;
+using Tsumari.Bot.Configuration;
 using Tsumari.Bot.Services;
 using Xunit;
 
@@ -909,6 +911,8 @@ namespace Tsumari.Bot.Tests.Component
                 .Returns(discordCdnHttpClient ?? new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.OK))));
             var discordMessagePublisherService = new DiscordMessagePublisherService(
                 httpClientFactoryMock.Object,
+                new PassThroughDiscordRestRetryPolicy(),
+                new OptionsWrapper<DiscordRestOptions>(new DiscordRestOptions()),
                 NullLogger<DiscordMessagePublisherService>.Instance);
             var replyMirroringService = new ReplyMirroringService(_dbService);
             var mirroredMessageRoutingService = new MirroredMessageRoutingService(
@@ -1120,6 +1124,16 @@ namespace Tsumari.Bot.Tests.Component
             public Task<IUserMessage?> SendMessageAsync(ulong channelId, string message)
             {
                 throw new NotSupportedException("SendMessageAsync is not used by gateway hosted service component tests.");
+            }
+
+            public async Task<IMessage?> GetMessageAsync(ulong channelId, ulong messageId)
+            {
+                if (_channels.TryGetValue(channelId, out var channel) && channel != null)
+                {
+                    return await channel.GetMessageAsync(messageId);
+                }
+
+                return null;
             }
 
             public Task<DateTimeOffset?> GetMessageTimestampAsync(ulong channelId, ulong messageId)

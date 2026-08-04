@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using Tsumari.Bot.Configuration;
 using Tsumari.Bot.Services;
 
 namespace Tsumari.Bot
@@ -20,6 +21,12 @@ namespace Tsumari.Bot
             Console.OutputEncoding = Encoding.UTF8;
 
             var builder = Host.CreateApplicationBuilder(args);
+
+            // Load Discord REST guardrail options up front so they can be applied to the
+            // underlying Discord.Net HTTP client before the host is built.
+            builder.Services.Configure<DiscordRestOptions>(builder.Configuration.GetSection("Discord:Rest"));
+            var discordRestOptions = new DiscordRestOptions();
+            builder.Configuration.GetSection("Discord:Rest").Bind(discordRestOptions);
 
             // Configure Console Logging
             builder.Logging.ClearProviders();
@@ -38,12 +45,16 @@ namespace Tsumari.Bot
             builder.Logging.AddDebug();
 
             // Discord Client Setup
+            // Enforce a per-request timeout on every REST call Discord.Net makes. The value here is
+            // the longest operation we expect (file uploads). Per-operation timeouts are set via
+            // RequestOptions, so this is only a safety net for calls that do not supply one.
             var socketConfig = new DiscordSocketConfig
             {
                 GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.GuildMessageReactions | GatewayIntents.MessageContent,
                 AlwaysDownloadUsers = false,
                 MessageCacheSize = 50,
-                LogLevel = LogSeverity.Info
+                LogLevel = LogSeverity.Info,
+                RestClientProvider = TimeoutRestClientProvider.Create(discordRestOptions.FileUploadTimeout)
             };
             builder.Services.AddSingleton(socketConfig);
             builder.Services.AddSingleton<DiscordSocketClient>();
@@ -63,11 +74,13 @@ namespace Tsumari.Bot
                 ));
 
             // Register Custom services
-            builder.Services.AddHttpClient(HttpClientNames.DiscordCdn);
+            builder.Services.AddHttpClient(HttpClientNames.DiscordCdn)
+                .ConfigureHttpClient(client => client.Timeout = discordRestOptions.FileUploadTimeout);
             builder.Services.AddHttpClient(HttpClientNames.DeepLLanguageMetadata);
             builder.Services.AddHttpClient(HttpClientNames.OllamaTranslation);
             builder.Services.AddHttpClient(HttpClientNames.OpenAITranslation);
 
+            builder.Services.AddSingleton<IDiscordRestRetryPolicy, DiscordRestRetryPolicy>();
             builder.Services.AddSingleton<IDiscordMessageService, DiscordMessageService>();
             builder.Services.AddSingleton<DatabaseService>();
             builder.Services.AddSingleton<DiscordMessagePublisherService>();

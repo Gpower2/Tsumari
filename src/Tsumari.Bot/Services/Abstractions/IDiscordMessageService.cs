@@ -22,6 +22,14 @@ namespace Tsumari.Bot.Services.Abstractions
         IAsyncEnumerable<IReadOnlyCollection<IUser>> GetReactionUsersAsync(IMessage message, IEmote emote, int limit);
 
         /// <summary>
+        /// Gets a specific message by querying Discord.
+        /// </summary>
+        /// <param name="channelId">The channel id of the message.</param>
+        /// <param name="messageId">The id of the message.</param>
+        /// <returns>The message, or null if it could not be found.</returns>
+        Task<IMessage?> GetMessageAsync(ulong channelId, ulong messageId);
+
+        /// <summary>
         /// Gets the timestamp of a specific message by querying Discord.
         /// </summary>
         /// <param name="channelId">The channel id of the message.</param>

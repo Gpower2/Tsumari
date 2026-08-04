@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http;
 using Discord;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
+using Tsumari.Bot.Configuration;
 using Tsumari.Bot.Services;
 using Xunit;
 
@@ -160,7 +162,7 @@ namespace Tsumari.Bot.Tests.Unit
                 .Returns(Task.CompletedTask);
 
             channelMock
-                .Setup(channel => channel.GetMessageAsync(It.IsAny<ulong>()))
+                .Setup(channel => channel.GetMessageAsync(It.IsAny<ulong>(), It.IsAny<CacheMode>(), It.IsAny<RequestOptions?>()))
                 .ReturnsAsync(userMessageMock.Object);
 
             var result = await publisher.TryModifyMessageContentAsync(channelMock.Object, 12345UL, "new content");
@@ -177,7 +179,7 @@ namespace Tsumari.Bot.Tests.Unit
             var messageMock = new Mock<IMessage>();
 
             channelMock
-                .Setup(channel => channel.GetMessageAsync(It.IsAny<ulong>()))
+                .Setup(channel => channel.GetMessageAsync(It.IsAny<ulong>(), It.IsAny<CacheMode>(), It.IsAny<RequestOptions?>()))
                 .ReturnsAsync(messageMock.Object);
 
             var result = await publisher.TryModifyMessageContentAsync(channelMock.Object, 12345UL, "new content");
@@ -298,6 +300,8 @@ namespace Tsumari.Bot.Tests.Unit
 
             return new DiscordMessagePublisherService(
                 httpClientFactoryMock.Object,
+                new PassThroughDiscordRestRetryPolicy(),
+                new OptionsWrapper<DiscordRestOptions>(new DiscordRestOptions()),
                 NullLogger<DiscordMessagePublisherService>.Instance);
         }
 

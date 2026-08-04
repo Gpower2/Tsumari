@@ -4,23 +4,33 @@ using System.Threading.Tasks;
 using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
+using Microsoft.Extensions.Options;
+using Tsumari.Bot.Configuration;
 
 namespace Tsumari.Bot.Services
 {
     public class DiscordMessageService : IDiscordMessageService
     {
         private readonly DiscordSocketClient _client;
+        private readonly IDiscordRestRetryPolicy _retryPolicy;
+        private readonly DiscordRestOptions _options;
 
-        public DiscordMessageService(DiscordSocketClient client)
+        public DiscordMessageService(DiscordSocketClient client, IDiscordRestRetryPolicy retryPolicy, IOptions<DiscordRestOptions> options)
         {
             _client = client;
+            _retryPolicy = retryPolicy;
+            _options = options.Value;
         }
 
         public ulong CurrentUserId => _client.CurrentUser.Id;
 
         public async Task<IMessageChannel?> GetChannelAsync(ulong channelId)
         {
-            return await _client.GetChannelAsync(channelId) as IMessageChannel;
+            var options = DiscordRequestOptionsFactory.MessageOptions(_options);
+            var channel = await _retryPolicy.ExecuteAsync(
+                async () => await _client.GetChannelAsync(channelId, options),
+                $"get channel {channelId}");
+            return channel as IMessageChannel;
         }
 
         public async Task<IUserMessage?> SendMessageAsync(ulong channelId, string message)
@@ -31,7 +41,10 @@ namespace Tsumari.Bot.Services
                 return null;
             }
 
-            return await channel.SendMessageAsync(message);
+            var options = DiscordRequestOptionsFactory.MessageOptions(_options);
+            return await _retryPolicy.ExecuteAsync(
+                () => channel.SendMessageAsync(message, options: options),
+                $"send message to channel {channelId}");
         }
 
         public async Task<bool> DeleteMessageAsync(ulong channelId, ulong messageId)
@@ -42,30 +55,39 @@ namespace Tsumari.Bot.Services
                 return false;
             }
 
-            await channel.DeleteMessageAsync(messageId);
+            var options = DiscordRequestOptionsFactory.MessageOptions(_options);
+            await _retryPolicy.ExecuteAsync(
+                () => channel.DeleteMessageAsync(messageId, options),
+                $"delete message {messageId} from channel {channelId}");
             return true;
         }
 
         public Task AddReactionAsync(IMessage message, IEmote emote)
         {
-            return message switch
-            {
-                SocketUserMessage socketMessage => socketMessage.AddReactionAsync(emote),
-                RestUserMessage restUserMessage => restUserMessage.AddReactionAsync(emote, null),
-                RestMessage restMessage => restMessage.AddReactionAsync(emote, null),
-                _ => throw new InvalidOperationException($"Message type '{message.GetType().FullName}' does not support reaction mirroring.")
-            };
+            var options = DiscordRequestOptionsFactory.MessageOptions(_options);
+            return _retryPolicy.ExecuteAsync(
+                () => message switch
+                {
+                    SocketUserMessage socketMessage => socketMessage.AddReactionAsync(emote, options),
+                    RestUserMessage restUserMessage => restUserMessage.AddReactionAsync(emote, options),
+                    RestMessage restMessage => restMessage.AddReactionAsync(emote, options),
+                    _ => throw new InvalidOperationException($"Message type '{message.GetType().FullName}' does not support reaction mirroring.")
+                },
+                $"add reaction to message {message.Id}");
         }
 
         public Task RemoveOwnReactionAsync(IMessage message, IEmote emote)
         {
-            return message switch
-            {
-                SocketUserMessage socketMessage => socketMessage.RemoveReactionAsync(emote, CurrentUserId),
-                RestUserMessage restUserMessage => restUserMessage.RemoveReactionAsync(emote, CurrentUserId, null),
-                RestMessage restMessage => restMessage.RemoveReactionAsync(emote, CurrentUserId, null),
-                _ => throw new InvalidOperationException($"Message type '{message.GetType().FullName}' does not support reaction mirroring.")
-            };
+            var options = DiscordRequestOptionsFactory.MessageOptions(_options);
+            return _retryPolicy.ExecuteAsync(
+                () => message switch
+                {
+                    SocketUserMessage socketMessage => socketMessage.RemoveReactionAsync(emote, CurrentUserId, options),
+                    RestUserMessage restUserMessage => restUserMessage.RemoveReactionAsync(emote, CurrentUserId, options),
+                    RestMessage restMessage => restMessage.RemoveReactionAsync(emote, CurrentUserId, options),
+                    _ => throw new InvalidOperationException($"Message type '{message.GetType().FullName}' does not support reaction mirroring.")
+                },
+                $"remove reaction from message {message.Id}");
         }
 
         public IAsyncEnumerable<IReadOnlyCollection<IUser>> GetReactionUsersAsync(IMessage message, IEmote emote, int limit)
@@ -79,7 +101,7 @@ namespace Tsumari.Bot.Services
             };
         }
 
-        public async Task<DateTimeOffset?> GetMessageTimestampAsync(ulong channelId, ulong messageId)
+        public async Task<IMessage?> GetMessageAsync(ulong channelId, ulong messageId)
         {
             var channel = await GetChannelAsync(channelId);
             if (channel == null)
@@ -87,7 +109,15 @@ namespace Tsumari.Bot.Services
                 return null;
             }
 
-            var message = await channel.GetMessageAsync(messageId);
+            var options = DiscordRequestOptionsFactory.MessageOptions(_options);
+            return await _retryPolicy.ExecuteAsync(
+                () => channel.GetMessageAsync(messageId, options: options),
+                $"get message {messageId} from channel {channelId}");
+        }
+
+        public async Task<DateTimeOffset?> GetMessageTimestampAsync(ulong channelId, ulong messageId)
+        {
+            var message = await GetMessageAsync(channelId, messageId);
             return message?.Timestamp;
         }
     }

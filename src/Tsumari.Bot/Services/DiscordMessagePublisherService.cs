@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.IO;
 using Discord;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Tsumari.Bot.Configuration;
 
 namespace Tsumari.Bot.Services
 {
@@ -9,13 +11,19 @@ namespace Tsumari.Bot.Services
     {
         private const int MaxParallelAttachmentDownloads = 4;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IDiscordRestRetryPolicy _retryPolicy;
+        private readonly DiscordRestOptions _options;
         private readonly ILogger<DiscordMessagePublisherService> _logger;
 
         public DiscordMessagePublisherService(
             IHttpClientFactory httpClientFactory,
+            IDiscordRestRetryPolicy retryPolicy,
+            IOptions<DiscordRestOptions> options,
             ILogger<DiscordMessagePublisherService> logger)
         {
             _httpClientFactory = httpClientFactory;
+            _retryPolicy = retryPolicy;
+            _options = options.Value;
             _logger = logger;
         }
 
@@ -107,11 +115,16 @@ namespace Tsumari.Bot.Services
             }
 
             var finalComponents = finalBuilder.Build();
+            var editOptions = DiscordRequestOptionsFactory.MessageOptions(_options);
             foreach (var sentMessage in sentMessages)
             {
                 try
                 {
-                    await sentMessage.Value.ModifyAsync(properties => properties.Components = finalComponents);
+                    var channelId = sentMessage.Key;
+                    var message = sentMessage.Value;
+                    await _retryPolicy.ExecuteAsync(
+                        () => message.ModifyAsync(properties => properties.Components = finalComponents, options: editOptions),
+                        $"edit jump buttons in channel {channelId}");
                 }
                 catch (Exception ex)
                 {
@@ -146,20 +159,30 @@ namespace Tsumari.Bot.Services
 
                 if (fileAttachments.Count == 0)
                 {
-                    return await channel.SendMessageAsync(text, components: components, messageReference: replyReference);
+                    var textOptions = DiscordRequestOptionsFactory.MessageOptions(_options);
+                    return await _retryPolicy.ExecuteAsync(
+                        () => channel.SendMessageAsync(text, components: components, messageReference: replyReference, options: textOptions),
+                        $"send message to channel {channel.Id}");
                 }
 
-                return await channel.SendFilesAsync(fileAttachments, text, components: components, messageReference: replyReference);
+                var fileOptions = DiscordRequestOptionsFactory.FileUploadOptions(_options);
+                return await _retryPolicy.ExecuteAsync(
+                    () => channel.SendFilesAsync(fileAttachments, text, components: components, messageReference: replyReference, options: fileOptions),
+                    $"send files to channel {channel.Id}");
             }
             catch (Exception ex)
             {
                 _logger.LogSendWithFilesFailed(ex, channel.Id);
                 try
                 {
-                    return await channel.SendMessageAsync(
-                        text + "\n*(Media attachments failed to mirror)*",
-                        components: components,
-                        messageReference: replyReference);
+                    var fallbackOptions = DiscordRequestOptionsFactory.MessageOptions(_options);
+                    return await _retryPolicy.ExecuteAsync(
+                        () => channel.SendMessageAsync(
+                            text + "\n*(Media attachments failed to mirror)*",
+                            components: components,
+                            messageReference: replyReference,
+                            options: fallbackOptions),
+                        $"fallback send to channel {channel.Id}");
                 }
                 catch (Exception sendEx)
                 {
@@ -190,10 +213,16 @@ namespace Tsumari.Bot.Services
                 return false;
             }
 
-            var fetched = await channel.GetMessageAsync(messageId);
+            var messageOptions = DiscordRequestOptionsFactory.MessageOptions(_options);
+            var fetched = await _retryPolicy.ExecuteAsync(
+                () => channel.GetMessageAsync(messageId, options: messageOptions),
+                $"fetch message {messageId} from channel {channel.Id}");
+
             if (fetched is IUserMessage userMessage)
             {
-                await userMessage.ModifyAsync(properties => properties.Content = newText);
+                await _retryPolicy.ExecuteAsync(
+                    () => userMessage.ModifyAsync(properties => properties.Content = newText, options: messageOptions),
+                    $"modify message {messageId} in channel {channel.Id}");
                 return true;
             }
 
