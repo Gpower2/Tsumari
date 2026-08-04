@@ -67,19 +67,12 @@ namespace Tsumari.Bot
             {
                 await _client.LoginAsync(TokenType.Bot, token);
 
-                // Initialize the database, interaction modules, and global slash commands before
-                // opening the gateway. This ensures the bot is fully ready when Discord fires the
-                // Ready event and avoids blocking the gateway task with long-running setup work.
+                // Initialize the database schema and interaction modules before opening the gateway.
+                // Command registration must wait for the Discord Ready event, but these steps do not.
                 await EnsureReadyInitializationAsync(
                     async () => await _dbService.InitializeDatabaseAsync(),
                     async () => await _interactionService.AddModulesAsync(typeof(Program).Assembly, _serviceProvider),
-                    async () =>
-                    {
-                        await _interactionService.RegisterCommandsGloballyAsync();
-                        _logger.LogAdministrativeCommandsRegistered();
-                    });
-
-                _readinessCoordinator.MarkReady();
+                    () => Task.CompletedTask);
 
                 await _client.StartAsync();
 
@@ -130,14 +123,32 @@ namespace Tsumari.Bot
             return Task.CompletedTask;
         }
 
-        private Task OnReadyAsync()
+        private async Task OnReadyAsync()
         {
             _logger.LogReadyEventReceived();
             _logger.LogConnectedToGateway(_client.CurrentUser.ToString());
 
-            // Initialization already completed before the gateway was started, so the Ready handler
-            // can return immediately and never blocks Discord.Net's gateway task.
-            return Task.CompletedTask;
+            try
+            {
+                // Global slash commands can only be registered after Discord signals Ready.
+                // The database and modules were already initialized before the gateway started.
+                await EnsureReadyInitializationAsync(
+                    () => Task.CompletedTask,
+                    () => Task.CompletedTask,
+                    async () =>
+                    {
+                        await _interactionService.RegisterCommandsGloballyAsync();
+                        _logger.LogAdministrativeCommandsRegistered();
+                    });
+
+                // Signal readiness only after commands are registered so downstream services
+                // (startup sync) run against a fully initialized bot.
+                _readinessCoordinator.MarkReady();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogReadyInitializationFailed(ex);
+            }
         }
 
         internal async Task EnsureReadyInitializationAsync(

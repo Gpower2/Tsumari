@@ -54,6 +54,13 @@ namespace Tsumari.Bot.Logging
         public static partial void LogAdministrativeCommandsRegistered(this ILogger logger);
 
         [LoggerMessage(
+            EventId = 2307,
+            Level = LogLevel.Error,
+            Message = "Error occurred during hosted-service initialization on Ready event."
+        )]
+        public static partial void LogReadyInitializationFailed(this ILogger logger, Exception exception);
+
+        [LoggerMessage(
             EventId = 2308,
             Level = LogLevel.Error,
             Message = "Slash command execution failed: {Reason}"
