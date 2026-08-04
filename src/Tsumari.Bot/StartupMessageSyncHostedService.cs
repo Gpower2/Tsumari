@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Discord.WebSocket;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Tsumari.Bot.Logging;
@@ -11,46 +10,32 @@ namespace Tsumari.Bot
 {
     public class StartupMessageSyncHostedService : BackgroundService
     {
-        private readonly DiscordSocketClient _client;
+        private readonly IGatewayReadinessCoordinator _readinessCoordinator;
         private readonly IStartupMessageSyncService _startupMessageSyncService;
         private readonly ILogger<StartupMessageSyncHostedService> _logger;
-        private int _readyEventReceived;
-        private CancellationToken _stoppingToken;
 
         public StartupMessageSyncHostedService(
-            DiscordSocketClient client,
+            IGatewayReadinessCoordinator readinessCoordinator,
             IStartupMessageSyncService startupMessageSyncService,
             ILogger<StartupMessageSyncHostedService> logger)
         {
-            _client = client;
+            _readinessCoordinator = readinessCoordinator;
             _startupMessageSyncService = startupMessageSyncService;
             _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _stoppingToken = stoppingToken;
-            _client.Ready += OnReadyAsync;
-
             try
             {
-                await Task.Delay(Timeout.Infinite, stoppingToken);
+                // Wait until the gateway hosted service has finished initializing the database,
+                // loading interaction modules, and registering global slash commands. This ensures
+                // the bot is fully ready before we start the startup sync.
+                await _readinessCoordinator.WaitForReadyAsync(stoppingToken);
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
-                // Expected when the host is stopping.
-            }
-            finally
-            {
-                _client.Ready -= OnReadyAsync;
-            }
-        }
-
-        internal async Task OnReadyAsync()
-        {
-            // Discord.NET can fire multiple Ready events during a session; only run once.
-            if (Interlocked.Exchange(ref _readyEventReceived, 1) == 1)
-            {
+                // Host stopped before the gateway was ready.
                 return;
             }
 
@@ -58,7 +43,7 @@ namespace Tsumari.Bot
 
             try
             {
-                await _startupMessageSyncService.RunAsync(_stoppingToken);
+                await _startupMessageSyncService.RunAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {

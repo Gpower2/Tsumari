@@ -32,11 +32,8 @@ namespace Tsumari.Bot.Services
 
         public async Task<StartupSyncResult> RunAsync(CancellationToken cancellationToken = default)
         {
-            // Defensively initialize the database schema here. Startup sync runs on the Discord
-            // Ready event, potentially concurrently with the gateway hosted service's own schema
-            // initialization. This ensures the OriginalMessageTimestamp column exists before use.
-            await _dbService.InitializeDatabaseAsync();
-
+            // The database schema is initialized by DiscordGatewayHostedService before it signals
+            // readiness, so startup sync can rely on the schema being present.
             var result = new StartupSyncResult();
             var masterChannelIds = await _dbService.GetAllMasterChannelIdsAsync();
 

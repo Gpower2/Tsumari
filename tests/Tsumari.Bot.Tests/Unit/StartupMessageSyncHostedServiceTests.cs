@@ -1,93 +1,96 @@
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Discord;
-using Discord.WebSocket;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Tsumari.Bot.Services;
 using Tsumari.Bot.Services.Abstractions;
 using Xunit;
 
 namespace Tsumari.Bot.Tests.Unit
 {
-    public class StartupMessageSyncHostedServiceTests : IDisposable
+    public class StartupMessageSyncHostedServiceTests
     {
-        private readonly DiscordSocketClient _client;
-
-        public StartupMessageSyncHostedServiceTests()
-        {
-            _client = new DiscordSocketClient(new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.None
-            });
-        }
-
-        public void Dispose()
-        {
-            _client.Dispose();
-        }
-
         [Fact]
-        public async Task OnReadyAsync_RunsSyncOnFirstCall()
+        public async Task ExecuteAsync_RunsSyncAfterCoordinatorMarksReady()
         {
+            var readinessCoordinator = new GatewayReadinessCoordinator();
             var syncServiceMock = new Mock<IStartupMessageSyncService>();
             syncServiceMock
                 .Setup(service => service.RunAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Models.StartupSyncResult());
 
-            var hostedService = new StartupMessageSyncHostedService(
-                _client,
-                syncServiceMock.Object,
-                NullLogger<StartupMessageSyncHostedService>.Instance);
-
-            await hostedService.OnReadyAsync();
-
-            syncServiceMock.Verify(service => service.RunAsync(It.IsAny<CancellationToken>()), Times.Once);
-        }
-
-        [Fact]
-        public async Task OnReadyAsync_RunsSyncOnlyOnceForMultipleCalls()
-        {
-            var syncServiceMock = new Mock<IStartupMessageSyncService>();
-            syncServiceMock
-                .Setup(service => service.RunAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Models.StartupSyncResult());
-
-            var hostedService = new StartupMessageSyncHostedService(
-                _client,
-                syncServiceMock.Object,
-                NullLogger<StartupMessageSyncHostedService>.Instance);
-
-            await hostedService.OnReadyAsync();
-            await hostedService.OnReadyAsync();
-            await hostedService.OnReadyAsync();
-
-            syncServiceMock.Verify(service => service.RunAsync(It.IsAny<CancellationToken>()), Times.Once);
-        }
-
-        [Fact]
-        public async Task OnReadyAsync_PassesStoppingTokenToSyncService()
-        {
             using var cts = new CancellationTokenSource();
-            var syncServiceMock = new Mock<IStartupMessageSyncService>();
-            syncServiceMock
-                .Setup(service => service.RunAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Models.StartupSyncResult());
-
             var hostedService = new StartupMessageSyncHostedService(
-                _client,
+                readinessCoordinator,
                 syncServiceMock.Object,
                 NullLogger<StartupMessageSyncHostedService>.Instance);
 
-            // Simulate ExecuteAsync registering the token before Ready fires.
-            var stoppingTokenField = typeof(StartupMessageSyncHostedService).GetField(
-                "_stoppingToken",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            stoppingTokenField!.SetValue(hostedService, cts.Token);
+            var executeTask = StartExecuteAsync(hostedService, cts.Token);
 
-            await hostedService.OnReadyAsync();
+            // The service should be waiting, not running sync yet.
+            syncServiceMock.Verify(service => service.RunAsync(It.IsAny<CancellationToken>()), Times.Never);
+
+            readinessCoordinator.MarkReady();
+
+            await executeTask.WaitAsync(TimeSpan.FromSeconds(2));
 
             syncServiceMock.Verify(service => service.RunAsync(cts.Token), Times.Once);
+        }
+
+        [Fact]
+        public async Task ExecuteAsync_DoesNotRunSyncWhenHostStopsBeforeReady()
+        {
+            var readinessCoordinator = new GatewayReadinessCoordinator();
+            var syncServiceMock = new Mock<IStartupMessageSyncService>();
+            syncServiceMock
+                .Setup(service => service.RunAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Models.StartupSyncResult());
+
+            using var cts = new CancellationTokenSource();
+            var hostedService = new StartupMessageSyncHostedService(
+                readinessCoordinator,
+                syncServiceMock.Object,
+                NullLogger<StartupMessageSyncHostedService>.Instance);
+
+            var executeTask = StartExecuteAsync(hostedService, cts.Token);
+            cts.Cancel();
+
+            await executeTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+            syncServiceMock.Verify(service => service.RunAsync(It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ExecuteAsync_RunsSyncOnlyOnceForMultipleReadySignals()
+        {
+            var readinessCoordinator = new GatewayReadinessCoordinator();
+            var syncServiceMock = new Mock<IStartupMessageSyncService>();
+            syncServiceMock
+                .Setup(service => service.RunAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Models.StartupSyncResult());
+
+            using var cts = new CancellationTokenSource();
+            var hostedService = new StartupMessageSyncHostedService(
+                readinessCoordinator,
+                syncServiceMock.Object,
+                NullLogger<StartupMessageSyncHostedService>.Instance);
+
+            var executeTask = StartExecuteAsync(hostedService, cts.Token);
+            readinessCoordinator.MarkReady();
+            readinessCoordinator.MarkReady();
+
+            await executeTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+            syncServiceMock.Verify(service => service.RunAsync(It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        private static Task StartExecuteAsync(StartupMessageSyncHostedService service, CancellationToken token)
+        {
+            var method = typeof(StartupMessageSyncHostedService).GetMethod(
+                "ExecuteAsync",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            return (Task)method!.Invoke(service, new object[] { token })!;
         }
     }
 }

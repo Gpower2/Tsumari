@@ -249,9 +249,11 @@ namespace Tsumari.Bot.Tests.Unit
         }
 
         [Fact]
-        public async Task RunAsync_InitializesDatabaseSchema_BeforeQuerying()
+        public async Task RunAsync_RequiresDatabaseSchemaToBeInitializedByCaller()
         {
-            // Do NOT initialize the database explicitly. RunAsync should do it defensively.
+            // The gateway hosted service initializes the schema before startup sync runs.
+            await _dbService.InitializeDatabaseAsync();
+
             var historicalSyncMock = new Mock<IHistoricalMessageSyncService>();
             historicalSyncMock
                 .Setup(service => service.HasUnprocessedMessagesAsync(It.IsAny<ulong>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))

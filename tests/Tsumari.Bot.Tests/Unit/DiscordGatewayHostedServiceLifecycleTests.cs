@@ -395,6 +395,7 @@ namespace Tsumari.Bot.Tests.Unit
                     processor,
                     null!,
                     new ConfigurationBuilder().Build(),
+                    new GatewayReadinessCoordinator(),
                     NullLogger<DiscordGatewayHostedService>.Instance);
             }
 

@@ -81,6 +81,7 @@ namespace Tsumari.Bot
             builder.Services.AddHttpClient(HttpClientNames.OpenAITranslation);
 
             builder.Services.AddSingleton<IDiscordRestRetryPolicy, DiscordRestRetryPolicy>();
+            builder.Services.AddSingleton<IGatewayReadinessCoordinator, GatewayReadinessCoordinator>();
             builder.Services.AddSingleton<IDiscordMessageService, DiscordMessageService>();
             builder.Services.AddSingleton<DatabaseService>();
             builder.Services.AddSingleton<DiscordMessagePublisherService>();

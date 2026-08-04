@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Tsumari.Bot.Services;
+using Tsumari.Bot.Services.Abstractions;
 
 namespace Tsumari.Bot
 {
@@ -19,6 +20,7 @@ namespace Tsumari.Bot
         private readonly IDiscordGatewayEventProcessor _eventProcessor;
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
+        private readonly IGatewayReadinessCoordinator _readinessCoordinator;
         private readonly ILogger<DiscordGatewayHostedService> _logger;
         private readonly SemaphoreSlim _readyInitializationLock = new(1, 1);
         private bool _eventHandlersRegistered;
@@ -34,6 +36,7 @@ namespace Tsumari.Bot
             IDiscordGatewayEventProcessor eventProcessor,
             IServiceProvider serviceProvider,
             IConfiguration configuration,
+            IGatewayReadinessCoordinator readinessCoordinator,
             ILogger<DiscordGatewayHostedService> logger)
         {
             _client = client;
@@ -43,6 +46,7 @@ namespace Tsumari.Bot
             _eventProcessor = eventProcessor;
             _serviceProvider = serviceProvider;
             _configuration = configuration;
+            _readinessCoordinator = readinessCoordinator;
             _logger = logger;
         }
 
@@ -62,6 +66,21 @@ namespace Tsumari.Bot
             try
             {
                 await _client.LoginAsync(TokenType.Bot, token);
+
+                // Initialize the database, interaction modules, and global slash commands before
+                // opening the gateway. This ensures the bot is fully ready when Discord fires the
+                // Ready event and avoids blocking the gateway task with long-running setup work.
+                await EnsureReadyInitializationAsync(
+                    async () => await _dbService.InitializeDatabaseAsync(),
+                    async () => await _interactionService.AddModulesAsync(typeof(Program).Assembly, _serviceProvider),
+                    async () =>
+                    {
+                        await _interactionService.RegisterCommandsGloballyAsync();
+                        _logger.LogAdministrativeCommandsRegistered();
+                    });
+
+                _readinessCoordinator.MarkReady();
+
                 await _client.StartAsync();
 
                 await Task.Delay(Timeout.Infinite, stoppingToken);
@@ -111,26 +130,14 @@ namespace Tsumari.Bot
             return Task.CompletedTask;
         }
 
-        private async Task OnReadyAsync()
+        private Task OnReadyAsync()
         {
             _logger.LogReadyEventReceived();
             _logger.LogConnectedToGateway(_client.CurrentUser.ToString());
 
-            try
-            {
-                await EnsureReadyInitializationAsync(
-                    async () => await _dbService.InitializeDatabaseAsync(),
-                    async () => await _interactionService.AddModulesAsync(typeof(Program).Assembly, _serviceProvider),
-                    async () =>
-                    {
-                        await _interactionService.RegisterCommandsGloballyAsync();
-                        _logger.LogAdministrativeCommandsRegistered();
-                    });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogReadyInitializationFailed(ex);
-            }
+            // Initialization already completed before the gateway was started, so the Ready handler
+            // can return immediately and never blocks Discord.Net's gateway task.
+            return Task.CompletedTask;
         }
 
         internal async Task EnsureReadyInitializationAsync(

@@ -953,6 +953,7 @@ namespace Tsumari.Bot.Tests.Component
                 eventProcessor,
                 null!,
                 null!,
+                new GatewayReadinessCoordinator(),
                 NullLogger<DiscordGatewayHostedService>.Instance);
         }
 
