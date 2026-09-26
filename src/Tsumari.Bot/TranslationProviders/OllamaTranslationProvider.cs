@@ -33,6 +33,11 @@ namespace Tsumari.Bot.TranslationProviders
             _keepAlive = configuration["Translation:Ollama:KeepAlive"] ?? "15m";
         }
 
+        public override bool SupportsGenerationOptions => true;
+
+        protected override Task<string> CallTranslationModelAsync(string systemPrompt, string userPrompt, TranslationGenerationOptions? options)
+            => CallModelAsync(systemPrompt, userPrompt, null, options);
+
         protected override string ProviderName => "Ollama";
 
         protected override string? ConfiguredEndpoint => _apiUrl;
@@ -73,7 +78,7 @@ namespace Tsumari.Bot.TranslationProviders
             return CallModelAsync(systemPrompt, userPrompt, responseFormat: null);
         }
 
-        private async Task<string> CallModelAsync(string systemPrompt, string userPrompt, string? responseFormat)
+        private async Task<string> CallModelAsync(string systemPrompt, string userPrompt, string? responseFormat, TranslationGenerationOptions? generation = null)
         {
             var payload = new
             {
@@ -88,9 +93,9 @@ namespace Tsumari.Bot.TranslationProviders
                 options = new
                 {
                     // Keep decoding deterministic so repeated translations of the same text do not drift.
-                    temperature = 0.0f,
+                    temperature = generation?.Temperature ?? 0.0,
                     // Restrict the token candidate pool further to favor literal, stable translations.
-                    top_p = 0.10f,
+                    top_p = generation?.TopP ?? 0.10,
                     // Translation requests are short; a moderate context window keeps resource usage low.
                     num_ctx = 4096,
                 }

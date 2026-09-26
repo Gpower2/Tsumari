@@ -5,6 +5,11 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
 {
     public interface ITranslationProvider
     {
+        bool SupportsGenerationOptions => false;
+
+        Task<string> TranslateWithOptionsAsync(string text, string targetLanguageCode, string? sourceLanguageCode, TranslationGenerationOptions options)
+            => throw new NotSupportedException("This provider does not support retry generation settings.");
+
         bool IsActive { get; }
 
         bool UsesCharacterQuota { get; }

@@ -66,7 +66,16 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
             return ParseLanguageAnalysisResult(rawResult);
         }
 
-        public async Task<string> TranslateTextAsync(string text, string targetLanguageCode, string? sourceLanguageCode = null)
+        public virtual bool SupportsGenerationOptions => false;
+
+        public Task<string> TranslateTextAsync(string text, string targetLanguageCode, string? sourceLanguageCode = null)
+            => TranslateCoreAsync(text, targetLanguageCode, sourceLanguageCode, null);
+
+        public Task<string> TranslateWithOptionsAsync(string text, string targetLanguageCode, string? sourceLanguageCode, TranslationGenerationOptions options)
+            => SupportsGenerationOptions ? TranslateCoreAsync(text, targetLanguageCode, sourceLanguageCode, options)
+                : throw new NotSupportedException("This provider does not support retry generation settings.");
+
+        private async Task<string> TranslateCoreAsync(string text, string targetLanguageCode, string? sourceLanguageCode, TranslationGenerationOptions? options)
         {
             if (!IsActive)
             {
@@ -111,7 +120,7 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
                 $"<text>\n{text}\n</text>\n\n" +
                 $"Task: Output ONLY the direct translation of the above text into language: {targetLanguage}.";
 
-            var result = await CallModelAsync(systemPrompt, userPrompt);
+            var result = await CallTranslationModelAsync(systemPrompt, userPrompt, options);
             return NormalizeTranslationResult(result);
         }
 
@@ -125,6 +134,9 @@ namespace Tsumari.Bot.TranslationProviders.Abstractions
         {
             return CallModelAsync(systemPrompt, userPrompt);
         }
+
+        protected virtual Task<string> CallTranslationModelAsync(string systemPrompt, string userPrompt, TranslationGenerationOptions? options)
+            => CallModelAsync(systemPrompt, userPrompt);
 
         protected abstract Task<string> CallModelAsync(string systemPrompt, string userPrompt);
 

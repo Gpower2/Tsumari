@@ -30,6 +30,18 @@ namespace Tsumari.Bot.Services
             _logger.LogProviderImplementationConfigured(_translationProvider.GetType().Name);
         }
 
+        public bool SupportsGenerationOptions => _translationProvider.SupportsGenerationOptions;
+
+        public async Task<string> RetryTranslationAsync(string text, string targetLanguageCode, string? sourceLanguageCode, TranslationGenerationOptions options)
+        {
+            if (!IsActive || !SupportsGenerationOptions || !await CanTranslateAsync(text.Length))
+                throw new InvalidOperationException("Translation provider is unavailable for retries.");
+            var result = await _translationResiliencyHelper.ExecuteAsync(() =>
+                _translationProvider.TranslateWithOptionsAsync(text, targetLanguageCode, sourceLanguageCode, options));
+            await IncrementTranslationUsageAsync(text.Length);
+            return result;
+        }
+
         public bool IsActive => _translationProvider.IsActive;
 
         public bool UsesCharacterQuota => _translationProvider.UsesCharacterQuota;
