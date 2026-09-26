@@ -20,3 +20,6 @@ appsettings.Development.json
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Private Discord repair plans, original message snapshots and journals
+.repair-runs/
