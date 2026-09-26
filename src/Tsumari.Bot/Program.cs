@@ -93,6 +93,9 @@ namespace Tsumari.Bot
             builder.Services.AddSingleton<ITranslationProvider>(provider =>
                 provider.GetRequiredService<TranslationProviderResolver>().Resolve());
             builder.Services.AddSingleton<TranslationService>();
+            builder.Services.Configure<TranslationRetryOptions>(builder.Configuration.GetSection("Translation:Retry"));
+            builder.Services.AddSingleton<MessageMutationCoordinator>();
+            builder.Services.AddSingleton<TranslationRetryService>();
             builder.Services.AddSingleton<MirroredMessageRoutingService>();
             builder.Services.AddSingleton<IMirroredMessageRoutingService>(provider =>
                 provider.GetRequiredService<MirroredMessageRoutingService>());

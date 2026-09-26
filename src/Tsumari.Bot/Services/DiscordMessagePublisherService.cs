@@ -122,8 +122,23 @@ namespace Tsumari.Bot.Services
                 {
                     var channelId = sentMessage.Key;
                     var message = sentMessage.Value;
+                    var components = ComponentBuilder.FromComponents(finalComponents.Components);
+                    if (targets.Any(t => t.ChannelId == channelId && t.LanguageLabel != "MASTER" && t.LanguageLabel != "Original"))
+                    {
+                        // At Discord's 25-button limit, the copy's own jump link is redundant.
+                        // Keep Original and every other destination, reserving its slot for Retry.
+                        var buttons = finalComponents.Components.OfType<ActionRowComponent>().SelectMany(r => r.Components).OfType<ButtonComponent>().ToArray();
+                        if (buttons.Length == 25)
+                        {
+                            components = new ComponentBuilder();
+                            foreach (var button in buttons.Where(b => b.Url != MirroredMessageFormatter.BuildJumpUrl(message)))
+                                components.WithButton(button.ToBuilder());
+                        }
+                        components.WithButton("↻", customId: TranslationRetryRules.ButtonId, style: ButtonStyle.Secondary);
+                    }
+                    var messageComponents = components.Build();
                     await _retryPolicy.ExecuteAsync(
-                        () => message.ModifyAsync(properties => properties.Components = finalComponents, options: editOptions),
+                        () => message.ModifyAsync(properties => properties.Components = messageComponents, options: editOptions),
                         $"edit jump buttons in channel {channelId}");
                 }
                 catch (Exception ex)

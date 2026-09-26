@@ -21,6 +21,7 @@ namespace Tsumari.Bot.Modules
     {
         private const int MaxInteractionResponseLength = 1900;
 
+        private readonly TranslationRetryService? _retryService;
         private readonly DatabaseService _dbService;
         private readonly TranslationService _translationService;
         private readonly IHistoricalMessageSyncService _historicalMessageSyncService;
@@ -30,12 +31,35 @@ namespace Tsumari.Bot.Modules
             DatabaseService dbService,
             TranslationService translationService,
             IHistoricalMessageSyncService historicalMessageSyncService,
-            ILogger<InteractionModule> logger)
+            ILogger<InteractionModule> logger, TranslationRetryService? retryService = null)
         {
+            _retryService = retryService;
             _dbService = dbService;
             _translationService = translationService;
             _historicalMessageSyncService = historicalMessageSyncService;
             _logger = logger;
+        }
+
+        [SlashCommand("retry", "Retry one existing translated message in place.")]
+        public async Task RetryTranslationAsync([Summary("message", "Jump link to the translated copy")] string message)
+        {
+            if (Context.Guild == null || Context.User is not IGuildUser user || _retryService == null
+                || !TranslationRetryRules.TryParseJumpLink(message, out var guild, out var channel, out var id) || guild != Context.Guild.Id)
+            {
+                await RespondAsync("Use a translated-message link from this server.", ephemeral: true);
+                return;
+            }
+            await DeferAsync(ephemeral: true);
+            try
+            {
+                var result = await _retryService.RetryAsync(guild, channel, id, user);
+                await FollowupAsync(result.Message, ephemeral: true, allowedMentions: AllowedMentions.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not process translation retry");
+                await FollowupAsync("Retry could not be processed. Please try again later.", ephemeral: true);
+            }
         }
 
         [SlashCommand("add-master", "Registers an independent Master Channel.")]

@@ -13,6 +13,78 @@ namespace Tsumari.Bot.Tests.Unit
     public class DiscordMessagePublisherServiceTests
     {
         [Fact]
+        public async Task FullButtonLayout_ReservesSelfLinkSlotForRetry_PreservesOtherLinks()
+        {
+            var original = new Mock<IMessage>();
+            var originalChannel = new Mock<ITextChannel>();
+            originalChannel.SetupGet(c => c.Id).Returns(10);
+            originalChannel.SetupGet(c => c.GuildId).Returns(1);
+            original.SetupGet(m => m.Channel).Returns(originalChannel.Object);
+            original.SetupGet(m => m.Id).Returns(100);
+            var messages = new Dictionary<ulong, IUserMessage>();
+            var results = new Dictionary<ulong, MessageComponent>();
+            var targets = new List<JumpLinkTarget>();
+            for (ulong i = 20; i < 44; i++)
+            {
+                var id = i;
+                var channel = new Mock<ITextChannel>();
+                channel.SetupGet(c => c.Id).Returns(id); channel.SetupGet(c => c.GuildId).Returns(1);
+                var message = new Mock<IUserMessage>();
+                message.SetupGet(m => m.Id).Returns(id + 100);
+                message.SetupGet(m => m.Channel).Returns(channel.Object);
+                message.Setup(m => m.ModifyAsync(It.IsAny<Action<MessageProperties>>(), It.IsAny<RequestOptions>()))
+                    .Callback<Action<MessageProperties>, RequestOptions>((action, _) => { var p = new MessageProperties(); action(p); results[id] = p.Components.Value; }).Returns(Task.CompletedTask);
+                messages[id] = message.Object;
+                targets.Add(new() { ChannelId = id, LanguageLabel = $"L{id}" });
+            }
+            await CreatePublisher().EditJumpButtonsIntoSentMessagesAsync(original.Object, messages, targets);
+            Assert.Equal(24, results.Count);
+            foreach (var pair in results)
+            {
+                var buttons = pair.Value.Components.OfType<ActionRowComponent>().SelectMany(r => r.Components).OfType<ButtonComponent>().ToArray();
+                Assert.Equal(25, buttons.Length);
+                Assert.Single(buttons, b => b.CustomId == TranslationRetryRules.ButtonId);
+                Assert.Single(buttons, b => b.Label == "Original");
+                foreach (var other in messages.Where(m => m.Key != pair.Key))
+                    Assert.Contains(buttons, b => b.Url == MirroredMessageFormatter.BuildJumpUrl(other.Value));
+            }
+        }
+
+        [Fact]
+        public async Task JumpButtonRefresh_AddsSingleClockwiseRetryOnlyToLocalizedCopy()
+        {
+            var original = new Mock<IMessage>();
+            var channel = new Mock<ITextChannel>();
+            channel.SetupGet(c => c.Id).Returns(10);
+            channel.SetupGet(c => c.GuildId).Returns(1);
+            original.SetupGet(m => m.Id).Returns(100);
+            original.SetupGet(m => m.Channel).Returns(channel.Object);
+            var local = new Mock<IUserMessage>();
+            local.SetupGet(m => m.Id).Returns(200);
+            local.SetupGet(m => m.Channel).Returns(channel.Object);
+            var master = new Mock<IUserMessage>();
+            master.SetupGet(m => m.Id).Returns(300);
+            master.SetupGet(m => m.Channel).Returns(channel.Object);
+            MessageComponent? localComponents = null, masterComponents = null;
+            local.Setup(m => m.ModifyAsync(It.IsAny<Action<MessageProperties>>(), It.IsAny<RequestOptions>()))
+                .Callback<Action<MessageProperties>, RequestOptions>((action, _) => { var p = new MessageProperties(); action(p); localComponents = p.Components.Value; }).Returns(Task.CompletedTask);
+            master.Setup(m => m.ModifyAsync(It.IsAny<Action<MessageProperties>>(), It.IsAny<RequestOptions>()))
+                .Callback<Action<MessageProperties>, RequestOptions>((action, _) => { var p = new MessageProperties(); action(p); masterComponents = p.Components.Value; }).Returns(Task.CompletedTask);
+            var publisher = CreatePublisher();
+            for (var i = 0; i < 2; i++)
+                await publisher.EditJumpButtonsIntoSentMessagesAsync(original.Object,
+                    new Dictionary<ulong, IUserMessage> { [20] = local.Object, [30] = master.Object },
+                    [new() { ChannelId = 20, LanguageLabel = "FR" }, new() { ChannelId = 30, LanguageLabel = "Original" }]);
+            var buttons = localComponents!.Components.OfType<ActionRowComponent>().SelectMany(r => r.Components).OfType<ButtonComponent>().ToArray();
+            var retry = Assert.Single(buttons, b => b.CustomId == TranslationRetryRules.ButtonId);
+            Assert.Equal("↻", retry.Label);
+            Assert.Equal(ButtonStyle.Secondary, retry.Style);
+            Assert.Null(retry.Url);
+            Assert.Contains(buttons, b => b.Label == "Original" && b.Style == ButtonStyle.Link);
+            Assert.DoesNotContain(masterComponents!.Components.OfType<ActionRowComponent>().SelectMany(r => r.Components).OfType<ButtonComponent>(), b => b.CustomId == TranslationRetryRules.ButtonId);
+        }
+
+        [Fact]
         public async Task SendMessageWithFilesAsync_PassesReplyReference_ForTextOnlyMessages()
         {
             var publisher = CreatePublisher();

@@ -92,6 +92,8 @@ namespace Tsumari.Bot.Services
             IEmote? emote,
             bool humanReactionKnownPresent = false)
         {
+            // Counter emojis are reserved throughout linked families, including remove/clear reconciliation.
+            if (emote != null && TranslationRetryRules.IsCounter(emote)) return;
             var family = await _dbService.GetLinkedMessageFamilyAsync(triggerMessageId, triggerChannelId);
             if (family == null)
             {
@@ -118,6 +120,7 @@ namespace Tsumari.Bot.Services
 
                 foreach (var trackedEmote in trackedEmotes)
                 {
+                    if (TranslationRetryRules.IsCounter(trackedEmote)) continue;
                     await ReconcileEmoteAcrossFamilyAsync(
                         familyMessages,
                         trackedEmote,

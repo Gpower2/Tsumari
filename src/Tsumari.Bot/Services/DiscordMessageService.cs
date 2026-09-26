@@ -120,5 +120,15 @@ namespace Tsumari.Bot.Services
             var message = await GetMessageAsync(channelId, messageId);
             return message?.Timestamp;
         }
+
+        public async Task<IMessage?> GetFreshMessageAsync(ulong channelId, ulong messageId)
+        {
+            var options = DiscordRequestOptionsFactory.MessageOptions(_options);
+            return await _retryPolicy.ExecuteAsync(async () =>
+            {
+                var channel = await _client.Rest.GetChannelAsync(channelId, options) as IMessageChannel;
+                return channel == null ? null : await channel.GetMessageAsync(messageId, options: options);
+            }, $"fetch fresh message {messageId} from channel {channelId}");
+        }
     }
 }

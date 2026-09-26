@@ -6,6 +6,7 @@ namespace Tsumari.Bot.Services
 {
     public class EditedMessageSyncService
     {
+        private readonly MessageMutationCoordinator _mutations;
         private readonly DatabaseService _dbService;
         private readonly TranslationService _translationService;
         private readonly IDiscordMessageService _discordMessageService;
@@ -17,8 +18,9 @@ namespace Tsumari.Bot.Services
             TranslationService translationService,
             IDiscordMessageService discordMessageService,
             DiscordMessagePublisherService discordMessagePublisherService,
-            ILogger<EditedMessageSyncService> logger)
+            ILogger<EditedMessageSyncService> logger, MessageMutationCoordinator? mutations = null)
         {
+            _mutations = mutations ?? new MessageMutationCoordinator();
             _dbService = dbService;
             _translationService = translationService;
             _discordMessageService = discordMessageService;
@@ -49,6 +51,7 @@ namespace Tsumari.Bot.Services
                     return;
                 }
 
+                using var lease = await _mutations.AcquireAsync(message.Id);
                 await SynchronizeEditedMessageAsync(message);
             }
             catch (Exception ex)

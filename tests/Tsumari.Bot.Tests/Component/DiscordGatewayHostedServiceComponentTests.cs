@@ -1083,7 +1083,7 @@ namespace Tsumari.Bot.Tests.Component
             {
                 if (topLevelComponent is ButtonComponent button)
                 {
-                    buttons[button.Label] = button.Url ?? string.Empty;
+                    if (button.Style == ButtonStyle.Link) buttons[button.Label] = button.Url ?? string.Empty;
                     continue;
                 }
 
@@ -1094,7 +1094,7 @@ namespace Tsumari.Bot.Tests.Component
 
                 foreach (var rowButton in row.Components.OfType<ButtonComponent>())
                 {
-                    buttons[rowButton.Label] = rowButton.Url ?? string.Empty;
+                    if (rowButton.Style == ButtonStyle.Link) buttons[rowButton.Label] = rowButton.Url ?? string.Empty;
                 }
             }
 

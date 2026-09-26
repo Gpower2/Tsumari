@@ -29,6 +29,9 @@ namespace Tsumari.Bot.Services.Abstractions
         /// <returns>The message, or null if it could not be found.</returns>
         Task<IMessage?> GetMessageAsync(ulong channelId, ulong messageId);
 
+        // Retry counters and optimistic edit checks must bypass gateway caches.
+        Task<IMessage?> GetFreshMessageAsync(ulong channelId, ulong messageId) => GetMessageAsync(channelId, messageId);
+
         /// <summary>
         /// Gets the timestamp of a specific message by querying Discord.
         /// </summary>

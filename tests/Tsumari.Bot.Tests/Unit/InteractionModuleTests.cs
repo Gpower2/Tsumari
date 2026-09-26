@@ -120,6 +120,8 @@ namespace Tsumari.Bot.Tests.Unit
             using var harness = await CreateHarnessAsync();
             await harness.InteractionService.AddModulesAsync(typeof(Program).Assembly, harness.Services);
 
+            Assert.Contains(harness.InteractionService.SlashCommands, command => command.Name == "retry");
+            Assert.Contains(harness.InteractionService.ComponentCommands, command => command.Name == TranslationRetryRules.ButtonId);
             var addMasterCommand = Assert.Single(
                 harness.InteractionService.SlashCommands,
                 command => command.Name == "add-master");
@@ -581,6 +583,12 @@ namespace Tsumari.Bot.Tests.Unit
 
             var services = new ServiceCollection()
                 .AddSingleton(dbService)
+                .AddSingleton<IDiscordMessageService>(new Mock<IDiscordMessageService>().Object)
+                .AddSingleton<MessageMutationCoordinator>()
+                .AddSingleton<TranslationRetryService>()
+                .AddSingleton<Microsoft.Extensions.Options.IOptions<Tsumari.Bot.Configuration.TranslationRetryOptions>>(Microsoft.Extensions.Options.Options.Create(new Tsumari.Bot.Configuration.TranslationRetryOptions()))
+                .AddSingleton<ILogger<TranslationRetryService>>(NullLogger<TranslationRetryService>.Instance)
+                .AddSingleton<ILogger<Tsumari.Bot.Modules.TranslationRetryModule>>(NullLogger<Tsumari.Bot.Modules.TranslationRetryModule>.Instance)
                 .AddSingleton(translationService)
                 .AddSingleton(providerMock.Object)
                 .AddSingleton(historicalSyncMock.Object)
