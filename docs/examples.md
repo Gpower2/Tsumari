@@ -44,9 +44,10 @@ Generated bot messages use:
 
 - `Original` to jump back to the source user-authored message
 - uppercased language-code buttons (`EL`, `IT`, `EN`, etc.) for generated bot copies
+- a gray `↻` retry button on localized bot copies; generated master copies do not receive it
 
 > [!NOTE]
-> In master flow, a generated localized copy can include a button that links back to itself, because every generated copy receives the same final button layout.
+> Examples below list jump links only for readability. Localized copies additionally show `↻`. At the 25-button limit, their redundant self-language link is omitted to make room. [Retry rules](translation-retries.md).
 
 ---
 

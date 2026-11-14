@@ -8,7 +8,7 @@ The reply is private. On success the existing message is edited, preserving its 
 
 ## Configuration
 
-`Translation:Retry` contains `Temperatures` (default `[0.15,0.25,0.35,0.45,0.55,0.60,0.60,0.60,0.60,0.60]`), `TopP` (0.8), `CooldownSeconds` (30), `QueueCapacity` (8 including the active job), and `RoleId` (0 disables role-based access). The temperature schedule must be nondecreasing, at most ten entries, and bounded by 0.60. The number of entries is the retry limit. Normal translations and language detection retain their existing deterministic settings. Currently Ollama supports the retry profiles; unsupported providers report that capability before consuming an attempt.
+`Translation:Retry` contains `Temperatures` (default `[0.15,0.25,0.35,0.45,0.55,0.60,0.60,0.60,0.60,0.60]`), `TopP` (0.8), `CooldownSeconds` (30), `QueueCapacity` (8 including the active job), and `RoleId` (0 disables role-based access). The temperature schedule must be nondecreasing, at most ten entries, and bounded by 0.60. The number of entries is the retry limit. Normal translations and language detection retain their existing deterministic settings. The baseline Ollama provider supports these settings. Named model profiles report their own `SupportsRetry` capability; the shipped Salamandra/Tiny Aya profiles are unqualified and disable it. Unsupported providers/profiles report that capability before consuming an attempt. Configured temperature arrays replace the defaults instead of being appended.
 
 One retry runs at a time, with a bounded queue and at most 60 seconds waiting for the worker. Concurrent clicks on the same copy are rejected. Source-edit synchronization and retry commits share a lock; retry re-fetches source/copy via REST before committing and skips concurrent changes. Discord has no conditional PATCH, so external edits in the final check-to-edit interval cannot be made atomic.
 
@@ -22,6 +22,8 @@ Exact source echoes with a different detected language are rejected for review; 
 
 ## Deployment and tests
 
-Build/test with an isolated `--artifacts-path` while production is running. This change requires a planned bot restart to activate the new service and register the command. Do not overwrite the production config, token or DB. Historical copies can use the command immediately after deployment; adding buttons to old copies and bulk time-window repair are separate operations.
+Build/test with an isolated `--artifacts-path` while production is running. Use [deployment](DEPLOYMENT.md) to validate before stopping the bot and to preserve local settings and SQLite files. A new build takes effect after restart; do not overwrite a running release manually. Historical copies can use the command immediately after deployment; adding buttons to old copies and bulk time-window repair are separate operations.
 
 Unit/component integration tests use temporary SQLite databases and simulated Discord/provider boundaries. HTTP serialization tests exercise the actual Ollama provider and TranslationService concurrently. Tests make no live Discord edits and do not start a bot gateway. A live smoke test belongs in the test channels after deployment.
+
+Regression coverage includes bounded uncertain PATCH behavior, recursive button metadata, the 25-button self-link boundary, unspecified Discord Optional reference fields, and coordination between edit-sync and retry commits. Tests do not establish semantic translation quality or eliminate Discord's final-check race.

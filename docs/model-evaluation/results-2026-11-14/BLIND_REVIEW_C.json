@@ -1,0 +1,226 @@
+{
+  "batch": "blind-batch-03",
+  "reviewer": "independent assistant blind reviewer",
+  "scope": "Supplied anonymized input, target, semanticChecks and output only. No model identities or other evaluation artifacts inspected.",
+  "limitations": "Assistant linguistic judgment, not native-speaker or expert validation. Source corpus and checks are not human gold. Natural equivalents and equivalent clock notation accepted; register can vary by region/context. Whole wrong-script outputs are major; isolated mixed-script character defects with intact meaning are minor.",
+  "ratings": [
+    {
+      "id": "C000",
+      "rating": "minor",
+      "rationale": "Address, facts, newline and emojis preserved, but stanno gia surriscaldando lacks the reflexive si needed for things heating up, yielding a grammatical defect."
+    },
+    {
+      "id": "C001",
+      "rating": "minor",
+      "rationale": "Full meaning and formatting survive, but setzen Wetten is an awkward German collocation for placing bets; wetten or Wetten abschliessen would be idiomatic."
+    },
+    {
+      "id": "C002",
+      "rating": "minor",
+      "rationale": "German question correct, but meaningful French address remains untranslated despite the whole-message translation requirement."
+    },
+    {
+      "id": "C003",
+      "rating": "pass",
+      "rationale": "Complete natural French with affectionate address retained."
+    },
+    {
+      "id": "C004",
+      "rating": "minor",
+      "rationale": "Greek affection and question survive, but Ma is incorrectly rendered as the additional Greek interjection/conjunction Ma rather than simply translating the French possessive within my darling."
+    },
+    {
+      "id": "C005",
+      "rating": "minor",
+      "rationale": "Address, meaning and emoji retained, but das wird schon verrueckt is slightly awkward for something already getting wild."
+    },
+    {
+      "id": "C006",
+      "rating": "pass",
+      "rationale": "Original strong expletive and complete Portuguese body preserved, without invented target; added mesmo is a small natural intensifier."
+    },
+    {
+      "id": "C007",
+      "rating": "pass",
+      "rationale": "Both expletives and the full body translated into natural European Portuguese, preserving emoji."
+    },
+    {
+      "id": "C008",
+      "rating": "pass",
+      "rationale": "Complete Greek sentence with vulgar address and emoji retained."
+    },
+    {
+      "id": "C009",
+      "rating": "major",
+      "rationale": "All profanity is censored, caralho becomes a targeted cunt insult, and the final dismissal becomes the nonsensical sh**t you. Meaning, target and explicit register are materially distorted."
+    },
+    {
+      "id": "C010",
+      "rating": "major",
+      "rationale": "Fck censors an expletive; caralho becomes the personal/gendered insult cunt; idiot weakens the vulgar malaka insult. Final fuck off is plausible, but several list elements are materially changed."
+    },
+    {
+      "id": "C011",
+      "rating": "major",
+      "rationale": "Adds a Translation heading, quotation wrapper and an entire explanatory Note absent from the source, substantially violating translation-only output. Idiot also weakens the opening vulgar insult; dismissal and leave-us-alone meaning survive."
+    },
+    {
+      "id": "C012",
+      "rating": "major",
+      "rationale": "Fck censors the first expletive and cunt turns the second standalone frustration expression into a personal/gendered insult, materially changing target and meaning."
+    },
+    {
+      "id": "C013",
+      "rating": "major",
+      "rationale": "Damn materially softens the sole strong vulgar exclamation caralho under the required profanity-preservation standard."
+    },
+    {
+      "id": "C014",
+      "rating": "major",
+      "rationale": "The Greek question is translated, but the entire vulgar address malaka is omitted, removing a key explicitly tested tone element."
+    },
+    {
+      "id": "C015",
+      "rating": "minor",
+      "rationale": "Tasos, plural they and funny are retained, but affirmative Si remains Italian instead of being translated as yes."
+    },
+    {
+      "id": "C016",
+      "rating": "minor",
+      "rationale": "Complete grammatical German, but Kameraden has comrades/military-associate overtones rather than the ordinary friendly mates register; a mild lexical/register mismatch."
+    },
+    {
+      "id": "C017",
+      "rating": "major",
+      "rationale": "Floet is changed to the unsupported name Flotter, and the vulgar address is entirely omitted. Funny and after-all/actually sense largely survive."
+    },
+    {
+      "id": "C018",
+      "rating": "pass",
+      "rationale": "Brother address and heating-up meaning preserved in understandable, somewhat literal German."
+    },
+    {
+      "id": "C019",
+      "rating": "pass",
+      "rationale": "Complete natural German preserving brother address and question."
+    },
+    {
+      "id": "C020",
+      "rating": "pass",
+      "rationale": "Natural complete German group greeting."
+    },
+    {
+      "id": "C021",
+      "rating": "pass",
+      "rationale": "Only leaves at 6:30 PM plausibly conveys the delayed/not-until departure; all facts, register, formatting and emoji preserved, though not until would be clearer."
+    },
+    {
+      "id": "C022",
+      "rating": "pass",
+      "rationale": "Damn it is a conventional frustrated equivalent here; Alex, train, equivalent time, request, newline, bold and emoji preserved."
+    },
+    {
+      "id": "C023",
+      "rating": "minor",
+      "rationale": "Meaning, frustration and formatting remain understandable, but Voza is the wrong noun case for the subject train, and Latin u is mixed into otherwise Cyrillic Serbian. Generic SR does not require a particular script."
+    },
+    {
+      "id": "C024",
+      "rating": "major",
+      "rationale": "Wait for me becomes See you, replacing the request with a farewell. Cazzo also remains untranslated in the English output."
+    },
+    {
+      "id": "C025",
+      "rating": "major",
+      "rationale": "Explicit porra is substantially softened to damn it, and bold is added to the whole first line. Facts and wait-for-me request otherwise survive."
+    },
+    {
+      "id": "C026",
+      "rating": "major",
+      "rationale": "Explicit joder becomes nonprofane Oh, man, substantially softening tone. The first exclamation also gains unsupported bold; facts and request survive."
+    },
+    {
+      "id": "C027",
+      "rating": "major",
+      "rationale": "Serbian train is mistranslated as bus, and explicit jebote is softened to damn it. Additional quotation marks and bold alter the source formatting."
+    },
+    {
+      "id": "C028",
+      "rating": "major",
+      "rationale": "Strong Chinese vulgar exclamation is softened to damn. Wait for me is shortened to Wait, omitting who should be waited for; train, time and remaining formatting survive."
+    },
+    {
+      "id": "C029",
+      "rating": "major",
+      "rationale": "Train becomes bus, a factual error, and jebote remains untranslated in the English output. Time, name and request survive."
+    },
+    {
+      "id": "C030",
+      "rating": "major",
+      "rationale": "Strong Traditional Chinese vulgar exclamation is softened to damn; Wait for me becomes Wait, losing its object. Train, time and remaining formatting survive."
+    },
+    {
+      "id": "C031",
+      "rating": "pass",
+      "rationale": "Complete natural German preserving all facts, frustrated register, newline, bold and emoji."
+    },
+    {
+      "id": "C032",
+      "rating": "minor",
+      "rationale": "Complete Greek meaning and tone preserved, but unsupported bold is added around the opening; Περίμενε με also lacks the enclitic stress accent expected in Περίμενέ με."
+    },
+    {
+      "id": "C033",
+      "rating": "minor",
+      "rationale": "Complete natural Italian meaning and mild curse, but required bold around the request is removed."
+    },
+    {
+      "id": "C034",
+      "rating": "pass",
+      "rationale": "Complete acceptable Portuguese preserving facts, mild curse, newline, bold request and emoji."
+    },
+    {
+      "id": "C035",
+      "rating": "pass",
+      "rationale": "Complete understandable Spanish; Maldicion retains the mild curse and Espera por mi is a valid request. Facts, newline, bold and emoji preserved."
+    },
+    {
+      "id": "C036",
+      "rating": "pass",
+      "rationale": "Complete simplified Chinese with facts, frustrated exclamation, newline, bold request and emoji preserved."
+    },
+    {
+      "id": "C037",
+      "rating": "major",
+      "rationale": "Explicit Serbian Latin target is violated by an almost entirely Cyrillic output. The noun subject also has the wrong case and one Latin u is mixed in, though core meaning remains recoverable."
+    },
+    {
+      "id": "C038",
+      "rating": "minor",
+      "rationale": "Requested Cyrillic is largely used, but a single Latin u is mixed in and Voza is the wrong noun case for train as subject. Core facts, request, formatting and emoji are understandable; native Serbian review could refine naturalness severity."
+    },
+    {
+      "id": "C039",
+      "rating": "minor",
+      "rationale": "Meaning and formatting correct, but the isolated simplified character 车 remains in otherwise Traditional Chinese; requested Traditional form is 車. This is a localized script defect rather than a wholly wrong-script response."
+    },
+    {
+      "id": "C040",
+      "rating": "pass",
+      "rationale": "Complete Brazilian Portuguese preserving mild curse, facts, newline, bold request and emoji."
+    },
+    {
+      "id": "C041",
+      "rating": "minor",
+      "rationale": "European Portuguese vocabulary and full meaning correct, but unsupported bold is added around the whole first line."
+    }
+  ],
+  "summary": {
+    "total": 42,
+    "pass": 14,
+    "minor": 13,
+    "major": 15,
+    "uncertain": 0,
+    "unavailable": 0
+  }
+}

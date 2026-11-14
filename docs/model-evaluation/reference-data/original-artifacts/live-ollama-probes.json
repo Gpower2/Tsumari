@@ -1,0 +1,172 @@
+[
+  {
+    "name": "analyze_fratello",
+    "kind": "analysis",
+    "text": "Thank you fratello! 🤗\nThings are already heating up, they are placing bets like crazy 😅",
+    "seconds": 4.87,
+    "raw_response": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.90},{\"languageCode\":\"IT\",\"share\":0.10}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+    "normalized_response": "{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.90},{\"languageCode\":\"IT\",\"share\":0.10}],\"isMixed\":true,\"hasClearDominantLanguage\":true}",
+    "parsed_response": {
+      "dominantLanguageCode": "EN",
+      "languages": [
+        {
+          "languageCode": "EN",
+          "share": 0.9
+        },
+        {
+          "languageCode": "IT",
+          "share": 0.1
+        }
+      ],
+      "isMixed": true,
+      "hasClearDominantLanguage": true
+    }
+  },
+  {
+    "name": "analyze_ma_cherie",
+    "kind": "analysis",
+    "text": "Ma cherie! How are you doing?",
+    "seconds": 4.72,
+    "raw_response": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.85},{\"languageCode\":\"FR\",\"share\":0.15}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+    "normalized_response": "{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.85},{\"languageCode\":\"FR\",\"share\":0.15}],\"isMixed\":true,\"hasClearDominantLanguage\":true}",
+    "parsed_response": {
+      "dominantLanguageCode": "EN",
+      "languages": [
+        {
+          "languageCode": "EN",
+          "share": 0.85
+        },
+        {
+          "languageCode": "FR",
+          "share": 0.15
+        }
+      ],
+      "isMixed": true,
+      "hasClearDominantLanguage": true
+    }
+  },
+  {
+    "name": "analyze_thanks_hermano",
+    "kind": "analysis",
+    "text": "Thanks hermano, this is getting wild already 😂",
+    "seconds": 4.77,
+    "raw_response": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.95},{\"languageCode\":\"ES\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+    "normalized_response": "{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.95},{\"languageCode\":\"ES\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}",
+    "parsed_response": {
+      "dominantLanguageCode": "EN",
+      "languages": [
+        {
+          "languageCode": "EN",
+          "share": 0.95
+        },
+        {
+          "languageCode": "ES",
+          "share": 0.05
+        }
+      ],
+      "isMixed": true,
+      "hasClearDominantLanguage": true
+    }
+  },
+  {
+    "name": "analyze_caralho_english_clause",
+    "kind": "analysis",
+    "text": "caralho, this is getting wild already 😂",
+    "seconds": 4.77,
+    "raw_response": "```json\n{\"dominantLanguageCode\":\"PT\",\"languages\":[{\"languageCode\":\"PT\",\"share\":0.95},{\"languageCode\":\"EN\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+    "normalized_response": "{\"dominantLanguageCode\":\"PT\",\"languages\":[{\"languageCode\":\"PT\",\"share\":0.95},{\"languageCode\":\"EN\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}",
+    "parsed_response": {
+      "dominantLanguageCode": "PT",
+      "languages": [
+        {
+          "languageCode": "PT",
+          "share": 0.95
+        },
+        {
+          "languageCode": "EN",
+          "share": 0.05
+        }
+      ],
+      "isMixed": true,
+      "hasClearDominantLanguage": true
+    }
+  },
+  {
+    "name": "analyze_pt_intro_english_body",
+    "kind": "analysis",
+    "text": "foda se, caralho. Things are already heating up and people are placing bets like crazy 😅",
+    "seconds": 4.78,
+    "raw_response": "```json\n{\"dominantLanguageCode\":\"PT\",\"languages\":[{\"languageCode\":\"PT\",\"share\":0.95},{\"languageCode\":\"EN\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+    "normalized_response": "{\"dominantLanguageCode\":\"PT\",\"languages\":[{\"languageCode\":\"PT\",\"share\":0.95},{\"languageCode\":\"EN\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}",
+    "parsed_response": {
+      "dominantLanguageCode": "PT",
+      "languages": [
+        {
+          "languageCode": "PT",
+          "share": 0.95
+        },
+        {
+          "languageCode": "EN",
+          "share": 0.05
+        }
+      ],
+      "isMixed": true,
+      "hasClearDominantLanguage": true
+    }
+  },
+  {
+    "name": "analyze_greek_intro_english_body",
+    "kind": "analysis",
+    "text": "μαλακα, this queue is moving fast tonight 😂",
+    "seconds": 4.8,
+    "raw_response": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.95},{\"languageCode\":\"EL\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+    "normalized_response": "{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.95},{\"languageCode\":\"EL\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}",
+    "parsed_response": {
+      "dominantLanguageCode": "EN",
+      "languages": [
+        {
+          "languageCode": "EN",
+          "share": 0.95
+        },
+        {
+          "languageCode": "EL",
+          "share": 0.05
+        }
+      ],
+      "isMixed": true,
+      "hasClearDominantLanguage": true
+    }
+  },
+  {
+    "name": "translate_profanity_to_en",
+    "kind": "translation",
+    "text": "foda se, caralho, μαλακα, γαμήσου",
+    "target": "EN",
+    "seconds": 3.32,
+    "raw_response": "fuck it, you fucking asshole, dickhead, fuck off."
+  },
+  {
+    "name": "translate_fratello_to_it",
+    "kind": "translation",
+    "text": "Thank you fratello! 🤗\nThings are already heating up, they are placing bets like crazy 😅",
+    "target": "IT",
+    "seconds": 3.63,
+    "raw_response": "Grazie fratello! 🤗\nLe cose si stanno già scaldando, stanno scommettendo come matti 😅"
+  },
+  {
+    "name": "translate_ma_cherie_to_de",
+    "kind": "translation",
+    "text": "Ma cherie! How are you doing?",
+    "target": "DE",
+    "seconds": 3.22,
+    "raw_response": "Meine Liebste! Wie geht es dir?"
+  },
+  {
+    "name": "translate_greek_slang_to_en",
+    "kind": "translation",
+    "text": "μαλακα, γαμήσου και άσε μας ήσυχους",
+    "target": "EN",
+    "seconds": 3.33,
+    "raw_response": "fuck you, go away and leave us alone."
+  }
+]

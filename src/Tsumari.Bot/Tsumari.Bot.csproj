@@ -5,7 +5,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Tsumari.Bot-0f4a1642-012c-4fab-8ab9-d0d6d2e931cb</UserSecretsId>
+    <ApplicationIcon>tsumari_logo2_final.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="tsumari_logo2_final.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="DeepL.net" Version="1.21.0" />
@@ -13,4 +18,5 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
   </ItemGroup>
+  <Import Project="..\..\build\LocalSettings.targets" />
 </Project>

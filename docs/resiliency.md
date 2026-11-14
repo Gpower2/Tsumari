@@ -1,104 +1,25 @@
-# Resiliency Helper
+# Translation resiliency
 
-Tsumari wraps translation and language-detection calls in a custom `ResiliencyHelper` instead of using an external resilience library.
+`TranslationService` owns **two separate** `ResiliencyHelper` instances: one for `AnalyzeLanguageAsync` and one for translation (`TranslateTextAsync` and generation-option retries). Translation failure does not directly open the analysis circuit, and vice versa. Each helper applies to the selected backend, including DeepL, Ollama and OpenAI-compatible providers.
 
-This helper provides:
+## Settings and state
 
-- retry with exponential backoff and jitter
-- a circuit breaker with `Closed`, `Open`, and `HalfOpen` states
+Both helpers use failure threshold 3, break duration 30 seconds, at most 3 total action attempts per invocation, and initial retry delay 1 second. Circuit state can stop retries sooner.
 
-## Current Runtime Settings
+- **Closed:** requests run; success resets failures.
+- **Open:** requests fail before calling the provider.
+- After the 30-second break, a request can transition the circuit to **HalfOpen**. Success closes it; failure reopens it. This is not a guarantee of exactly one exclusive concurrent probe.
 
-`TranslationService` creates the helper with:
+Backoff is `initialDelay * 2^(attempt - 1) * jitter`, jitter in `[0.5, 1.5)`, capped at 30 seconds. The helper retries provider operations; it does not decide whether a completed translation is linguistically accurate.
 
-- failure threshold: `3`
-- break duration: `30s`
-- max retry attempts: `3`
-- initial retry delay: `1s`
+## Quota and manual generation retries
 
-The same helper is used for:
+Quota checks are separate. DeepL alone uses the monthly 500,000-character guard. Successful analysis and translation can each increment its usage counter. Local/self-hosted providers do not consume that application quota.
 
-- `DetectLanguageAsync(...)`
-- `TranslateTextAsync(...)`
+The gray Retry button and `/tsumari retry` are a different mechanism: they change a qualified model's sampling settings to generate a replacement for one existing copy. Transport retries retain the same settings and do not consume additional displayed generation attempts. An uncertain Discord PATCH is not blindly repeated. See [translation retries](translation-retries.md).
 
-## Circuit Breaker States
+## Gateway and Discord REST isolation
 
-```text
-            +--------- success ---------+
-            |                           |
-            v                           |
-      +-----------+   failures >= 3   +----------+
-  --->|  Closed   |------------------>|   Open   |
-      +-----------+                   +----------+
-            ^                              |
-            |                        cooldown 30s
-         success                           |
-            |                              v
-      +-----------+                   +----------+
-      | HalfOpen  |<-- next request --| HalfOpen |
-      +-----------+                   +----------+
-            |                              |
-            +----------- failure ----------+
-```
+Gateway message/edit/delete/reaction callbacks enqueue work and return. The dispatcher routes it into FIFO queues keyed by linked channel group; each group is processed sequentially while unrelated groups can run in parallel. This isolates gateway handling, not the shared backend's physical GPU capacity or its per-task circuit state.
 
-### Closed
-
-Normal operation. Requests are allowed through. Success resets the failure count.
-
-### Open
-
-The helper fast-fails requests without calling the underlying provider once the failure threshold is reached.
-
-### HalfOpen
-
-After the cooldown window expires, the next request is allowed through as a test:
-
-- success closes the circuit again
-- failure reopens it immediately
-
-## Retry Strategy
-
-The retry delay uses:
-
-```text
-delay = initialDelay * 2^(attempt - 1) * jitter
-```
-
-Current details:
-
-- base delay starts at `1s`
-- jitter is a random value in `[0.5, 1.5)`
-- delay is capped at `30s`
-
-## Provider Scope
-
-The resilience behavior applies to the **selected translation backend**, not just DeepL.
-
-That means:
-
-- DeepL detection/translation calls are wrapped
-- Ollama detection/translation calls are wrapped
-- OpenAI-compatible detection/translation calls are wrapped
-
-## Relationship to Quota Checks
-
-Quota enforcement is separate from resiliency:
-
-- when `Translation.Provider = DeepL`, Tsumari checks the monthly character limit before calling the provider
-- when `Translation.Provider = Ollama` or `OpenAI`, `CanTranslateAsync(...)` always returns `true`
-
-So the circuit breaker protects backend availability, while `UsageTracker` protects DeepL billing.
-
-## Gateway Isolation for Slow Local LLMs
-
-Translation resiliency is only one part of runtime stability. Tsumari also isolates Discord gateway callbacks from slow local/self-hosted LLM calls by enqueueing gateway events into a dispatcher:
-
-- gateway callbacks enqueue and return immediately
-- a single router forwards events into FIFO queues keyed by linked channel group
-- one worker processes each active linked group sequentially
-
-That means:
-
-- a slow translation in one linked channel cluster does not block unrelated clusters
-- ordering inside a linked channel cluster is still preserved
-- Discord.Net no longer needs to wait on the full translation pipeline inside `MessageReceived`
+Discord REST operations use their separate bounded timeout/retry policy and named HTTP clients. Defaults are documented in [configuration](configuration.md); routing order and synchronization are in [routing](routing.md).

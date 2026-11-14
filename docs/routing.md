@@ -61,7 +61,7 @@ For a new message, the routing pipeline:
 
 Minor secondary-language traces can be collapsed back to a single-language result when they only account for a very small share of the message, so isolated loanwords, slang, or names do not automatically trigger mixed-language headers.
 
-If language analysis fails, the pipeline falls back to `EN`.
+If language analysis fails, routing/display uses an `EN` fallback marked untrusted. It is **not** passed as a trusted source hint to the translation model. If analysis explicitly reports unclear dominance, its source hint is also withheld. This protects translation disambiguation but does not guarantee that routing from failed analysis is correct.
 
 ## Branch A: Message Received in a Master Channel
 
@@ -82,7 +82,7 @@ When a user posts in a master channel:
 
 ### Resulting Button Behavior
 
-In master flow, each generated localized copy receives the same final button set. That includes a button for its own language copy, because the final component layout is built from all generated bot messages.
+In master flow, generated localized copies normally share the same jump-link set, including a self-language link. Each localized copy also has a gray Retry button. At the 25-button limit its redundant self-link is omitted to make room for Retry; Original and links to other copies remain.
 
 ## Branch B: Message Received in a Localized Channel
 
@@ -139,6 +139,7 @@ The final button set is created in `EditJumpButtonsIntoSentMessagesAsync`.
 - Language buttons use the uppercased target language code for the generated bot message in that channel.
 - Only bot-generated messages found in `sentMessages` become language buttons.
 - Buttons are added by editing bot messages after all destination URLs are known.
+- Localized copies also receive the `↻` retry button; generated master copies do not. At capacity, omit the localized self-link to make room. See [retries](translation-retries.md).
 
 ## Reply Mirroring
 
@@ -248,7 +249,7 @@ When a standard reaction changes on any message that belongs to a linked message
 
 ### Current Limitations
 
-- Only **standard reactions** are mirrored. Burst reactions are ignored.
+- Only **standard reactions** are mirrored. Burst reactions and the reserved retry-counter emojis `1️⃣` through `🔟` are ignored, including reconciliation after clear/remove events.
 - If an older mirrored message was created before source-channel IDs were stored in `MessageLinks`, family resolution from that mirrored message may be unavailable until the original message is seen again.
 
 ## Historical and Startup Message Synchronization

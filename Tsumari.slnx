@@ -1,4 +1,18 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+    <File Path="docs/configuration.md" />
+    <File Path="docs/models.md" />
+    <File Path="docs/model-evaluation/README.md" />
+    <File Path="tools/check_docs.py" />
+    <File Path="Deploy.ps1" />
+    <File Path="Run-TsumariConsole.ps1" />
+    <File Path="Install-DeploymentShortcut.ps1" />
+    <File Path="build/LocalSettings.targets" />
+    <File Path="build/Merge-AppSettings.ps1" />
+    <File Path="docs/DEPLOYMENT.md" />
+    <File Path="tests/deployment/Deploy.Tests.ps1" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Tsumari.Bot/Tsumari.Bot.csproj" />
   </Folder>
@@ -7,6 +21,7 @@
     <Project Path="tests/Tsumari.Repair.Tests/Tsumari.Repair.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/Tsumari.Evaluation/Tsumari.Evaluation.csproj" />
     <Project Path="tools/Tsumari.Repair/Tsumari.Repair.csproj" />
   </Folder>
 </Solution>

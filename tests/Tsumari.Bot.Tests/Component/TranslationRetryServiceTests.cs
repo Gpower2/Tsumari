@@ -8,6 +8,23 @@ namespace Tsumari.Bot.Tests.Component;
 
 public sealed class TranslationRetryServiceTests
 {
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Retry_HandlesReplyReferencesWithOmittedFields(bool sourceReply, bool mirrorReply)
+    {
+        using var h = await Harness.Create();
+        if (sourceReply) h.Source.SetupGet(m => m.Reference).Returns(new MessageReference(88, 10, null, null, default));
+        if (mirrorReply) h.Mirror.SetupGet(m => m.Reference).Returns(new MessageReference(99, 20, null, null, default));
+        var metadata = TranslationRetryRules.PreservedMetadata(h.Mirror.Object);
+        var result = await h.Run();
+        Assert.True(result.Success, result.Message);
+        Assert.Equal(1, result.Attempt);
+        Assert.Equal(metadata, TranslationRetryRules.PreservedMetadata(h.Mirror.Object));
+        Assert.Single(h.Profiles);
+    }
+
     [Fact]
     public async Task Retry_UsesOriginalAndConfiguredProfile_EditsOnlyContent_VerifiesAndSurvivesRestart()
     {

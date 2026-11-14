@@ -1,0 +1,225 @@
+{
+  "batch": "blind-batch-01",
+  "reviewer": "independent assistant blind reviewer",
+  "scope": "Supplied anonymized input, target, semanticChecks and output only; no model identities or other evaluation artifacts inspected.",
+  "limitations": "Assistant linguistic judgment, not native-speaker or expert validation. The source corpus and semantic checks are not human gold. Natural equivalents and equivalent clock notation are accepted. Register distinctions can vary by region and context.",
+  "ratings": [
+    {
+      "id": "A000",
+      "rating": "pass",
+      "rationale": "Complete natural Italian; address, both clauses, newline and emojis preserved."
+    },
+    {
+      "id": "A001",
+      "rating": "pass",
+      "rationale": "Preserves brother address, rising excitement and frenzied betting with newline and emojis; somewhat literal but understandable German."
+    },
+    {
+      "id": "A002",
+      "rating": "pass",
+      "rationale": "Affectionate feminine address and the question are correctly rendered in German."
+    },
+    {
+      "id": "A003",
+      "rating": "pass",
+      "rationale": "Complete French with the affectionate address retained and correctly accented."
+    },
+    {
+      "id": "A004",
+      "rating": "pass",
+      "rationale": "Natural affectionate Greek address and complete question."
+    },
+    {
+      "id": "A005",
+      "rating": "minor",
+      "rationale": "Address, basic meaning and emoji retained. Das wird schon verrueckt is slightly awkward for something already getting wild; more idiomatic German would express that it is already becoming wild."
+    },
+    {
+      "id": "A006",
+      "rating": "pass",
+      "rationale": "Portuguese body is translated, caralho keeps its exclamatory force, and no personal target is invented."
+    },
+    {
+      "id": "A007",
+      "rating": "pass",
+      "rationale": "Both Portuguese profanity expressions, rising excitement, betting and emoji retained."
+    },
+    {
+      "id": "A008",
+      "rating": "pass",
+      "rationale": "Greek queue sentence is fully translated; original vulgar address and emoji retained."
+    },
+    {
+      "id": "A009",
+      "rating": "major",
+      "rationale": "Standalone caralho becomes a directed asshole insult, and malaka becomes a gendered bitch insult. The output invents personal targeting and gendered abuse absent from those expressions."
+    },
+    {
+      "id": "A010",
+      "rating": "major",
+      "rationale": "Caralho becomes a personal asshole insult and malaka becomes you fucking bitch, inventing targeting and a gendered slur. Overall profanity is retained but meaning is materially distorted."
+    },
+    {
+      "id": "A011",
+      "rating": "minor",
+      "rationale": "Go fuck yourself and leave us alone are correct. The opening malaka is an addressed insult, while fuck is a standalone exclamation; that address/insult distinction is lost."
+    },
+    {
+      "id": "A012",
+      "rating": "major",
+      "rationale": "Fuck it is plausible for foda-se, but you damn it is ungrammatical and does not render the second strong standalone expletive; it also introduces an unsupported you."
+    },
+    {
+      "id": "A013",
+      "rating": "pass",
+      "rationale": "Fuck is a valid strong standalone English exclamation for caralho; no person is invented."
+    },
+    {
+      "id": "A014",
+      "rating": "major",
+      "rationale": "The entire English question remains untranslated despite the Greek target. Only the already Greek address is present in Greek."
+    },
+    {
+      "id": "A015",
+      "rating": "pass",
+      "rationale": "Affirmative yes, Tasos, plural they and can be fun are correctly preserved."
+    },
+    {
+      "id": "A016",
+      "rating": "pass",
+      "rationale": "Complete idiomatic German; Leute is a reasonable informal equivalent for mates."
+    },
+    {
+      "id": "A017",
+      "rating": "minor",
+      "rationale": "Name and vulgar informal address survive, but you fucking Floet is unnatural English and really funny loses the discovery/after-all nuance of telika in the Greek."
+    },
+    {
+      "id": "A018",
+      "rating": "pass",
+      "rationale": "Address and heating-up meaning both translated into German; wording is literal but intelligible."
+    },
+    {
+      "id": "A019",
+      "rating": "pass",
+      "rationale": "Brother address and complete question preserved in natural German."
+    },
+    {
+      "id": "A020",
+      "rating": "pass",
+      "rationale": "Hallo zusammen is a natural complete German greeting to everybody."
+    },
+    {
+      "id": "A021",
+      "rating": "pass",
+      "rationale": "Frustration, Alex and the not-until restriction are preserved. 6:30 PM is equivalent to 18:30; bold, newline and emoji retained."
+    },
+    {
+      "id": "A022",
+      "rating": "pass",
+      "rationale": "Frustration, Alex, train departure time, request, formatting and emoji preserved; English profanity is a plausible contextual equivalent."
+    },
+    {
+      "id": "A023",
+      "rating": "pass",
+      "rationale": "Serbian Latin is acceptable for generic SR. Facts, request, formatting and explicit frustrated register preserved; Jebi ga is somewhat stronger than damn it but a plausible idiomatic equivalent."
+    },
+    {
+      "id": "A024",
+      "rating": "pass",
+      "rationale": "Cazzo is appropriately rendered as fuck; train, Alex, equivalent time, request, formatting and emoji preserved."
+    },
+    {
+      "id": "A025",
+      "rating": "pass",
+      "rationale": "Strong frustrated exclamation and all train details, request, formatting and emoji preserved."
+    },
+    {
+      "id": "A026",
+      "rating": "major",
+      "rationale": "Joder is an explicit vulgar exclamation, whereas damn materially reduces its profanity force. All factual content, formatting and emoji are otherwise correct. Severity follows the supplied requirement to retain explicit profanity."
+    },
+    {
+      "id": "A027",
+      "rating": "major",
+      "rationale": "Serbian voz means train, but the output says bus, changing the transport fact. Profanity and remaining details survive."
+    },
+    {
+      "id": "A028",
+      "rating": "pass",
+      "rationale": "Chinese strong exclamation, train, Alex, equivalent time, request, newline, bold and emoji preserved."
+    },
+    {
+      "id": "A029",
+      "rating": "major",
+      "rationale": "Voz is incorrectly translated as bus instead of train, and jebote is softened to the neutral greeting hey. Both factual meaning and profanity fail."
+    },
+    {
+      "id": "A030",
+      "rating": "pass",
+      "rationale": "Traditional Chinese is understood correctly; profanity, train, Alex, equivalent time, request and formatting preserved."
+    },
+    {
+      "id": "A031",
+      "rating": "pass",
+      "rationale": "Natural complete German preserving frustration and every factual and formatting element."
+    },
+    {
+      "id": "A032",
+      "rating": "minor",
+      "rationale": "Aman conveys exasperation but weakens damn it into a non-curse; its displayed double accent is also nonstandard. Train, name, time, request, formatting and emoji remain correct."
+    },
+    {
+      "id": "A033",
+      "rating": "pass",
+      "rationale": "Accidenti is a conventional Italian equivalent for the mild curse damn it; all other meaning and formatting preserved."
+    },
+    {
+      "id": "A034",
+      "rating": "pass",
+      "rationale": "Droga is a conventional Portuguese frustrated exclamation for damn it; Brazilian vocabulary is valid for generic PT and all facts and formatting survive."
+    },
+    {
+      "id": "A035",
+      "rating": "minor",
+      "rationale": "Facts and frustration retained, but Espera a mi is unidiomatic/incorrect for wait for me; Spanish should use Esperame or Espera por mi. Meaning remains recoverable."
+    },
+    {
+      "id": "A036",
+      "rating": "pass",
+      "rationale": "Complete simplified Chinese; transliteration of Alex is acceptable, with time, train, frustrated exclamation and formatting retained."
+    },
+    {
+      "id": "A037",
+      "rating": "pass",
+      "rationale": "Requested Latin script is used; Serbian message preserves facts, request, formatting and explicit frustration, allowing idiomatic register variation."
+    },
+    {
+      "id": "A038",
+      "rating": "major",
+      "rationale": "Cyrillic script is present, but Vozot uses a Macedonian definite form rather than Serbian voz, and Jeba is not a natural complete Serbian equivalent of damn it. The requested Serbian output contains conspicuous language/form defects, although the train fact and request remain understandable. Native Serbian review would refine idiomatic register severity."
+    },
+    {
+      "id": "A039",
+      "rating": "pass",
+      "rationale": "Traditional Chinese script is correctly used; all meaning, name transliteration, time, formatting and emoji retained."
+    },
+    {
+      "id": "A040",
+      "rating": "pass",
+      "rationale": "Brazilian Portuguese vocabulary and phrasing are appropriate; frustrated exclamation, facts, request, formatting and emoji preserved."
+    },
+    {
+      "id": "A041",
+      "rating": "minor",
+      "rationale": "European Portuguese vocabulary and facts are correct, but caralho is appreciably more vulgar than the mild curse damn it, increasing the register strength. Formatting and emoji preserved."
+    }
+  ],
+  "summary": {
+    "total": 42,
+    "pass": 28,
+    "minor": 6,
+    "major": 8,
+    "uncertain": 0
+  }
+}

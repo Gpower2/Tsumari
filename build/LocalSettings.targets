@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <LocalSecretsPath Condition="'$(LocalSecretsPath)' == ''">$(MSBuildThisFileDirectory)../.local/appsettings.secrets.json</LocalSecretsPath>
+  </PropertyGroup>
+  <Target Name="MergeLocalBuildSettings" AfterTargets="CopyFilesToOutputDirectory" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(MSBuildThisFileDirectory)Merge-AppSettings.ps1&quot; -BasePath &quot;$(MSBuildProjectDirectory)/appsettings.json&quot; -ModelsPath &quot;$(MSBuildProjectDirectory)/appsettings.models.json&quot; -SecretsPath &quot;$(LocalSecretsPath)&quot; -OutputPath &quot;$(TargetDir)appsettings.json&quot;" />
+  </Target>
+  <Target Name="MergeLocalPublishSettings" AfterTargets="Publish">
+    <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(MSBuildThisFileDirectory)Merge-AppSettings.ps1&quot; -BasePath &quot;$(MSBuildProjectDirectory)/appsettings.json&quot; -ModelsPath &quot;$(MSBuildProjectDirectory)/appsettings.models.json&quot; -SecretsPath &quot;$(LocalSecretsPath)&quot; -OutputPath &quot;$(PublishDir)appsettings.json&quot;" />
+  </Target>
+</Project>

@@ -1,0 +1,233 @@
+{
+  "batch": "blind-batch-04",
+  "reviewer": "independent assistant blind reviewer",
+  "scope": "Supplied anonymized input, target, semanticChecks and output only. No model identities or evaluation metrics inspected.",
+  "limitations": "Assistant linguistic judgment, not native-speaker or expert validation. Source corpus and checks are not human gold. Natural equivalents and equivalent clock notation accepted; register varies by region/context. A single weakened address within otherwise explicit profanity is minor; complete profanity deletion, substantial explicit-to-nonvulgar softening, invented personal targets, factual substitutions and whole wrong-language responses are major.",
+  "ratings": [
+    {
+      "id": "D000",
+      "rating": "minor",
+      "rationale": "Address, facts, newline and emojis retained, but stanno gia surriscaldando lacks the reflexive si needed for things heating up, yielding a grammatical defect."
+    },
+    {
+      "id": "D001",
+      "rating": "minor",
+      "rationale": "Meaning and formatting preserved, but setzen Wetten is an awkward German collocation for placing bets; wetten or Wetten abschliessen would be idiomatic."
+    },
+    {
+      "id": "D002",
+      "rating": "minor",
+      "rationale": "German question correct, but meaningful French address remains untranslated despite the whole-message translation requirement."
+    },
+    {
+      "id": "D003",
+      "rating": "pass",
+      "rationale": "Complete natural French with affectionate address retained."
+    },
+    {
+      "id": "D004",
+      "rating": "minor",
+      "rationale": "Question is correct, but Ma cherie is replaced by Ma geia sou, roughly but/oh hello there; the affectionate my darling meaning is lost."
+    },
+    {
+      "id": "D005",
+      "rating": "minor",
+      "rationale": "German body and emoji retained, but hermano remains Spanish rather than being translated, and das wird schon verrueckt is slightly awkward for already getting wild."
+    },
+    {
+      "id": "D006",
+      "rating": "pass",
+      "rationale": "Strong expletive and full Portuguese body retained without an invented target; added mesmo is a small natural intensifier."
+    },
+    {
+      "id": "D007",
+      "rating": "pass",
+      "rationale": "Both expletives and complete body translated into natural European Portuguese, preserving emoji."
+    },
+    {
+      "id": "D008",
+      "rating": "pass",
+      "rationale": "Complete Greek sentence preserving vulgar address and emoji."
+    },
+    {
+      "id": "D009",
+      "rating": "minor",
+      "rationale": "All four positions are rendered without censorship or invented personal targets, but idiot weakens the vulgar insult malaka into a nonvulgar insult. Other standalone vulgar exclamations and final dismissal remain plausible."
+    },
+    {
+      "id": "D010",
+      "rating": "major",
+      "rationale": "Repeated fuck you changes standalone frustration and the malaka noun insult into directed personal dismissals, inventing/altering targets rather than preserving the four distinct expressions."
+    },
+    {
+      "id": "D011",
+      "rating": "minor",
+      "rationale": "Explicit dismissal and leave-us-alone meaning retained, but shit changes the opening addressed malaka insult into a standalone exclamation."
+    },
+    {
+      "id": "D012",
+      "rating": "major",
+      "rationale": "Fuck you introduces a directed personal target where the source pair provides standalone frustration without an explicit addressee. Shit is otherwise a plausible strong exclamation for caralho; foda-se interpretation is context-sensitive."
+    },
+    {
+      "id": "D013",
+      "rating": "pass",
+      "rationale": "Shit is a plausible uncensored vulgar standalone exclamation for caralho; no target is invented."
+    },
+    {
+      "id": "D014",
+      "rating": "major",
+      "rationale": "The Greek question is translated, but the entire explicitly tested vulgar address malaka is omitted."
+    },
+    {
+      "id": "D015",
+      "rating": "major",
+      "rationale": "They can be funny becomes you can be funny, changing who is being discussed and losing the explicitly required plural third person. Tasos is also shortened to Taso."
+    },
+    {
+      "id": "D016",
+      "rating": "pass",
+      "rationale": "Natural complete German; Kumpels preserves the friendly mates register."
+    },
+    {
+      "id": "D017",
+      "rating": "major",
+      "rationale": "Floet is replaced with unsupported Fletch, changing a proper name; idiot also weakens the vulgar address. Actually/after-all and funny meanings survive."
+    },
+    {
+      "id": "D018",
+      "rating": "minor",
+      "rationale": "German main body preserves the heating-up meaning, but fratello remains Italian rather than translating the meaningful brother address."
+    },
+    {
+      "id": "D019",
+      "rating": "pass",
+      "rationale": "Natural complete German preserving brother address and question."
+    },
+    {
+      "id": "D020",
+      "rating": "pass",
+      "rationale": "Natural complete German group greeting."
+    },
+    {
+      "id": "D021",
+      "rating": "pass",
+      "rationale": "Only leaves at 6:30 PM plausibly conveys delayed/not-until departure; all facts, register, newline, bold and emoji preserved, although not until would be clearer."
+    },
+    {
+      "id": "D022",
+      "rating": "pass",
+      "rationale": "Shit is a plausible frustrated vulgar equivalent; Alex, train, equivalent evening time, request, newline, bold and emoji preserved."
+    },
+    {
+      "id": "D023",
+      "rating": "major",
+      "rationale": "Serbian vagon means a wagon/railway carriage rather than the train as a whole, substituting the transport entity. Time, request, register and formatting are otherwise retained."
+    },
+    {
+      "id": "D024",
+      "rating": "major",
+      "rationale": "Crap is substantially milder than the explicit vulgar exclamation cazzo, softening its force. All facts, request, formatting and emoji are otherwise correct."
+    },
+    {
+      "id": "D025",
+      "rating": "pass",
+      "rationale": "Strong frustrated exclamation, Alex, train, equivalent evening time, full request, newline, bold and emoji preserved."
+    },
+    {
+      "id": "D026",
+      "rating": "major",
+      "rationale": "The entire message remains in Spanish despite an English target. Meaning and formatting are copied but translation is not performed."
+    },
+    {
+      "id": "D027",
+      "rating": "major",
+      "rationale": "Serbian voz means train, but output says bus, changing a concrete transport fact. Explicit frustration and other details survive."
+    },
+    {
+      "id": "D028",
+      "rating": "minor",
+      "rationale": "Explicit profanity, train, name, time and formatting retained, but Wait for me becomes Wait, omitting who should be waited for. Alex, fuck is also less natural English ordering."
+    },
+    {
+      "id": "D029",
+      "rating": "major",
+      "rationale": "The whole Serbian Latin source is returned unchanged despite the English target; no translation is performed."
+    },
+    {
+      "id": "D030",
+      "rating": "minor",
+      "rationale": "Uncensored vulgar frustration, train, name, time and formatting retained, but Wait for me becomes Wait, omitting its object; opening English word order is also unnatural."
+    },
+    {
+      "id": "D031",
+      "rating": "pass",
+      "rationale": "Complete natural German preserving facts, mild curse, newline, bold request and emoji."
+    },
+    {
+      "id": "D032",
+      "rating": "minor",
+      "rationale": "Complete Greek meaning and tone preserved, but unsupported bold is added around the opening; Περίμενε με also lacks the enclitic stress accent expected in Περίμενέ με."
+    },
+    {
+      "id": "D033",
+      "rating": "minor",
+      "rationale": "Italian meaning, time and request preserved with a plausible mild curse, but unsupported bold is added around the opening exclamation."
+    },
+    {
+      "id": "D034",
+      "rating": "minor",
+      "rationale": "Generic Portuguese facts, mild curse and complete request are correct, but unsupported bold is added around the entire first line."
+    },
+    {
+      "id": "D035",
+      "rating": "pass",
+      "rationale": "Complete understandable Spanish preserving mild curse, facts, request, newline, bold and emoji."
+    },
+    {
+      "id": "D036",
+      "rating": "pass",
+      "rationale": "Complete simplified Chinese preserving facts, frustrated exclamation, newline, bold request and emoji."
+    },
+    {
+      "id": "D037",
+      "rating": "minor",
+      "rationale": "Correct Serbian Latin script, train meaning, time and request; unsupported bold is added around the opening exclamation."
+    },
+    {
+      "id": "D038",
+      "rating": "major",
+      "rationale": "Cyrillic script is correct, but vagon means wagon/railway carriage rather than train, changing the named transport entity. Other details and formatting survive."
+    },
+    {
+      "id": "D039",
+      "rating": "minor",
+      "rationale": "Traditional Chinese script and all meaning are correct, but unsupported bold is added around the entire first line."
+    },
+    {
+      "id": "D040",
+      "rating": "pass",
+      "rationale": "Complete Brazilian Portuguese preserving mild curse, facts, request, newline, bold and emoji."
+    },
+    {
+      "id": "D041",
+      "rating": "pass",
+      "rationale": "European Portuguese comboio and espera por mim are appropriate; merda is a plausible idiomatic vulgar frustration equivalent, with facts and formatting preserved."
+    }
+  ],
+  "comparisonWithC": {
+    "preferredBatch": "D",
+    "qualification": "Marginal preference on this small corpus only, not a production-readiness judgment or expert validation.",
+    "reason": "D has 16 pass, 15 minor and 11 major judgments versus C with 14 pass, 13 minor and 15 major. It removes censorship/explanatory wrapping, improves several profanity outputs, and fixes the requested Serbian Latin script and the remaining simplified Chinese character in the Traditional output.",
+    "regressions": "D introduces a third-person plural to second-person error in the Tasos case, changes train to railway carriage in two Serbian targets, and returns whole untranslated messages for the Spanish and Serbian-Latin English targets. C already failed the latter cases differently, so raw major-count improvement does not imply that routing is reliable.",
+    "remainingRequiredBehaviorFailures": "D still omits Greek vulgar address, invents directed profanity targets and a proper name, softens the Italian strong expletive, changes Serbian train to bus/carriage, leaves some source-language address phrases untranslated, drops me from the Chinese requests and adds unsupported bold. These prevent treating D as acceptable overall."
+  },
+  "summary": {
+    "total": 42,
+    "pass": 16,
+    "minor": 15,
+    "major": 11,
+    "uncertain": 0,
+    "unavailable": 0
+  }
+}

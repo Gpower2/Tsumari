@@ -23,6 +23,8 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <EmbeddedResource Include="Unit\Fixtures\LegacyPromptSnapshot.json" />
+    <EmbeddedResource Include="..\..\src\Tsumari.Bot\appsettings.models.json" LogicalName="ShippedModelProfiles.json" />
   </ItemGroup>
 
   <ItemGroup>

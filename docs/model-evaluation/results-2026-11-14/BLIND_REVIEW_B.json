@@ -1,0 +1,226 @@
+{
+  "batch": "blind-batch-02",
+  "reviewer": "independent assistant blind reviewer",
+  "scope": "Supplied anonymized input, target, semanticChecks, output and error only. No other evaluation artifacts or model identities used for judgments.",
+  "limitations": "Assistant linguistic judgment, not native-speaker or expert validation. Source corpus and checks are not human gold. Register varies by region and context. Equivalent clock notation accepted when PM is preserved; bare 6:30 loses the explicit evening distinction. Unavailable output is excluded from semantic quality judgments.",
+  "ratings": [
+    {
+      "id": "B000",
+      "rating": "pass",
+      "rationale": "Complete Italian preserving address, both clauses, newline and emojis."
+    },
+    {
+      "id": "B001",
+      "rating": "pass",
+      "rationale": "Brother address, increasing excitement and frenzied betting preserved in understandable German with newline and emojis."
+    },
+    {
+      "id": "B002",
+      "rating": "minor",
+      "rationale": "German question is correct, but the meaningful French address remains untranslated despite the instruction to translate the whole message. Affection is retained."
+    },
+    {
+      "id": "B003",
+      "rating": "pass",
+      "rationale": "Complete natural French with accented affectionate address."
+    },
+    {
+      "id": "B004",
+      "rating": "pass",
+      "rationale": "Affectionate feminine address and question correctly translated into Greek."
+    },
+    {
+      "id": "B005",
+      "rating": "pass",
+      "rationale": "Informal brother address, already getting wild meaning and emoji preserved."
+    },
+    {
+      "id": "B006",
+      "rating": "pass",
+      "rationale": "Portuguese body preserves the colloquial wild/intense meaning, original expletive and emoji, with no invented target."
+    },
+    {
+      "id": "B007",
+      "rating": "pass",
+      "rationale": "Both original expletives and complete Portuguese body preserved; source spelling of foda se is retained without losing meaning."
+    },
+    {
+      "id": "B008",
+      "rating": "pass",
+      "rationale": "Complete Greek translation retaining vulgar address and emoji."
+    },
+    {
+      "id": "B009",
+      "rating": "unavailable",
+      "rationale": "No translation output; an unsupported/missing source-language mapping error is reported. This is a coverage failure, not an observed semantic mistranslation."
+    },
+    {
+      "id": "B010",
+      "rating": "major",
+      "rationale": "The two Greek expressions remain in Greek, leaving half the list untranslated into English. Portuguese exclamations are translated without invented targets."
+    },
+    {
+      "id": "B011",
+      "rating": "minor",
+      "rationale": "Explicit dismissal and leave-us-alone meaning survive, but dude removes the vulgar insult/address force of malaka in this hostile context."
+    },
+    {
+      "id": "B012",
+      "rating": "major",
+      "rationale": "Both positions are represented, but caralho is reduced to the much milder damn it. The explicit force of the second expletive is materially softened under the supplied rubric."
+    },
+    {
+      "id": "B013",
+      "rating": "major",
+      "rationale": "Damn is materially milder than the strong standalone vulgar exclamation caralho. No person is invented, but the sole source expression loses its explicit profanity force."
+    },
+    {
+      "id": "B014",
+      "rating": "pass",
+      "rationale": "Complete Greek question with vulgar address and tonight preserved."
+    },
+    {
+      "id": "B015",
+      "rating": "pass",
+      "rationale": "Yes, Tasos, plural they and amusement meaning correctly retained."
+    },
+    {
+      "id": "B016",
+      "rating": "pass",
+      "rationale": "Natural complete German; Leute is a reasonable informal address equivalent."
+    },
+    {
+      "id": "B017",
+      "rating": "minor",
+      "rationale": "Floet, funny and after-all nuance are preserved. Shit retains vulgar frustration but changes the addressed malaka insult into a standalone exclamation."
+    },
+    {
+      "id": "B018",
+      "rating": "pass",
+      "rationale": "Brother address and heating-up meaning preserved; Stimmung is a reasonable contextual rendering of the situation becoming heated."
+    },
+    {
+      "id": "B019",
+      "rating": "pass",
+      "rationale": "Brother address and complete question correctly translated into German."
+    },
+    {
+      "id": "B020",
+      "rating": "pass",
+      "rationale": "Natural complete German group greeting."
+    },
+    {
+      "id": "B021",
+      "rating": "minor",
+      "rationale": "Not-until restriction, train and request survive, but the newline is removed and bare 6:30 loses the explicit PM information in 18:30. Missing comma also makes Damn Alex momentarily ambiguous as a curse on Alex."
+    },
+    {
+      "id": "B022",
+      "rating": "major",
+      "rationale": "Entire Wait for me request, its bold formatting and emoji are omitted. Bare 6:30 also loses the explicit evening distinction."
+    },
+    {
+      "id": "B023",
+      "rating": "minor",
+      "rationale": "Meaning, frustrated register, time, bold request and emoji retained in acceptable generic Serbian Cyrillic, but required newline is removed."
+    },
+    {
+      "id": "B024",
+      "rating": "major",
+      "rationale": "Entire Wait for me request, its formatting and emoji are omitted; bare 6:30 additionally loses the PM distinction. Strong frustrated register otherwise survives."
+    },
+    {
+      "id": "B025",
+      "rating": "major",
+      "rationale": "Entire Wait for me request and emoji are omitted, bare 6:30 loses PM information, and porra is softened to the milder damn."
+    },
+    {
+      "id": "B026",
+      "rating": "major",
+      "rationale": "Entire Wait for me request, bold formatting and emoji are omitted. Bare 6:30 loses explicit PM information; profanity itself is preserved."
+    },
+    {
+      "id": "B027",
+      "rating": "major",
+      "rationale": "Entire Wait for me request, bold formatting and emoji are omitted. Bare 6:30 loses PM information; train and explicit frustration are otherwise correct."
+    },
+    {
+      "id": "B028",
+      "rating": "minor",
+      "rationale": "Core meaning, explicit frustration, bold request and emoji survive; required newline is removed and bare 6:30 loses the explicit evening distinction."
+    },
+    {
+      "id": "B029",
+      "rating": "major",
+      "rationale": "Entire Wait for me request and emoji are omitted; bare 6:30 loses PM information. Alex is an acceptable equivalent spelling of Aleks and train/profanity are correct."
+    },
+    {
+      "id": "B030",
+      "rating": "major",
+      "rationale": "Mother mistranslates the Chinese vulgar exclamation as a kinship noun, removing its profanity and producing an incoherent opening. Newline is also removed and PM information lost."
+    },
+    {
+      "id": "B031",
+      "rating": "minor",
+      "rationale": "Facts, frustration, bold request and emoji survive, but newline is removed. Wartet addresses multiple people despite the message naming Alex, introducing a likely number shift; source English alone does not strictly specify number."
+    },
+    {
+      "id": "B032",
+      "rating": "minor",
+      "rationale": "Facts, mild curse and bold request retained, but newline is removed. Perimenete changes the likely singular familiar request to plural or polite address, an unsupported register/number choice rather than a clear factual failure."
+    },
+    {
+      "id": "B033",
+      "rating": "minor",
+      "rationale": "Complete Italian meaning, facts, bold request and emoji preserved, but newline is removed and cazzo is more explicitly vulgar than the mild damn it."
+    },
+    {
+      "id": "B034",
+      "rating": "minor",
+      "rationale": "Brazilian Portuguese is valid for generic PT; facts, request and emoji survive, but newline is removed. Caraca is a milder euphemistic exclamation and slightly reduces the curse register."
+    },
+    {
+      "id": "B035",
+      "rating": "minor",
+      "rationale": "Natural complete Spanish preserving meaning, register, bold and emoji; required newline is removed."
+    },
+    {
+      "id": "B036",
+      "rating": "minor",
+      "rationale": "Complete simplified Chinese with facts, frustrated exclamation, bold request and emoji; required newline is removed."
+    },
+    {
+      "id": "B037",
+      "rating": "major",
+      "rationale": "Latin Serbian script is correct, but the entire Wait for me request and emoji are omitted."
+    },
+    {
+      "id": "B038",
+      "rating": "minor",
+      "rationale": "Cyrillic Serbian and complete core meaning are preserved with bold and emoji, but required newline is removed."
+    },
+    {
+      "id": "B039",
+      "rating": "major",
+      "rationale": "Explicit Traditional Chinese target is violated: simplified 该, 车 and 发 appear instead of 該, 車 and 發. Core meaning is otherwise correct; newline is also removed."
+    },
+    {
+      "id": "B040",
+      "rating": "minor",
+      "rationale": "Brazilian Portuguese facts and request preserved, but newline is removed and euphemistic caraca slightly weakens the curse register."
+    },
+    {
+      "id": "B041",
+      "rating": "minor",
+      "rationale": "Core facts and request survive, but required newline is removed. O trem is a Brazilian lexical choice rather than the expected European Portuguese comboio; the curse phrasing is also awkward without a complement."
+    }
+  ],
+  "summary": {
+    "total": 42,
+    "pass": 14,
+    "minor": 15,
+    "major": 12,
+    "uncertain": 0,
+    "unavailable": 1
+  }
+}

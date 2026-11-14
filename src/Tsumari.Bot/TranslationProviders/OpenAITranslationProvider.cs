@@ -26,6 +26,7 @@ namespace Tsumari.Bot.TranslationProviders
             _apiUrl = configuration["Translation:OpenAI:ApiUrl"] ?? "http://localhost:8080/v1/chat/completions";
             _model = configuration["Translation:OpenAI:Model"] ?? "mistral-7b";
             _apiKey = configuration["Translation:OpenAI:ApiKey"] ?? "dummy";
+            ConfigureModelProfiles(configuration,httpClientFactory,"OpenAI");
         }
 
         protected override string ProviderName => "OpenAI";
@@ -34,7 +35,7 @@ namespace Tsumari.Bot.TranslationProviders
 
         protected override string? ConfiguredModel => _model;
 
-        public override bool IsActive => !string.IsNullOrWhiteSpace(_apiUrl) && !string.IsNullOrWhiteSpace(_model);
+        public override bool IsActive => TranslationModel is not null || (!string.IsNullOrWhiteSpace(_apiUrl) && !string.IsNullOrWhiteSpace(_model));
 
         protected override async Task<string> CallModelAsync(string systemPrompt, string userPrompt)
         {

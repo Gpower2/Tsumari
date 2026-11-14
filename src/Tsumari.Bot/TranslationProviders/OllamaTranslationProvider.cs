@@ -31,9 +31,10 @@ namespace Tsumari.Bot.TranslationProviders
             _apiUrl = configuration["Translation:Ollama:ApiUrl"] ?? "http://localhost:11434/api/generate";
             _model = configuration["Translation:Ollama:Model"] ?? "aya:8b";
             _keepAlive = configuration["Translation:Ollama:KeepAlive"] ?? "15m";
+            ConfigureModelProfiles(configuration,httpClientFactory,"Ollama");
         }
 
-        public override bool SupportsGenerationOptions => true;
+        public override bool SupportsGenerationOptions => TranslationModel?.Profile.SupportsRetry ?? true;
 
         protected override Task<string> CallTranslationModelAsync(string systemPrompt, string userPrompt, TranslationGenerationOptions? options)
             => CallModelAsync(systemPrompt, userPrompt, null, options);
@@ -44,11 +45,12 @@ namespace Tsumari.Bot.TranslationProviders
 
         protected override string? ConfiguredModel => _model;
 
-        public override bool IsActive => !string.IsNullOrWhiteSpace(_apiUrl) && !string.IsNullOrWhiteSpace(_model);
+        public override bool IsActive => TranslationModel is not null || (!string.IsNullOrWhiteSpace(_apiUrl) && !string.IsNullOrWhiteSpace(_model));
 
         public override TranslationProviderConfigurationReport GetConfigurationReport()
         {
             var report = base.GetConfigurationReport();
+            if (TranslationModel is not null) return report;
             if (string.IsNullOrWhiteSpace(_keepAlive))
             {
                 return report;

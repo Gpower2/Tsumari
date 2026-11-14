@@ -2,6 +2,16 @@ namespace Tsumari.Bot.Configuration;
 
 public sealed class TranslationRetryOptions
 {
+    public void BindConfiguration(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    {
+        // ConfigurationBinder appends to initialized arrays. A configured retry schedule
+        // replaces the default schedule rather than silently doubling its length.
+        Microsoft.Extensions.Configuration.ConfigurationBinder.Bind(configuration, this);
+        var temperatures = configuration.GetSection(nameof(Temperatures));
+        if (temperatures.Exists())
+            Temperatures = Microsoft.Extensions.Configuration.ConfigurationBinder.Get<double[]>(temperatures) ?? [];
+    }
+
     public double[] Temperatures { get; set; } = [0.15, 0.25, 0.35, 0.45, 0.55, 0.60, 0.60, 0.60, 0.60, 0.60];
     public double TopP { get; set; } = 0.80;
     public int CooldownSeconds { get; set; } = 30;

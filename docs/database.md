@@ -105,11 +105,10 @@ Discord Snowflake IDs are 64-bit values. Storing them as `TEXT` avoids cross-lay
 
 ## Concurrency and Safety Settings
 
-Every connection enables:
+Connections enable foreign keys through `SqliteConnectionStringBuilder.ForeignKeys = true`. Database initialization enables persistent write-ahead logging:
 
 ```sql
 PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
 ```
 
 ### `journal_mode = WAL`
@@ -119,3 +118,7 @@ Write-ahead logging improves concurrent read/write behavior, which matters becau
 ### `foreign_keys = ON`
 
 SQLite does not enforce foreign keys by default. Tsumari enables them explicitly so cascade deletes work reliably.
+
+## Deployment and backups
+
+Relative `Database:FilePath` values resolve from the process working directory; deployment deliberately uses the release folder. The deployment script protects the database and its WAL/SHM/journal files, and refuses to switch away from an existing database path. It does not make a database backup or run migrations itself. Normal application initialization can perform the additive schema setup described above. Keep live SQLite sidecars with their database; see [deployment](DEPLOYMENT.md).

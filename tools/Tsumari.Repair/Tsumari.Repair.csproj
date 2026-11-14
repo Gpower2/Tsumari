@@ -14,7 +14,15 @@
   <ItemGroup>
     <Compile Include="../../src/Tsumari.Bot/TranslationProviders/OllamaTranslationProvider.cs" Link="Bot/OllamaTranslationProvider.cs" />
     <Compile Include="../../src/Tsumari.Bot/TranslationProviders/Abstractions/*.cs" Link="Bot/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Tsumari.Bot/TranslationProviders/Models/*.cs" Link="Bot/Models/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Tsumari.Bot/TranslationProviders/Formatting/*.cs" Link="Bot/Formatting/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Tsumari.Bot/TranslationProviders/Clients/*.cs" Link="Bot/Clients/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Tsumari.Bot/TranslationProviders/Requests/*.cs" Link="Bot/Requests/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Tsumari.Bot/TranslationProviders/Parsing/*.cs" Link="Bot/Parsing/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Tsumari.Bot/Configuration/LlmOptions*.cs" Link="Bot/Configuration/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Tsumari.Bot/Configuration/ModelProfileOptions.cs" Link="Bot/Configuration/ModelProfileOptions.cs" />
     <Compile Include="../../src/Tsumari.Bot/Models/LanguageAnalysisResult.cs" Link="Bot/LanguageAnalysisResult.cs" />
+    <Compile Include="../../src/Tsumari.Bot/Models/TranslationProvider.cs" Link="Bot/TranslationProvider.cs" />
     <Compile Include="../../src/Tsumari.Bot/Models/TranslationProviderConfigurationReport.cs" Link="Bot/TranslationProviderConfigurationReport.cs" />
     <Compile Include="../../src/Tsumari.Bot/Services/LanguageCodeService.cs" Link="Bot/LanguageCodeService.cs" />
     <Compile Include="../../src/Tsumari.Bot/Services/MirroredMessageNoticeLocalizer.cs" Link="Bot/MirroredMessageNoticeLocalizer.cs" />

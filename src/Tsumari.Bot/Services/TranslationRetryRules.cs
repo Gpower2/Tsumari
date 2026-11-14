@@ -40,15 +40,26 @@ public static class TranslationRetryRules
     {
         message.Id, Channel = message.Channel.Id, message.Content, message.EditedTimestamp,
         Attachments = message.Attachments.Select(a => new { a.Id, a.Filename, a.Url }),
-        Components = SnapshotComponents(message.Components), message.Reference, message.Flags
+        Components = SnapshotComponents(message.Components), Reference = SnapshotReference(message.Reference), message.Flags
     });
 
     public static string PreservedMetadata(IUserMessage message) => JsonSerializer.Serialize(new
     {
         message.Id, Channel = message.Channel.Id, message.Timestamp,
         Attachments = message.Attachments.Select(a => new { a.Id, a.Filename, a.Url }),
-        Components = SnapshotComponents(message.Components), message.Reference
+        Components = SnapshotComponents(message.Components), Reference = SnapshotReference(message.Reference)
     });
+
+    // Discord Optional<T>.Value throws when an API field was omitted. Never serialize
+    // the SDK reference directly: JSON serializers inspect Value even when unspecified.
+    private static object? SnapshotReference(MessageReference? reference) => reference == null ? null : new
+    {
+        MessageId = OptionalValue(reference.MessageId), reference.ChannelId,
+        GuildId = OptionalValue(reference.GuildId),
+        FailIfNotExists = OptionalValue(reference.FailIfNotExists), reference.ReferenceType
+    };
+
+    private static T? OptionalValue<T>(Optional<T> value) where T : struct => value.IsSpecified ? value.Value : null;
 
     private static object[] SnapshotComponents(IEnumerable<IMessageComponent>? components) => (components ?? []).Select<IMessageComponent, object>(c => c switch
     {

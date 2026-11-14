@@ -1,0 +1,1244 @@
+{
+  "schema_version": 1,
+  "session_id": "56123b7e-2b3a-4bd3-97e7-063bf46de215",
+  "cases": [
+    {
+      "id": "fratello-full",
+      "input": "Thank you fratello! 🤗\nThings are already heating up, they are placing bets like crazy 😅",
+      "origin": "user_reported_real_example",
+      "user_report_events_line": 10054,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "IT"
+      ],
+      "semantic_checks": "English dominates; translate the English body even when the target is Italian. Preserve the brother/address meaning, newline and emojis.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "IT",
+          "historical_source_hint": null
+        },
+        {
+          "target_language": "IT",
+          "historical_source_hint": "EN"
+        },
+        {
+          "target_language": "DE",
+          "historical_source_hint": "EN"
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10741,
+          "name": "analyze_fratello",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10741,
+          "name": "translate_fratello_to_it",
+          "kind": "translation",
+          "target": "IT",
+          "source_hint": null
+        },
+        {
+          "events_line": 10748,
+          "name": "fratello",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10755,
+          "name": "fratello",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10776,
+          "name": "fratello",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10841,
+          "name": "fratello",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10848,
+          "name": "fratello",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10942,
+          "name": "fratello",
+          "kind": "translation",
+          "target": "IT",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 10949,
+          "name": "fratello",
+          "kind": "translation",
+          "target": "IT",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 10956,
+          "name": "fratello",
+          "kind": "translation",
+          "target": "IT",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11027,
+          "name": "fratello",
+          "kind": "translation",
+          "target": "IT",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11082,
+          "name": "fratello-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11082,
+          "name": "fratello-to-it",
+          "kind": "translation",
+          "target": "IT",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11082,
+          "name": "fratello-to-de",
+          "kind": "translation",
+          "target": "DE",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11089,
+          "name": "fratello",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "fratello-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "fratello-to-it",
+          "kind": "translation",
+          "target": "IT",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11111,
+          "name": "fratello-to-de",
+          "kind": "translation",
+          "target": "DE",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11134,
+          "name": "Fratello example",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Fratello example",
+          "kind": "translation",
+          "target": "IT",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11134,
+          "name": "Fratello example",
+          "kind": "translation",
+          "target": "DE",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 19599,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 19631,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "ma-cherie",
+      "input": "Ma cherie! How are you doing?",
+      "origin": "user_reported_real_example",
+      "user_report_events_line": 10054,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "FR"
+      ],
+      "semantic_checks": "English dominates, with a meaningful French phrase. Translate the whole message and retain the affectionate address.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "DE",
+          "historical_source_hint": null
+        },
+        {
+          "target_language": "DE",
+          "historical_source_hint": "EN"
+        },
+        {
+          "target_language": "FR",
+          "historical_source_hint": "EN"
+        },
+        {
+          "target_language": "EL",
+          "historical_source_hint": "EN"
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10741,
+          "name": "analyze_ma_cherie",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10741,
+          "name": "translate_ma_cherie_to_de",
+          "kind": "translation",
+          "target": "DE",
+          "source_hint": null
+        },
+        {
+          "events_line": 10748,
+          "name": "ma_cherie",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10755,
+          "name": "ma_cherie",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10848,
+          "name": "ma_cherie",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10942,
+          "name": "ma_cherie",
+          "kind": "translation",
+          "target": "DE",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 10949,
+          "name": "ma_cherie",
+          "kind": "translation",
+          "target": "DE",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 10956,
+          "name": "ma_cherie",
+          "kind": "translation",
+          "target": "DE",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11027,
+          "name": "ma_cherie",
+          "kind": "translation",
+          "target": "DE",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11082,
+          "name": "ma-cherie-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11082,
+          "name": "ma-cherie-to-fr",
+          "kind": "translation",
+          "target": "FR",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11082,
+          "name": "ma-cherie-to-el",
+          "kind": "translation",
+          "target": "EL",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11089,
+          "name": "ma_cherie",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "ma-cherie-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "ma-cherie-to-fr",
+          "kind": "translation",
+          "target": "FR",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11111,
+          "name": "ma-cherie-to-el",
+          "kind": "translation",
+          "target": "EL",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11134,
+          "name": "Ma cherie example",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Ma cherie example",
+          "kind": "translation",
+          "target": "FR",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 11134,
+          "name": "Ma cherie example",
+          "kind": "translation",
+          "target": "EL",
+          "source_hint": "EN"
+        },
+        {
+          "events_line": 19582,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 19599,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 19631,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "hermano",
+      "input": "Thanks hermano, this is getting wild already 😂",
+      "origin": "copilot_added_probe",
+      "user_report_events_line": null,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "ES"
+      ],
+      "semantic_checks": "English dominates; a Spanish address must not suppress translation of the rest. Preserve emoji and address.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [],
+      "provenance": [
+        {
+          "events_line": 10741,
+          "name": "analyze_thanks_hermano",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "pt-intro-short",
+      "input": "caralho, this is getting wild already 😂",
+      "origin": "copilot_added_probe",
+      "user_report_events_line": null,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "PT"
+      ],
+      "semantic_checks": "English dominates; preserve the Portuguese expletive force and emoji without inventing a directed insult.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "PT",
+          "historical_source_hint": "EN"
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10741,
+          "name": "analyze_caralho_english_clause",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10748,
+          "name": "caralho_clause",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10755,
+          "name": "caralho_clause",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10848,
+          "name": "caralho_clause",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11082,
+          "name": "caralho-clause-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11089,
+          "name": "caralho_clause",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "caralho-clause-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Portuguese intro short clause",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Portuguese intro short clause",
+          "kind": "translation",
+          "target": "PT",
+          "source_hint": "EN"
+        }
+      ]
+    },
+    {
+      "id": "pt-intro-long",
+      "input": "foda se, caralho. Things are already heating up and people are placing bets like crazy 😅",
+      "origin": "copilot_added_probe",
+      "user_report_events_line": null,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "PT"
+      ],
+      "semantic_checks": "Longer English clause dominates; preserve both Portuguese profanity expressions and emoji.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "PT",
+          "historical_source_hint": "EN"
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10741,
+          "name": "analyze_pt_intro_english_body",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10748,
+          "name": "pt_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10755,
+          "name": "pt_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10776,
+          "name": "pt_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10841,
+          "name": "pt_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10848,
+          "name": "pt_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11082,
+          "name": "pt-intro-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11089,
+          "name": "pt_intro",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "pt-intro-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Portuguese intro long body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Portuguese intro long body",
+          "kind": "translation",
+          "target": "PT",
+          "source_hint": "EN"
+        }
+      ]
+    },
+    {
+      "id": "el-intro-queue",
+      "input": "μαλακα, this queue is moving fast tonight 😂",
+      "origin": "copilot_added_probe",
+      "user_report_events_line": null,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "EL"
+      ],
+      "semantic_checks": "English dominates; preserve Greek profanity/address force. When translating to Greek, do not soften μαλακα to μάγκα.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "EL",
+          "historical_source_hint": "EN"
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10741,
+          "name": "analyze_greek_intro_english_body",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10748,
+          "name": "greek_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10755,
+          "name": "greek_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10776,
+          "name": "greek_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10841,
+          "name": "greek_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10848,
+          "name": "greek_intro_body",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Greek intro queue",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Greek intro queue",
+          "kind": "translation",
+          "target": "EL",
+          "source_hint": "EN"
+        }
+      ]
+    },
+    {
+      "id": "mixed-profanity-list",
+      "input": "foda se, caralho, μαλακα, γαμήσου",
+      "origin": "copilot_probe_from_user_terms",
+      "user_report_events_line": 10239,
+      "expected_dominant_language": null,
+      "meaningful_input_languages": [
+        "PT",
+        "EL"
+      ],
+      "semantic_checks": "Artificial mixed-language stress case. Do not enforce a unique dominant language. Preserve expletives without omissions, softening or invented personal targets; human review required.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "EN",
+          "historical_source_hint": null
+        },
+        {
+          "target_language": "EN",
+          "historical_source_hint": "PT"
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10741,
+          "name": "translate_profanity_to_en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": null
+        },
+        {
+          "events_line": 10762,
+          "name": "pt_list_to_en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": null
+        },
+        {
+          "events_line": 10769,
+          "name": "pt_list_to_en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": null
+        },
+        {
+          "events_line": 10942,
+          "name": "profanity",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "PT"
+        },
+        {
+          "events_line": 10949,
+          "name": "profanity",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "PT"
+        },
+        {
+          "events_line": 10956,
+          "name": "profanity",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "PT"
+        },
+        {
+          "events_line": 11082,
+          "name": "profanity-to-en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "PT"
+        },
+        {
+          "events_line": 11111,
+          "name": "profanity-to-en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "PT"
+        },
+        {
+          "events_line": 11134,
+          "name": "Profanity list",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Profanity list",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "PT"
+        }
+      ]
+    },
+    {
+      "id": "el-profanity-sentence",
+      "input": "μαλακα, γαμήσου και άσε μας ήσυχους",
+      "origin": "copilot_added_probe",
+      "user_report_events_line": null,
+      "expected_dominant_language": "EL",
+      "meaningful_input_languages": [
+        "EL"
+      ],
+      "semantic_checks": "Preserve address/insult, explicit dismissal and leave-us-alone meaning without censorship or omitted elements.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "EN",
+          "historical_source_hint": null
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10741,
+          "name": "translate_greek_slang_to_en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": null
+        },
+        {
+          "events_line": 10762,
+          "name": "greek_phrase_to_en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "pt-profanity-pair",
+      "input": "foda se, caralho",
+      "origin": "copilot_probe_from_user_terms",
+      "user_report_events_line": 10239,
+      "expected_dominant_language": "PT",
+      "meaningful_input_languages": [
+        "PT"
+      ],
+      "semantic_checks": "Preserve both expletives; distinguish standalone frustration from a directed personal insult. Human review of register required.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "EN",
+          "historical_source_hint": null
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10762,
+          "name": "pt_phrase_to_en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": null
+        },
+        {
+          "events_line": 10769,
+          "name": "pt_phrase_to_en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "pt-exclamation",
+      "input": "caralho!",
+      "origin": "copilot_probe_from_user_terms",
+      "user_report_events_line": 10239,
+      "expected_dominant_language": "PT",
+      "meaningful_input_languages": [
+        "PT"
+      ],
+      "semantic_checks": "Treat as a standalone exclamation; do not invent a person or target.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "EN",
+          "historical_source_hint": null
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10769,
+          "name": "pt_exclaim_to_en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "el-intro-question",
+      "input": "μαλακα, how are you doing tonight?",
+      "origin": "copilot_added_probe",
+      "user_report_events_line": null,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "EL"
+      ],
+      "semantic_checks": "English question dominates; preserve Greek address/profanity force, rather than changing μαλακα to μάγκα.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "EL",
+          "historical_source_hint": "EN"
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10841,
+          "name": "greek_intro_question",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10848,
+          "name": "greek_intro_question",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11082,
+          "name": "greek-question-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11089,
+          "name": "greek_question",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "greek-question-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Greek intro question",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Greek intro question",
+          "kind": "translation",
+          "target": "EL",
+          "source_hint": "EN"
+        }
+      ]
+    },
+    {
+      "id": "tasos-italian",
+      "input": "Si Tasos , sanno essere divertenti",
+      "origin": "user_reported_real_example",
+      "user_report_events_line": 10897,
+      "expected_dominant_language": "IT",
+      "meaningful_input_languages": [
+        "IT"
+      ],
+      "semantic_checks": "Si means affirmative sì/Yes, not If. Tasos is a proper name and does not establish Greek content. Preserve the plural they and amusement meaning.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [
+        {
+          "target_language": "EN",
+          "historical_source_hint": "IT"
+        }
+      ],
+      "provenance": [
+        {
+          "events_line": 10901,
+          "name": "TEXT",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10902,
+          "name": "TEXT",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10929,
+          "name": "TEXT",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 10942,
+          "name": "tasos",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "IT"
+        },
+        {
+          "events_line": 10949,
+          "name": "tasos",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "IT"
+        },
+        {
+          "events_line": 10956,
+          "name": "tasos",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "IT"
+        },
+        {
+          "events_line": 11027,
+          "name": "tasos",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "IT"
+        },
+        {
+          "events_line": 11082,
+          "name": "tasos-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11082,
+          "name": "tasos-to-en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "IT"
+        },
+        {
+          "events_line": 11089,
+          "name": "tasos",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "tasos-analysis",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11111,
+          "name": "tasos-to-en",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "IT"
+        },
+        {
+          "events_line": 11134,
+          "name": "Tasos example",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 11134,
+          "name": "Tasos example",
+          "kind": "translation",
+          "target": "EN",
+          "source_hint": "IT"
+        }
+      ]
+    },
+    {
+      "id": "mates-monolingual",
+      "input": "I'm glad you all are here mates",
+      "origin": "user_reported_production_example",
+      "user_report_events_line": 19554,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN"
+      ],
+      "semantic_checks": "Monolingual English: mates is not evidence of Italian; do not hallucinate a second language.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [],
+      "provenance": [
+        {
+          "events_line": 19582,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 19631,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20089,
+          "name": "mates_en",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20103,
+          "name": "mates_en",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20110,
+          "name": "mates_en",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20117,
+          "name": "mates_en",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "greek-name-monolingual",
+      "input": "Μαλάκα Φλοετ τελικά είσαι πολύ αστείος",
+      "origin": "user_reported_production_example",
+      "user_report_events_line": 19554,
+      "expected_dominant_language": "EL",
+      "meaningful_input_languages": [
+        "EL"
+      ],
+      "semantic_checks": "Monolingual Greek with a proper/transliterated name. Do not hallucinate English; preserve name and slang/register.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [],
+      "provenance": [
+        {
+          "events_line": 19582,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 19631,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20089,
+          "name": "greek_slang",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20103,
+          "name": "greek_slang",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20110,
+          "name": "greek_slang",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20117,
+          "name": "greek_slang",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "fratello-shortened",
+      "input": "Thank you fratello! Things are already heating up",
+      "origin": "copilot_derived_variant",
+      "user_report_events_line": null,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "IT"
+      ],
+      "semantic_checks": "English dominates; do not let the short Italian address change routing. Minor-language collapse is a separate application policy.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [],
+      "provenance": [
+        {
+          "events_line": 19582,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20110,
+          "name": "fratello_mix",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        },
+        {
+          "events_line": 20117,
+          "name": "fratello_mix",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "fratello-question",
+      "input": "Thank you fratello! How are you doing?",
+      "origin": "copilot_derived_variant",
+      "user_report_events_line": null,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN",
+        "IT"
+      ],
+      "semantic_checks": "English dominates; preserve address and question. Do not confuse raw language identification with label policy.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [],
+      "provenance": [
+        {
+          "events_line": 19599,
+          "name": "powershell-example",
+          "kind": "analysis",
+          "target": null,
+          "source_hint": null
+        }
+      ]
+    },
+    {
+      "id": "hello-control",
+      "input": "Hello everybody",
+      "origin": "production_log_prefix_reused_as_control",
+      "user_report_events_line": 20030,
+      "expected_dominant_language": "EN",
+      "meaningful_input_languages": [
+        "EN"
+      ],
+      "semantic_checks": "Simple English control used for warm/cold timing and JSON output experiments; original log alone does not prove full-message completeness.",
+      "expectation_status": "curated_from_requirements_not_human_gold",
+      "historically_requested_translations": [],
+      "provenance": [
+        {
+          "events_line": 20089,
+          "name": "simple_en",
+          "kind": null,
+          "target": null,
+          "source_hint": null
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Input languages describe content, not mandatory UI label entries.",
+    "Observed model outputs and mock fixtures are not human-approved references.",
+    "No exact share targets; mixed profanity list has no required dominant language."
+  ]
+}

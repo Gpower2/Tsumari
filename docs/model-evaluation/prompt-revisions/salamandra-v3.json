@@ -1,0 +1,3 @@
+{
+  "salamandra-v3-q4": "Translate the entire following text from {{source}} into {{target}}, including every line. Preserve all words, names, numbers, emoji, line breaks and Markdown. Preserve profanity and its original emotional force without softening it. Do not omit any part of the text."
+}

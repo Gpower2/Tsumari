@@ -1,10 +1,53 @@
 using Discord;
+using System.Text.Json;
 using Tsumari.Bot.Configuration;
 
 namespace Tsumari.Bot.Tests.Unit;
 
 public sealed class TranslationRetryRulesTests
 {
+    [Fact]
+    public void ReplySnapshots_HandleMissingMessageIdAndDetectReferenceChanges()
+    {
+        var message = new Mock<IUserMessage>();
+        message.SetupGet(m => m.Channel).Returns(Mock.Of<IMessageChannel>());
+        message.SetupGet(m => m.Attachments).Returns(Array.Empty<IAttachment>());
+        message.SetupGet(m => m.Reference).Returns(new MessageReference(null, 456, null, null, default));
+        var initialFingerprint = TranslationRetryRules.Fingerprint(message.Object);
+        var initialMetadata = TranslationRetryRules.PreservedMetadata(message.Object);
+        using var snapshot = JsonDocument.Parse(initialFingerprint);
+        Assert.Equal(JsonValueKind.Null, snapshot.RootElement.GetProperty("Reference").GetProperty("MessageId").ValueKind);
+        message.SetupGet(m => m.Reference).Returns(new MessageReference(123, 456, null, null, default));
+        Assert.NotEqual(initialFingerprint, TranslationRetryRules.Fingerprint(message.Object));
+        Assert.NotEqual(initialMetadata, TranslationRetryRules.PreservedMetadata(message.Object));
+        var withMessage = TranslationRetryRules.Fingerprint(message.Object);
+        message.SetupGet(m => m.Reference).Returns(new MessageReference(123, 456, null, false, default));
+        Assert.NotEqual(withMessage, TranslationRetryRules.Fingerprint(message.Object));
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(1UL, null)]
+    [InlineData(null, false)]
+    [InlineData(1UL, false)]
+    public void ReplySnapshots_HandleOmittedOptionalFields(ulong? guildId, bool? failIfNotExists)
+    {
+        var message = new Mock<IUserMessage>();
+        message.SetupGet(m => m.Channel).Returns(Mock.Of<IMessageChannel>());
+        message.SetupGet(m => m.Attachments).Returns(Array.Empty<IAttachment>());
+        message.SetupGet(m => m.Reference).Returns(new MessageReference(123, 456, guildId, failIfNotExists, default));
+        using var fingerprint = JsonDocument.Parse(TranslationRetryRules.Fingerprint(message.Object));
+        using var metadata = JsonDocument.Parse(TranslationRetryRules.PreservedMetadata(message.Object));
+        foreach (var snapshot in new[] { fingerprint.RootElement, metadata.RootElement })
+        {
+            var reference = snapshot.GetProperty("Reference");
+            Assert.Equal(123UL, reference.GetProperty("MessageId").GetUInt64());
+            Assert.Equal(456UL, reference.GetProperty("ChannelId").GetUInt64());
+            Assert.Equal(guildId, reference.GetProperty("GuildId").ValueKind == JsonValueKind.Null ? null : reference.GetProperty("GuildId").GetUInt64());
+            Assert.Equal(failIfNotExists, reference.GetProperty("FailIfNotExists").ValueKind == JsonValueKind.Null ? null : reference.GetProperty("FailIfNotExists").GetBoolean());
+        }
+    }
+
     [Theory]
     [InlineData("<t:123:f> **Alice**:\nHello *(Translation Failed)*", "<t:123:f> **Alice**:\nBonjour")]
     [InlineData("**Alice** (EN => FR):\nHello", "**Alice** (EN => FR):\nBonjour")]

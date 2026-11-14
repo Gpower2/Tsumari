@@ -1,0 +1,169 @@
+{
+  "model": "translategemma:12b",
+  "analysis": [
+    {
+      "name": "fratello-analysis",
+      "text": "Thank you fratello! 🤗\nThings are already heating up, they are placing bets like crazy 😅",
+      "raw": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.95},{\"languageCode\":\"IT\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+      "parsed": {
+        "dominantLanguageCode": "EN",
+        "languages": [
+          {
+            "languageCode": "EN",
+            "share": 0.95
+          },
+          {
+            "languageCode": "IT",
+            "share": 0.05
+          }
+        ],
+        "isMixed": true,
+        "hasClearDominantLanguage": true
+      }
+    },
+    {
+      "name": "ma-cherie-analysis",
+      "text": "Ma cherie! How are you doing?",
+      "raw": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.75},{\"languageCode\":\"FR\",\"share\":0.25}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+      "parsed": {
+        "dominantLanguageCode": "EN",
+        "languages": [
+          {
+            "languageCode": "EN",
+            "share": 0.75
+          },
+          {
+            "languageCode": "FR",
+            "share": 0.25
+          }
+        ],
+        "isMixed": true,
+        "hasClearDominantLanguage": true
+      }
+    },
+    {
+      "name": "tasos-analysis",
+      "text": "Si Tasos , sanno essere divertenti",
+      "raw": "```json\n{\"dominantLanguageCode\":\"EL\",\"languages\":[{\"languageCode\":\"EL\",\"share\":0.95},{\"languageCode\":\"IT\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+      "parsed": {
+        "dominantLanguageCode": "EL",
+        "languages": [
+          {
+            "languageCode": "EL",
+            "share": 0.95
+          },
+          {
+            "languageCode": "IT",
+            "share": 0.05
+          }
+        ],
+        "isMixed": true,
+        "hasClearDominantLanguage": true
+      }
+    },
+    {
+      "name": "caralho-clause-analysis",
+      "text": "caralho, this is getting wild already 😂",
+      "raw": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.95},{\"languageCode\":\"PT\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+      "parsed": {
+        "dominantLanguageCode": "EN",
+        "languages": [
+          {
+            "languageCode": "EN",
+            "share": 0.95
+          },
+          {
+            "languageCode": "PT",
+            "share": 0.05
+          }
+        ],
+        "isMixed": true,
+        "hasClearDominantLanguage": true
+      }
+    },
+    {
+      "name": "pt-intro-analysis",
+      "text": "foda se, caralho. Things are already heating up and people are placing bets like crazy 😅",
+      "raw": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.95},{\"languageCode\":\"PT\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+      "parsed": {
+        "dominantLanguageCode": "EN",
+        "languages": [
+          {
+            "languageCode": "EN",
+            "share": 0.95
+          },
+          {
+            "languageCode": "PT",
+            "share": 0.05
+          }
+        ],
+        "isMixed": true,
+        "hasClearDominantLanguage": true
+      }
+    },
+    {
+      "name": "greek-question-analysis",
+      "text": "μαλακα, how are you doing tonight?",
+      "raw": "```json\n{\"dominantLanguageCode\":\"EN\",\"languages\":[{\"languageCode\":\"EN\",\"share\":0.95},{\"languageCode\":\"EL\",\"share\":0.05}],\"isMixed\":true,\"hasClearDominantLanguage\":true}\n```",
+      "parsed": {
+        "dominantLanguageCode": "EN",
+        "languages": [
+          {
+            "languageCode": "EN",
+            "share": 0.95
+          },
+          {
+            "languageCode": "EL",
+            "share": 0.05
+          }
+        ],
+        "isMixed": true,
+        "hasClearDominantLanguage": true
+      }
+    }
+  ],
+  "translation": [
+    {
+      "name": "fratello-to-it",
+      "text": "Thank you fratello! 🤗\nThings are already heating up, they are placing bets like crazy 😅",
+      "target": "IT",
+      "source": "EN",
+      "raw": "Grazie fratello! 🤗\nLe cose si stanno già scaldando, stanno scommettendo come matti 😅"
+    },
+    {
+      "name": "fratello-to-de",
+      "text": "Thank you fratello! 🤗\nThings are already heating up, they are placing bets like crazy 😅",
+      "target": "DE",
+      "source": "EN",
+      "raw": "Vielen Dank, Bruder! 🤗\nDie Dinge werden schon heiß, sie wetten wie verrückt 😅"
+    },
+    {
+      "name": "ma-cherie-to-fr",
+      "text": "Ma cherie! How are you doing?",
+      "target": "FR",
+      "source": "EN",
+      "raw": "Ma chérie ! Comment vas-tu ?"
+    },
+    {
+      "name": "ma-cherie-to-el",
+      "text": "Ma cherie! How are you doing?",
+      "target": "EL",
+      "source": "EN",
+      "raw": "Αγάπη μου! Πώς είσαι;"
+    },
+    {
+      "name": "tasos-to-en",
+      "text": "Si Tasos , sanno essere divertenti",
+      "target": "EN",
+      "source": "IT",
+      "raw": "Yes, Tasos, they can be fun."
+    },
+    {
+      "name": "profanity-to-en",
+      "text": "foda se, caralho, μαλακα, γαμήσου",
+      "target": "EN",
+      "source": "PT",
+      "raw": "fuck it, you fucking asshole, you fucking bitch, fuck off."
+    }
+  ]
+}

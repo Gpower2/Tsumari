@@ -1,0 +1,669 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "Independent assistant blind reviewer",
+  "scope": "Only the supplied gemma-prompt-blind-w.json was read for these W judgments. Prior own blind judgments were used for comparison; no prompts, identities, metrics or other experiment data inspected.",
+  "limitations": [
+    "Assistant linguistic judgment, not expert/native-speaker validation; corpus and checks are not human gold.",
+    "Same rubric as X/Y/Z: natural equivalents accepted; materially weakened explicit profanity, invented personal/gendered targets, significant referent/fact changes and untranslated key spans are major.",
+    "Serbian colloquial exclamations and severity need native-speaker confirmation. Jebo ga is accepted as a colloquial exclamation rather than penalized by exact-string matching. W033 has independently clear plural/singular defects as well as a questionable exclamation.",
+    "New_heldout counts as recovered_regression. Natural target quotation glyphs and equivalent clock notation are accepted; actual quotation meaning, code, URL, bold and newlines are checked.",
+    "Rating ties may conceal substantive gains or new errors; W041 corrects the train fact while retaining a major profanity-softening issue."
+  ],
+  "ratings": [
+    {
+      "id": "W-000",
+      "variant": "W",
+      "origin": "copilot_added_probe",
+      "split": "recovered_regression",
+      "caseIndex": 0,
+      "caseId": "el-intro-question",
+      "rating": "minor",
+      "reason": "Question is fully translated, but μαλακά has the stress of softly rather than the vulgar vocative μαλάκα; intended address remains recoverable from context."
+    },
+    {
+      "id": "W-001",
+      "variant": "W",
+      "origin": "copilot_added_probe",
+      "split": "recovered_regression",
+      "caseIndex": 1,
+      "caseId": "el-intro-queue",
+      "rating": "minor",
+      "reason": "μαλακία means bullshit/nonsense rather than the addressed μαλάκα. Vulgarity remains, but a personal address changes into an exclamation."
+    },
+    {
+      "id": "W-002",
+      "variant": "W",
+      "origin": "copilot_added_probe",
+      "split": "recovered_regression",
+      "caseIndex": 2,
+      "caseId": "el-profanity-sentence",
+      "rating": "minor",
+      "reason": "Opening addressed malaka insult becomes standalone fuck. Explicit dismissal and leave-us-alone meaning survive."
+    },
+    {
+      "id": "W-003",
+      "variant": "W",
+      "origin": "user_reported_real_example",
+      "split": "recovered_regression",
+      "caseIndex": 3,
+      "caseId": "fratello-full",
+      "rating": "minor",
+      "reason": "Body, meaning and formatting survive, but meaningful brother address fratello is left Italian instead of translated into German."
+    },
+    {
+      "id": "W-004",
+      "variant": "W",
+      "origin": "user_reported_real_example",
+      "split": "recovered_regression",
+      "caseIndex": 4,
+      "caseId": "fratello-full",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-005",
+      "variant": "W",
+      "origin": "copilot_derived_variant",
+      "split": "recovered_regression",
+      "caseIndex": 5,
+      "caseId": "fratello-question",
+      "rating": "minor",
+      "reason": "Question is translated, but meaningful brother address fratello remains Italian instead of German."
+    },
+    {
+      "id": "W-006",
+      "variant": "W",
+      "origin": "copilot_derived_variant",
+      "split": "recovered_regression",
+      "caseIndex": 6,
+      "caseId": "fratello-shortened",
+      "rating": "minor",
+      "reason": "Heating-up body is translated, but meaningful brother address fratello remains Italian instead of German."
+    },
+    {
+      "id": "W-007",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 7,
+      "caseId": "fresh-00-DE",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-008",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 8,
+      "caseId": "fresh-01-EL",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-009",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 9,
+      "caseId": "fresh-02-EN",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-010",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 10,
+      "caseId": "fresh-03-IT",
+      "rating": "major",
+      "reason": "Si Luca is affirmative yes addressed to Luca. Yes, it is Luca invents an identity assertion instead of preserving the addressee; order quantities and negation are otherwise correct."
+    },
+    {
+      "id": "W-011",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 11,
+      "caseId": "fresh-04-PT",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-012",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 12,
+      "caseId": "fresh-05-ES",
+      "rating": "major",
+      "reason": "Explicit vulgar joder is materially softened to damn. Dates, negation, number 47 and instruction otherwise survive."
+    },
+    {
+      "id": "W-013",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 13,
+      "caseId": "fresh-06-SR",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-014",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 14,
+      "caseId": "fresh-07-ZH",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-015",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 15,
+      "caseId": "fresh-08-DE",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-016",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 16,
+      "caseId": "fresh-09-EL",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-017",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 17,
+      "caseId": "fresh-10-EN",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-018",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 18,
+      "caseId": "fresh-11-IT",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-019",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 19,
+      "caseId": "fresh-12-PT",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-020",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 20,
+      "caseId": "fresh-13-ES",
+      "rating": "major",
+      "reason": "Quoted explicit dismissal vete a la mierda is softened to the milder go to hell, losing its shit/fuck-level vulgarity. Quotation, denial of threat and absence of a current personal target survive."
+    },
+    {
+      "id": "W-021",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 21,
+      "caseId": "fresh-14-SR",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-022",
+      "variant": "W",
+      "origin": "fresh_validation",
+      "split": "fresh_validation",
+      "caseIndex": 22,
+      "caseId": "fresh-15-ZH",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-023",
+      "variant": "W",
+      "origin": "user_reported_production_example",
+      "split": "recovered_regression",
+      "caseIndex": 23,
+      "caseId": "greek-name-monolingual",
+      "rating": "minor",
+      "reason": "Floet and the after-all/actually nuance survive, but you fucking Floet is unnatural English for the opening vulgar address."
+    },
+    {
+      "id": "W-024",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 24,
+      "caseId": "heldout-DE",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-025",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 25,
+      "caseId": "heldout-EL",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-026",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 26,
+      "caseId": "heldout-EN-to-DE",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-027",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 27,
+      "caseId": "heldout-EN-to-EL",
+      "rating": "minor",
+      "reason": "Aman conveys exasperation but weakens the mild curse into a non-curse; Άμάν also has a nonstandard double accent. Facts, request and formatting are correct."
+    },
+    {
+      "id": "W-028",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 28,
+      "caseId": "heldout-EN-to-ES",
+      "rating": "minor",
+      "reason": "Espera a mi is not idiomatic grammatical Spanish for wait for me; Esperame or Espera por mi is needed. Intended meaning, facts and formatting are recoverable."
+    },
+    {
+      "id": "W-029",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 29,
+      "caseId": "heldout-EN-to-IT",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-030",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 30,
+      "caseId": "heldout-EN-to-PT-BR",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-031",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 31,
+      "caseId": "heldout-EN-to-PT-PT",
+      "rating": "minor",
+      "reason": "Caralho is appreciably more explicitly vulgar than mild damn it. European Portuguese vocabulary, facts, request and formatting are otherwise correct."
+    },
+    {
+      "id": "W-032",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 32,
+      "caseId": "heldout-EN-to-PT",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-033",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 33,
+      "caseId": "heldout-EN-to-SR-CYRL",
+      "rating": "major",
+      "reason": "Возови is plural trains rather than singular train and mismatches singular verb полази. Драј is not recognizable as a natural Serbian equivalent of damn it. Cyrillic, time, request and formatting remain, but meaning/register/form have conspicuous defects; native Serbian review should refine the exclamation judgment."
+    },
+    {
+      "id": "W-034",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 34,
+      "caseId": "heldout-EN-to-SR-LATN",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-035",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 35,
+      "caseId": "heldout-EN-to-ZH-HANT",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-036",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 36,
+      "caseId": "heldout-EN-to-ZH",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-037",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 37,
+      "caseId": "heldout-EN",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-038",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 38,
+      "caseId": "heldout-ES",
+      "rating": "major",
+      "reason": "Explicit vulgar joder is substantially softened to damn. Facts, request and formatting are otherwise correct."
+    },
+    {
+      "id": "W-039",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 39,
+      "caseId": "heldout-IT",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-040",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 40,
+      "caseId": "heldout-PT",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-041",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 41,
+      "caseId": "heldout-SR-Latn",
+      "rating": "major",
+      "reason": "Train is correctly translated, but explicit vulgar jebote is substantially softened to damn. Name, evening time, request and formatting survive."
+    },
+    {
+      "id": "W-042",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 42,
+      "caseId": "heldout-SR",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-043",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 43,
+      "caseId": "heldout-ZH-Hant",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-044",
+      "variant": "W",
+      "origin": "new_heldout",
+      "split": "recovered_regression",
+      "caseIndex": 44,
+      "caseId": "heldout-ZH",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-045",
+      "variant": "W",
+      "origin": "production_log_prefix_reused_as_control",
+      "split": "recovered_regression",
+      "caseIndex": 45,
+      "caseId": "hello-control",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-046",
+      "variant": "W",
+      "origin": "copilot_added_probe",
+      "split": "recovered_regression",
+      "caseIndex": 46,
+      "caseId": "hermano",
+      "rating": "minor",
+      "reason": "Das wird schon verrueckt is slightly awkward/ambiguous for something already getting wild; address, core meaning and emoji survive."
+    },
+    {
+      "id": "W-047",
+      "variant": "W",
+      "origin": "user_reported_real_example",
+      "split": "recovered_regression",
+      "caseIndex": 47,
+      "caseId": "ma-cherie",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-048",
+      "variant": "W",
+      "origin": "user_reported_real_example",
+      "split": "recovered_regression",
+      "caseIndex": 48,
+      "caseId": "ma-cherie",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-049",
+      "variant": "W",
+      "origin": "user_reported_real_example",
+      "split": "recovered_regression",
+      "caseIndex": 49,
+      "caseId": "ma-cherie",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-050",
+      "variant": "W",
+      "origin": "user_reported_production_example",
+      "split": "recovered_regression",
+      "caseIndex": 50,
+      "caseId": "mates-monolingual",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-051",
+      "variant": "W",
+      "origin": "copilot_probe_from_user_terms",
+      "split": "recovered_regression",
+      "caseIndex": 51,
+      "caseId": "mixed-profanity-list",
+      "rating": "major",
+      "reason": "Standalone caralho becomes a personal asshole insult and malaka becomes a gendered bitch insult, inventing a target and gendered abuse."
+    },
+    {
+      "id": "W-052",
+      "variant": "W",
+      "origin": "copilot_probe_from_user_terms",
+      "split": "recovered_regression",
+      "caseIndex": 52,
+      "caseId": "mixed-profanity-list",
+      "rating": "major",
+      "reason": "Standalone caralho becomes directed you fucking asshole and malaka becomes a gendered bitch insult, inventing a personal target and gendered abuse."
+    },
+    {
+      "id": "W-053",
+      "variant": "W",
+      "origin": "copilot_probe_from_user_terms",
+      "split": "recovered_regression",
+      "caseIndex": 53,
+      "caseId": "pt-exclamation",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-054",
+      "variant": "W",
+      "origin": "copilot_added_probe",
+      "split": "recovered_regression",
+      "caseIndex": 54,
+      "caseId": "pt-intro-long",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-055",
+      "variant": "W",
+      "origin": "copilot_added_probe",
+      "split": "recovered_regression",
+      "caseIndex": 55,
+      "caseId": "pt-intro-short",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    },
+    {
+      "id": "W-056",
+      "variant": "W",
+      "origin": "copilot_probe_from_user_terms",
+      "split": "recovered_regression",
+      "caseIndex": 56,
+      "caseId": "pt-profanity-pair",
+      "rating": "major",
+      "reason": "Standalone caralho becomes directed you bastard, inventing a personal target rather than translating an impersonal exclamation."
+    },
+    {
+      "id": "W-057",
+      "variant": "W",
+      "origin": "user_reported_real_example",
+      "split": "recovered_regression",
+      "caseIndex": 57,
+      "caseId": "tasos-italian",
+      "rating": "pass",
+      "reason": "No material error found: natural equivalent meaning, relevant facts, referents, negation, register and required formatting are preserved."
+    }
+  ],
+  "summary": [
+    {
+      "variant": "W",
+      "split": "fresh_validation",
+      "total": 16,
+      "pass": 13,
+      "minor": 0,
+      "major": 3,
+      "uncertain": 0
+    },
+    {
+      "variant": "W",
+      "split": "recovered_regression",
+      "total": 42,
+      "pass": 25,
+      "minor": 11,
+      "major": 6,
+      "uncertain": 0
+    },
+    {
+      "variant": "W",
+      "split": "all",
+      "total": 58,
+      "pass": 38,
+      "minor": 11,
+      "major": 9,
+      "uncertain": 0
+    }
+  ],
+  "comparisonWithY": {
+    "freshValidation": {
+      "W": "13 pass, 0 minor, 3 major",
+      "Y": "13 pass, 0 minor, 3 major",
+      "improvements": [
+        21
+      ],
+      "regressions": [
+        12
+      ],
+      "sameRatingCount": 14,
+      "explanation": "W correctly renders train before bus in 21, but weakens explicit joder to damn in 12. Same aggregate count therefore conceals a fact-versus-register tradeoff."
+    },
+    "recoveredRegression": {
+      "W": "25 pass, 11 minor, 6 major",
+      "Y": "28 pass, 6 minor, 8 major",
+      "improvements": [
+        0,
+        42
+      ],
+      "regressions": [
+        1,
+        3,
+        5,
+        6
+      ],
+      "sameRatingCount": 36,
+      "explanation": "W translates the Greek-target English question in 0, though the address stress is wrong, and fixes train instead of bus with preserved profanity in 42. It changes the Greek addressed noun to bullshit in 1 and leaves fratello untranslated in 3/5/6."
+    },
+    "sameRatingMaterialChanges": [
+      "W041 fixes the Serbian Latin-source train-to-bus fact error but weakens explicit jebote to damn, so it remains major.",
+      "W033 replaces previous malformed/mixed-language Serbian with a different defective exclamation plus plural trains and singular verb; still major.",
+      "W023 restores the actually/after-all nuance while retaining the unnatural you fucking Floet address, so it remains minor."
+    ],
+    "overall": {
+      "W": "38 pass, 11 minor, 9 major",
+      "Y": "41 pass, 6 minor, 11 major",
+      "interpretation": "W has two fewer major ratings and five more minor ratings, while fresh counts tie. This is a tradeoff, not dominance or evidence that every required behavior is fixed."
+    }
+  },
+  "findings": {
+    "strongestGain": "Corrects the Serbian transport facts in fresh case 21 and recovered cases 41/42. Case 42 also preserves explicit profanity correctly.",
+    "strongestNewFailuresVsY": "Leaves fratello untranslated in three German-target cases, changes Greek addressed malaka to malakia in the queue case, and weakens explicit joder in fresh case 12.",
+    "unresolvedRequiredBehavior": "Invented personal/gendered targets persist in 51/52/56. Serbian Cyrillic output 33 remains defective. Strong expletives are still weakened in 12/38/41. Luca is still converted from an addressee into an identity assertion in 10. The Spanish request grammar defect in 28 remains.",
+    "conclusion": "W is a useful transport-fact improvement with fewer major judgments overall, but does not clearly dominate Y: fresh counts tie and several address/completeness/regional-script-language defects persist. None of W/X/Y/Z satisfies the complete required behavior set. No automatic adoption is supported by this assistant review."
+  }
+}

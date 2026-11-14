@@ -4,6 +4,7 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
@@ -16,11 +17,41 @@ namespace Tsumari.Bot
     {
         public static void Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--validate-deployment")
+            {
+                try
+                {
+                    if (args.Length != 3) throw new ArgumentException("Usage: --validate-deployment <release-directory> <report-path>");
+                    DeploymentConfigurationValidator.ValidateArtifact(args[1], args[2]);
+                    Console.WriteLine("Deployment configuration validation passed. No bot or database was started.");
+                }
+                catch (Exception error)
+                {
+                    Console.Error.WriteLine($"Deployment configuration validation failed: {error.Message}");
+                    for (Exception? detail = error; detail is not null; detail = detail.InnerException)
+                        if (detail is System.Text.Json.JsonException json)
+                            Console.Error.WriteLine($"Invalid JSON syntax: line {json.LineNumber + 1}, byte position {json.BytePositionInLine}. Configuration values are not printed.");
+                    Environment.ExitCode = 2;
+                }
+                return;
+            }
+
             // Prefer UTF-8 console I/O so Unicode log output has the best chance of rendering.
             Console.InputEncoding = Encoding.UTF8;
             Console.OutputEncoding = Encoding.UTF8;
 
             var builder = Host.CreateApplicationBuilder(args);
+
+            // Build output contains the merged local configuration. Keep the source content
+            // root (and therefore database paths), while preserving normal override priority.
+            builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true, reloadOnChange: false);
+            builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, $"appsettings.{builder.Environment.EnvironmentName}.json"), optional: true, reloadOnChange: false);
+            builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, $"appsettings.{builder.Environment.EnvironmentName}.json"), optional: true, reloadOnChange: false);
+            if (builder.Environment.IsDevelopment())
+                builder.Configuration.AddUserSecrets<Program>(optional: true);
+            builder.Configuration.AddEnvironmentVariables();
+            builder.Configuration.AddCommandLine(args);
+
 
             // Load Discord REST guardrail options up front so they can be applied to the
             // underlying Discord.Net HTTP client before the host is built.
@@ -87,13 +118,14 @@ namespace Tsumari.Bot
             builder.Services.AddSingleton<DiscordMessagePublisherService>();
             builder.Services.AddSingleton<DeepLLanguageService>();
             builder.Services.AddSingleton<DeepLTranslationProvider>();
+            builder.Services.AddSingleton<Tsumari.Bot.TranslationProviders.Models.LlmModelFactory>();
             builder.Services.AddSingleton<OllamaTranslationProvider>();
             builder.Services.AddSingleton<OpenAITranslationProvider>();
             builder.Services.AddSingleton<TranslationProviderResolver>();
             builder.Services.AddSingleton<ITranslationProvider>(provider =>
                 provider.GetRequiredService<TranslationProviderResolver>().Resolve());
             builder.Services.AddSingleton<TranslationService>();
-            builder.Services.Configure<TranslationRetryOptions>(builder.Configuration.GetSection("Translation:Retry"));
+            builder.Services.Configure<TranslationRetryOptions>(options => options.BindConfiguration(builder.Configuration.GetSection("Translation:Retry")));
             builder.Services.AddSingleton<MessageMutationCoordinator>();
             builder.Services.AddSingleton<TranslationRetryService>();
             builder.Services.AddSingleton<MirroredMessageRoutingService>();
@@ -118,6 +150,7 @@ namespace Tsumari.Bot
             builder.Services.AddHostedService<StartupMessageSyncHostedService>();
 
             var host = builder.Build();
+            host.Services.GetRequiredService<Tsumari.Bot.TranslationProviders.Models.LlmModelFactory>().ValidateConfiguration();
             host.Services.GetRequiredService<TranslationService>().LogProviderConfiguration();
             host.Run();
         }

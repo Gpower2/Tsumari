@@ -9,8 +9,8 @@ compiles selected provider helpers into its own executable.
 ## Build and test
 
 ```powershell
-dotnet build tools\Tsumari.Repair\Tsumari.Repair.csproj -c Release
-dotnet test tests\Tsumari.Repair.Tests\Tsumari.Repair.Tests.csproj -c Release
+dotnet build tools/Tsumari.Repair/Tsumari.Repair.csproj -c Release --artifacts-path .artifacts/repair-build
+dotnet test tests/Tsumari.Repair.Tests/Tsumari.Repair.Tests.csproj -c Release --artifacts-path .artifacts/repair-tests
 ```
 
 ## Configuration and private files
@@ -32,10 +32,10 @@ paths may be absolute. Use the same plan path to resume an interrupted command.
 Do not run separate apply processes against overlapping plans.
 
 ```powershell
-dotnet tools\Tsumari.Repair\bin\Release\net10.0\Tsumari.Repair.dll scan --config src\Tsumari.Bot\bin\Release\net10.0\appsettings.json --db src\Tsumari.Bot\bin\Release\net10.0\tsumari.db --plan .repair-runs\production\plan.json --timezone Europe/Athens
-dotnet tools\Tsumari.Repair\bin\Release\net10.0\Tsumari.Repair.dll prepare --config src\Tsumari.Bot\bin\Release\net10.0\appsettings.json --plan .repair-runs\production\plan.json --limit 5
-dotnet tools\Tsumari.Repair\bin\Release\net10.0\Tsumari.Repair.dll apply --config src\Tsumari.Bot\bin\Release\net10.0\appsettings.json --plan .repair-runs\production\plan.json --limit 5
-dotnet tools\Tsumari.Repair\bin\Release\net10.0\Tsumari.Repair.dll verify --config src\Tsumari.Bot\bin\Release\net10.0\appsettings.json --plan .repair-runs\production\plan.json
+dotnet .artifacts/repair-build/bin/Tsumari.Repair/release/Tsumari.Repair.dll scan --config src/Tsumari.Bot/bin/Release/net10.0/appsettings.json --db src/Tsumari.Bot/bin/Release/net10.0/tsumari.db --plan .repair-runs/production/plan.json --timezone Europe/Athens
+dotnet .artifacts/repair-build/bin/Tsumari.Repair/release/Tsumari.Repair.dll prepare --config src/Tsumari.Bot/bin/Release/net10.0/appsettings.json --plan .repair-runs/production/plan.json --limit 5
+dotnet .artifacts/repair-build/bin/Tsumari.Repair/release/Tsumari.Repair.dll apply --config src/Tsumari.Bot/bin/Release/net10.0/appsettings.json --plan .repair-runs/production/plan.json --limit 5
+dotnet .artifacts/repair-build/bin/Tsumari.Repair/release/Tsumari.Repair.dll verify --config src/Tsumari.Bot/bin/Release/net10.0/appsettings.json --plan .repair-runs/production/plan.json
 ```
 
 - `scan` is read-only on Discord and SQLite. By default it fixes its time bounds
@@ -50,7 +50,7 @@ dotnet tools\Tsumari.Repair\bin\Release\net10.0\Tsumari.Repair.dll verify --conf
   reported as issues and never automatically repaired. A deleted mirror is never
   recreated. Missing original-channel IDs can be resolved from the Original button.
 - `prepare` calls the existing Ollama translation provider, using its normal
-  translation prompt without a source-language hint. It preserves the existing
+  translation prompt without a source-language hint unless a reviewed hint was supplied. It preserves the existing
   author/header, displayed timestamp and attachment warning. It makes no Discord
   edits, rejects empty/oversized output, and pauses at the first provider error.
 - `apply` only processes prepared records. It fetches both original and mirror
@@ -77,16 +77,14 @@ reduce this race but cannot eliminate it. Preparation preserves the original
 snapshot and application skips changed messages. Provider success is not proof of
 linguistic accuracy; inspect initial prepared examples before a bulk apply.
 
-There are no retry buttons or reaction counters in this utility. The running bot
-does not yet implement or protect those controls. Counts live only in the local
-plan/journal. SQL-only discovery cannot identify unmarked translation failures.
+This utility does not manage retry buttons or reaction counters. The bot implements those controls; repair PATCHes leave reactions/components in place and do not reset lifetime retry counts. Repair plans/journals are separate from those counts. Avoid overlapping repair applies and live retries: this utility does not share the bot's in-process mutation lock. SQL-only discovery cannot identify unmarked translation failures.
 Unlinked or missing messages remain outside scope; explicitly reviewed unmarked
 copies can be handled with the workflow below.
 
 ## Reviewed unmarked copies
 
-Language-analysis failures can make the bot assume English and copy non-English
-text into the English channel without adding a failure marker. The regular scan
+The bot's English routing/display fallback on failed analysis can cause non-English content to be copied raw. That fallback is withheld as a trusted translation hint; it does not eliminate incorrect routing. Earlier failures can therefore leave non-English
+text in the English channel without adding a failure marker. The regular scan
 cannot identify these. A successful HTTP edit also does not prove the provider
 actually translated the text.
 
@@ -121,3 +119,5 @@ Original snapshots and the live pre-edit checks still apply.
 
 Review the prepared text itself before application. The `verify` command checks
 exact delivery and metadata preservation, not semantic translation quality.
+
+The utility reuses the configured Ollama provider helpers, including explicit named profiles when selected. It does not run language analysis before preparing ordinary marked-failure records. A source-required profile such as Salamandra can therefore reject an unhinted request. Keep the evaluated baseline or supply explicitly reviewed hints; do not guess a source to force preparation. See [model profiles](../../docs/models.md) and [runtime configuration](../../docs/configuration.md).
